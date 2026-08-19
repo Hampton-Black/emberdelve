@@ -1,11 +1,11 @@
 package dm;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import dm.ai.DmService;
 import dm.engine.GameEngine;
 import dm.model.Diff;
 import dm.model.Mode;
+import dm.wire.Json;
 import dm.wire.ServerMessage;
 import io.javalin.websocket.WsConfig;
 import io.javalin.websocket.WsContext;
@@ -22,7 +22,6 @@ import java.util.concurrent.Executors;
 public final class WsHandler {
 
     private static final Logger log = LoggerFactory.getLogger(WsHandler.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** One virtual thread per turn, so a streaming DM call never blocks the socket. */
     private final ExecutorService turns = Executors.newVirtualThreadPerTaskExecutor();
@@ -47,7 +46,7 @@ public final class WsHandler {
 
         ws.onMessage(ctx -> {
             try {
-                handle(ctx, MAPPER.readTree(ctx.message()));
+                handle(ctx, Json.MAPPER.readTree(ctx.message()));
             } catch (Exception e) {
                 // No error recovery in M0 — log it and surface a visible toast (shortcut #13).
                 log.error("failed to handle message: {}", ctx.message(), e);
@@ -102,13 +101,32 @@ public final class WsHandler {
         }
 
         // Off the socket thread: this call streams for seconds.
-        turns.submit(() -> dm.handleFreeText(
-                actorId,
-                text,
-                segment -> send(ctx, new ServerMessage.Narration(segment)),
-                () -> send(ctx, new ServerMessage.NarrationEnd()),
-                error -> send(ctx, new ServerMessage.Error(
-                        "The DM stumbled: " + error.getMessage()))));
+        turns.submit(() -> dm.handleFreeText(actorId, text, new dm.ai.TurnSink() {
+            @Override
+            public void narration(dm.model.NarrationSegment segment) {
+                send(ctx, new ServerMessage.Narration(segment));
+            }
+
+            @Override
+            public void diffs(List<Diff> diffs) {
+                sendDiffs(ctx, diffs);
+            }
+
+            @Override
+            public void roll(dm.model.RollResult result) {
+                send(ctx, new ServerMessage.Roll(result));
+            }
+
+            @Override
+            public void complete() {
+                send(ctx, new ServerMessage.NarrationEnd());
+            }
+
+            @Override
+            public void error(Throwable error) {
+                send(ctx, new ServerMessage.Error("The DM stumbled: " + error.getMessage()));
+            }
+        }));
     }
 
     private void sendDiffs(WsContext ctx, List<Diff> diffs) {
@@ -120,7 +138,7 @@ public final class WsHandler {
 
     private void send(WsContext ctx, ServerMessage message) {
         try {
-            ctx.send(MAPPER.writeValueAsString(message));
+            ctx.send(Json.MAPPER.writeValueAsString(message));
         } catch (Exception e) {
             log.error("failed to serialize outbound message", e);
         }

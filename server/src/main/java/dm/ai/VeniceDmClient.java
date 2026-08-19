@@ -1,7 +1,7 @@
 package dm.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import dm.wire.Json;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
@@ -12,7 +12,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -25,7 +28,6 @@ import java.util.stream.Stream;
 public final class VeniceDmClient implements DmClient {
 
     private static final Logger log = LoggerFactory.getLogger(VeniceDmClient.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String DONE = "[DONE]";
 
     private final HttpClient http;
@@ -37,9 +39,7 @@ public final class VeniceDmClient implements DmClient {
         this.apiKey = config.require("VENICE_API_KEY");
         this.baseUrl = trimTrailingSlash(config.get("VENICE_BASE_URL", "https://api.venice.ai/api/v1"));
         this.model = config.get("DM_MODEL", "claude-opus-5");
-        this.http = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
+        this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
         log.info("DmClient -> {} model={}", baseUrl, model);
     }
@@ -50,14 +50,18 @@ public final class VeniceDmClient implements DmClient {
     }
 
     @Override
-    public void streamTurn(List<ChatMessage> conversation, DmListener listener) {
+    public TurnResult streamTurn(List<ChatMessage> conversation, JsonNode tools,
+                                 DmListener listener) {
+        var text = new StringBuilder();
+        var calls = new ToolCallAccumulator();
+
         try {
             var request = HttpRequest.newBuilder(URI.create(baseUrl + "/chat/completions"))
                     .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
                     .header("Accept", "text/event-stream")
                     .timeout(Duration.ofSeconds(120))
-                    .POST(HttpRequest.BodyPublishers.ofString(body(conversation)))
+                    .POST(HttpRequest.BodyPublishers.ofString(body(conversation, tools)))
                     .build();
 
             HttpResponse<Stream<String>> response =
@@ -69,8 +73,7 @@ public final class VeniceDmClient implements DmClient {
                         "Venice returned " + response.statusCode() + ": " + detail);
             }
 
-            consume(response.body(), listener);
-            listener.onComplete();
+            consume(response.body(), text, calls, listener);
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -79,10 +82,13 @@ public final class VeniceDmClient implements DmClient {
             log.error("DM turn failed", e);
             listener.onError(e);
         }
+
+        return new TurnResult(text.toString(), calls.toList());
     }
 
     /** Parses the SSE stream, forwarding each content delta the instant it arrives. */
-    private void consume(Stream<String> lines, DmListener listener) {
+    private void consume(Stream<String> lines, StringBuilder text,
+                         ToolCallAccumulator calls, DmListener listener) {
         lines.forEach(line -> {
             if (!line.startsWith("data:")) {
                 return;
@@ -92,12 +98,18 @@ public final class VeniceDmClient implements DmClient {
                 return;
             }
             try {
-                JsonNode delta = MAPPER.readTree(payload)
-                        .path("choices").path(0).path("delta");
+                JsonNode delta = Json.MAPPER.readTree(payload).path("choices").path(0).path("delta");
 
-                String text = delta.path("content").asText("");
-                if (!text.isEmpty()) {
-                    listener.onTextDelta(text);
+                String content = delta.path("content").asText("");
+                if (!content.isEmpty()) {
+                    text.append(content);
+                    listener.onTextDelta(content);
+                }
+
+                // Tool call arguments stream in fragments and must be reassembled by index.
+                JsonNode toolCalls = delta.path("tool_calls");
+                if (toolCalls.isArray()) {
+                    toolCalls.forEach(calls::accept);
                 }
             } catch (Exception e) {
                 // A malformed chunk should not abort a turn that is otherwise streaming fine.
@@ -106,8 +118,8 @@ public final class VeniceDmClient implements DmClient {
         });
     }
 
-    private String body(List<ChatMessage> conversation) {
-        ObjectNode root = MAPPER.createObjectNode();
+    private String body(List<ChatMessage> conversation, JsonNode tools) {
+        ObjectNode root = Json.MAPPER.createObjectNode();
         root.put("model", model);
         root.put("stream", true);
         root.put("max_tokens", 800);
@@ -115,16 +127,93 @@ public final class VeniceDmClient implements DmClient {
 
         ArrayNode messages = root.putArray("messages");
         for (ChatMessage message : conversation) {
-            ObjectNode node = messages.addObject();
-            node.put("role", message.role());
+            messages.add(serialize(message));
+        }
+
+        if (tools != null && tools.isArray() && !tools.isEmpty()) {
+            root.set("tools", tools);
+            root.put("tool_choice", "auto");
+        }
+
+        // Venice-specific: no system-prompt injection.
+        root.putObject("venice_parameters").put("include_venice_system_prompt", false);
+
+        return root.toString();
+    }
+
+    private ObjectNode serialize(ChatMessage message) {
+        ObjectNode node = Json.MAPPER.createObjectNode();
+        node.put("role", message.role());
+
+        // An assistant turn carrying tool calls sends content: null, not "".
+        if (message.content() == null || message.content().isBlank()) {
+            node.putNull("content");
+        } else {
             node.put("content", message.content());
         }
 
-        // Venice-specific: no system-prompt injection, and do not persist the conversation.
-        ObjectNode venice = root.putObject("venice_parameters");
-        venice.put("include_venice_system_prompt", false);
+        if (message.toolCallId() != null) {
+            node.put("tool_call_id", message.toolCallId());
+        }
 
-        return root.toString();
+        if (!message.toolCalls().isEmpty()) {
+            ArrayNode calls = node.putArray("tool_calls");
+            for (ToolCall call : message.toolCalls()) {
+                ObjectNode entry = calls.addObject();
+                entry.put("id", call.id());
+                entry.put("type", "function");
+                ObjectNode function = entry.putObject("function");
+                function.put("name", call.name());
+                function.put("arguments", call.argumentsJson());
+            }
+        }
+        return node;
+    }
+
+    /**
+     * Reassembles streamed tool calls. The name arrives once, the arguments arrive as JSON
+     * fragments across many chunks, and both are keyed by an index rather than an id.
+     */
+    private static final class ToolCallAccumulator {
+
+        private record Partial(String id, String name, StringBuilder arguments) {
+        }
+
+        private final Map<Integer, Partial> byIndex = new LinkedHashMap<>();
+
+        void accept(JsonNode node) {
+            int index = node.path("index").asInt(0);
+            Partial partial = byIndex.computeIfAbsent(index,
+                    i -> new Partial(null, null, new StringBuilder()));
+
+            String id = node.path("id").asText(null);
+            String name = node.path("function").path("name").asText(null);
+            String arguments = node.path("function").path("arguments").asText("");
+
+            if (id != null || name != null) {
+                partial = new Partial(
+                        id != null ? id : partial.id(),
+                        name != null ? name : partial.name(),
+                        partial.arguments());
+                byIndex.put(index, partial);
+            }
+            if (!arguments.isEmpty()) {
+                partial.arguments().append(arguments);
+            }
+        }
+
+        List<ToolCall> toList() {
+            var out = new ArrayList<ToolCall>();
+            byIndex.forEach((index, partial) -> {
+                if (partial.name() != null) {
+                    out.add(new ToolCall(
+                            partial.id() != null ? partial.id() : "call_" + index,
+                            partial.name(),
+                            partial.arguments().toString()));
+                }
+            });
+            return List.copyOf(out);
+        }
     }
 
     private static String trimTrailingSlash(String url) {

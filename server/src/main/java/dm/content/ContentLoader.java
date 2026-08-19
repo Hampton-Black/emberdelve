@@ -1,6 +1,6 @@
 package dm.content;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import dm.wire.Json;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,8 +14,6 @@ import java.nio.charset.StandardCharsets;
  * (shortcut #13), and a game with no room is not a game.
  */
 public final class ContentLoader {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public RoomDefinition room(String roomId) {
         return read("/content/rooms/" + roomId + ".json", RoomDefinition.class);
@@ -35,7 +33,7 @@ public final class ContentLoader {
 
     private <T> T read(String path, Class<T> type) {
         try (InputStream in = open(path)) {
-            return MAPPER.readValue(in, type);
+            return Json.MAPPER.readValue(in, type);
         } catch (IOException e) {
             throw new UncheckedIOException("Malformed content file: " + path, e);
         }

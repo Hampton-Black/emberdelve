@@ -1,5 +1,7 @@
 package dm.ai;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.util.List;
 
 /**
@@ -9,27 +11,55 @@ import java.util.List;
 public interface DmClient {
 
     /**
-     * Streams one DM turn. Text deltas arrive as the model produces them — the &lt;800ms
-     * first-token budget depends on this never buffering a whole response.
+     * Streams one DM turn. Text deltas reach the listener as the model produces them — the
+     * &lt;800ms first-token budget depends on this never buffering a whole response.
+     *
+     * @param tools tool definitions legal for this turn, rebuilt from live state
+     * @return the assembled text and any tool calls the model wants applied
      */
-    void streamTurn(List<ChatMessage> conversation, DmListener listener);
+    TurnResult streamTurn(List<ChatMessage> conversation, JsonNode tools, DmListener listener);
 
     /** What the model is currently configured to be, for the debug HUD. */
     String modelId();
 
-    /** One turn of conversation as the OpenAI-compatible wire format expects it. */
-    record ChatMessage(String role, String content) {
+    /** One tool invocation the model is asking for. Arguments stay raw until validated. */
+    record ToolCall(String id, String name, String argumentsJson) {
+    }
+
+    /** Everything one round-trip produced. */
+    record TurnResult(String text, List<ToolCall> toolCalls) {
+
+        public boolean wantsTools() {
+            return !toolCalls.isEmpty();
+        }
+    }
+
+    /**
+     * One turn of conversation in the OpenAI-compatible wire format. Fields not relevant to a
+     * given role are null — the client omits them when serialising.
+     */
+    record ChatMessage(String role, String content, List<ToolCall> toolCalls, String toolCallId) {
 
         public static ChatMessage system(String content) {
-            return new ChatMessage("system", content);
+            return new ChatMessage("system", content, List.of(), null);
         }
 
         public static ChatMessage user(String content) {
-            return new ChatMessage("user", content);
+            return new ChatMessage("user", content, List.of(), null);
         }
 
         public static ChatMessage assistant(String content) {
-            return new ChatMessage("assistant", content);
+            return new ChatMessage("assistant", content, List.of(), null);
+        }
+
+        /** The assistant turn that requested tools. Must precede its results in the history. */
+        public static ChatMessage assistantToolCalls(String content, List<ToolCall> calls) {
+            return new ChatMessage("assistant", content, calls, null);
+        }
+
+        /** What the engine decided, fed back so the model narrates what actually happened. */
+        public static ChatMessage toolResult(String toolCallId, String content) {
+            return new ChatMessage("tool", content, List.of(), toolCallId);
         }
     }
 
@@ -37,9 +67,6 @@ public interface DmClient {
 
         /** A fragment of narration. May be a partial word. */
         void onTextDelta(String delta);
-
-        /** The turn finished cleanly. */
-        void onComplete();
 
         /** No recovery in M0 — the caller surfaces a visible toast (shortcut #13). */
         void onError(Throwable error);
