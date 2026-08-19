@@ -119,6 +119,26 @@ Two findings that should survive this milestone:
 Most `e2ee-*` models report `supportsFunctionCalling: false` and are incompatible outright,
 despite being the strongest privacy tier.
 
+### Finalists, 4 samples each
+
+| Model | TTFT samples | Tools | Prose |
+|---|---|---|---|
+| `qwen3-coder-480b-a35b-instruct-turbo` | 563 / 653 / 603 / 621ms | 100% valid | good, stays in-world |
+| `qwen3-next-80b` | 540 / 771 / 577 / 586ms | 100% valid | **invents props** |
+| `deepseek-v4-flash-0731-fast` | 1195 / 1364 / 1599 / **38478**ms | 100% valid | good, stays in-world |
+
+**Current pick: `qwen3-coder-480b-a35b-instruct-turbo`.** Fastest, tightest variance, valid tool
+calls every time, and its prose is genuinely good despite being a coder model.
+
+Two disqualifiers found by measuring rather than reasoning:
+
+- `deepseek-v4-flash-0731-fast` throws occasional **38-second stalls**. Its median is fine; its
+  tail is not, and one freeze mid-session ruins a five-minute demo.
+- `qwen3-next-80b` **hallucinates props** — it invented "a small silver disc, half-buried in ash"
+  and a trail of footprints, neither of which exists in the room. It also misused a `[[fighter]]`
+  speaker marker for plain narration. Fast and tool-correct, but it fabricates world state, which
+  is the one thing the closed-enum design exists to prevent.
+
 ---
 
 ## Hardcoded shortcuts — implement exactly these, do not "improve" them
