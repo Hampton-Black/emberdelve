@@ -25,6 +25,11 @@ application {
     mainClass = "dm.App"
 }
 
+// Jackson binds JSON straight into record components by parameter name.
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-parameters")
+}
+
 tasks.test {
     useJUnitPlatform()
     testLogging { events("passed", "failed", "skipped") }

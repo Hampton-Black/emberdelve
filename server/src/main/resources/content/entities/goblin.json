@@ -1,0 +1,29 @@
+{
+  "id": "goblin",
+  "kind": "goblin",
+  "name": "Vessk",
+  "ac": 15,
+  "maxHp": 7,
+  "toHit": 4,
+  "damageDice": "1d6",
+  "damageModifier": 2,
+  "speedFeet": 30,
+  "abilityModifiers": {
+    "STR": -1,
+    "DEX": 2,
+    "CON": 0,
+    "INT": 0,
+    "WIS": -1,
+    "CHA": -1
+  },
+  "skillModifiers": {
+    "ATHLETICS": 1,
+    "PERCEPTION": 1,
+    "INVESTIGATION": 0,
+    "STEALTH": 6,
+    "PERSUASION": -1
+  },
+  "isPlayerControlled": false,
+  "description": "A wiry goblin scavenger, filthy with grave-dust, clutching a notched shortsword.",
+  "voice": "goblin"
+}

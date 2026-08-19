@@ -1,0 +1,68 @@
+package dm.model;
+
+import java.util.Map;
+
+/**
+ * The authoritative server-side entity. The client only ever sees the {@link EntityView}
+ * projection of this — it is never told a stat block (invariant #1).
+ */
+public record Entity(
+        String id,
+        String kind,
+        String name,
+        int ac,
+        int hp,
+        int maxHp,
+        int toHit,
+        String damageDice,
+        int damageModifier,
+        int speedFeet,
+        int x,
+        int y,
+        boolean isPlayerControlled,
+        Map<Skill, Integer> skillModifiers
+) {
+    public Entity {
+        skillModifiers = Map.copyOf(skillModifiers);
+    }
+
+    public boolean isAlive() {
+        return hp > 0;
+    }
+
+    /** Squares of movement per turn. Five feet to a square. */
+    public int speedSquares() {
+        return speedFeet / 5;
+    }
+
+    public int skillModifier(Skill skill) {
+        return skillModifiers.getOrDefault(skill, 0);
+    }
+
+    public Entity movedTo(int newX, int newY) {
+        return new Entity(id, kind, name, ac, hp, maxHp, toHit, damageDice, damageModifier,
+                speedFeet, newX, newY, isPlayerControlled, skillModifiers);
+    }
+
+    public Entity withHp(int newHp) {
+        return new Entity(id, kind, name, ac, Math.clamp(newHp, 0, maxHp), maxHp, toHit,
+                damageDice, damageModifier, speedFeet, x, y, isPlayerControlled, skillModifiers);
+    }
+
+    public Entity damaged(int amount) {
+        return withHp(hp - amount);
+    }
+
+    public EntityView toView() {
+        return new EntityView(id, kind, name, x, y, hp, maxHp, isPlayerControlled);
+    }
+
+    /** Chebyshev distance — diagonals cost one square, as in 5e's simplified grid rules. */
+    public int distanceTo(Entity other) {
+        return Math.max(Math.abs(x - other.x), Math.abs(y - other.y));
+    }
+
+    public boolean isAdjacentTo(Entity other) {
+        return distanceTo(other) <= 1;
+    }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "fighter",
+  "kind": "fighter",
+  "name": "Roderick",
+  "ac": 16,
+  "maxHp": 12,
+  "toHit": 5,
+  "damageDice": "1d8",
+  "damageModifier": 3,
+  "speedFeet": 30,
+  "abilityModifiers": {
+    "STR": 3,
+    "DEX": 1,
+    "CON": 2,
+    "INT": 0,
+    "WIS": 1,
+    "CHA": 0
+  },
+  "skillModifiers": {
+    "ATHLETICS": 5,
+    "PERCEPTION": 3,
+    "INVESTIGATION": 0,
+    "STEALTH": 1,
+    "PERSUASION": 2
+  },
+  "isPlayerControlled": true,
+  "description": "A level-1 fighter in scarred half-plate, carrying a longsword and a guttering lantern."
+}

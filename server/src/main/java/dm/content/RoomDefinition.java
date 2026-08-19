@@ -1,0 +1,74 @@
+package dm.content;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import dm.model.FloorType;
+import dm.model.LightingPreset;
+import dm.model.Prop;
+import dm.model.PropType;
+import dm.model.WallType;
+
+import java.util.List;
+
+/**
+ * A hand-authored room as it appears on disk. Carries more than the client needs — the
+ * prose fields exist for the DM prompt, not for the renderer.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record RoomDefinition(
+        String roomId,
+        String name,
+        int width,
+        int height,
+        FloorType floorType,
+        WallType wallType,
+        LightingPreset lighting,
+        List<PropDefinition> props,
+        StartPositions startPositions,
+        DmNotes dmNotes
+) {
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PropDefinition(
+            String id,
+            PropType type,
+            int x,
+            int y,
+            int rotation,
+            boolean hidden,
+            String description,
+            String revealHint,
+            String contains
+    ) {
+        public Prop toProp() {
+            return new Prop(id, type, x, y, rotation, hidden);
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record StartPositions(List<Point> party, Point goblinSpawn) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Point(int x, int y) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record DmNotes(String overview, String sensory, String theSarcophagus, String theDoor) {
+    }
+
+    public List<Prop> toProps() {
+        return props.stream().map(PropDefinition::toProp).toList();
+    }
+
+    public PropDefinition prop(String id) {
+        return props.stream()
+                .filter(p -> p.id().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No such prop: " + id));
+    }
+
+    /** The ids the {@code reveal_prop} tool is allowed to name right now — a closed set. */
+    public List<String> hiddenPropIds() {
+        return props.stream().filter(PropDefinition::hidden).map(PropDefinition::id).toList();
+    }
+}
