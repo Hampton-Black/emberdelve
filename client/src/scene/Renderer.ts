@@ -1,8 +1,17 @@
 import * as THREE from "three";
 import type { EntityView, LightingPreset, Prop, SceneState } from "../types";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPixelatedPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { loadKitPiece, toWorld, type KitPiece } from "./assets";
 import { buildProp, FLAME_INTENSITY } from "./props";
 import { buildToken } from "./tokens";
+
+/**
+ * Horizontal resolution of the low-res render target. Everything is rendered at this width and
+ * upscaled nearest-neighbour, which is what makes it read as pixel art rather than as soft 3D.
+ */
+const TARGET_WIDTH = 480;
 
 const LIGHTING: Record<LightingPreset, {
   ambient: number;
@@ -28,6 +37,9 @@ export class Renderer {
   private readonly props = new Map<string, THREE.Object3D>();
   private readonly flames: THREE.PointLight[] = [];
 
+  private readonly composer: EffectComposer;
+  private readonly pixelPass: RenderPixelatedPass;
+  private readonly moving = new Map<string, { from: THREE.Vector3; to: THREE.Vector3; t: number }>();
   private kit: { floor: KitPiece; wall: KitPiece } | null = null;
   private dims = { width: 12, height: 12 };
   private frameHandle = 0;
@@ -45,6 +57,17 @@ export class Renderer {
     this.positionCamera();
 
     this.scene.add(this.room);
+
+    // Pixelation also does normal- and depth-based edge detection, which keeps prop
+    // silhouettes legible once the resolution drops.
+    this.pixelPass = new RenderPixelatedPass(3, this.scene, this.camera);
+    this.pixelPass.normalEdgeStrength = 0.5;
+    this.pixelPass.depthEdgeStrength = 0.25;
+
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(this.pixelPass);
+    this.composer.addPass(new OutputPass());
+
     this.resize();
   }
 
@@ -211,11 +234,44 @@ export class Renderer {
     this.tokens.delete(entityId);
   }
 
+  /**
+   * Starts an eased slide. Nothing here waits on the server — the move has already been
+   * adjudicated, so the token begins moving on the same frame the diff lands (the <100ms
+   * click-to-move budget has no model anywhere in its path).
+   */
   moveEntity(entityId: string, x: number, y: number): void {
     const token = this.tokens.get(entityId);
     if (!token) return;
-    // Snapped for T3; eased movement arrives with T5.
-    token.position.copy(toWorld(x, y, this.dims.width, this.dims.height));
+
+    const to = toWorld(x, y, this.dims.width, this.dims.height);
+    if (token.position.distanceToSquared(to) < 1e-6) return;
+
+    this.moving.set(entityId, { from: token.position.clone(), to, t: 0 });
+  }
+
+  /** Advance in-flight slides. Duration scales with distance so long moves do not crawl. */
+  private advanceMovement(delta: number): void {
+    for (const [entityId, move] of this.moving) {
+      const token = this.tokens.get(entityId);
+      if (!token) {
+        this.moving.delete(entityId);
+        continue;
+      }
+
+      const squares = move.from.distanceTo(move.to);
+      const duration = Math.min(0.18 + squares * 0.07, 0.75);
+      move.t = Math.min(move.t + delta / duration, 1);
+
+      const eased = easeOutCubic(move.t);
+      token.position.lerpVectors(move.from, move.to, eased);
+      // A small hop sells the step without needing an animation rig.
+      token.position.y = Math.sin(eased * Math.PI) * 0.12 * Math.min(squares, 2);
+
+      if (move.t >= 1) {
+        token.position.copy(move.to);
+        this.moving.delete(entityId);
+      }
+    }
   }
 
   // ---- Frame loop ----
@@ -227,7 +283,10 @@ export class Renderer {
       if (this.disposed) return;
       this.frameHandle = requestAnimationFrame(tick);
 
-      const t = clock.getElapsedTime();
+      const delta = clock.getDelta();
+      const t = clock.elapsedTime;
+
+      this.advanceMovement(delta);
       // Cheap two-frequency flicker so the braziers never pulse in lockstep.
       this.flames.forEach((flame, i) => {
         flame.intensity =
@@ -236,7 +295,7 @@ export class Renderer {
           Math.sin(t * 17.7 + i) * 2.5;
       });
 
-      this.renderer.render(this.scene, this.camera);
+      this.composer.render();
     };
     tick();
   }
@@ -244,7 +303,13 @@ export class Renderer {
   resize(): void {
     const width = this.canvas.clientWidth || 1280;
     const height = this.canvas.clientHeight || 720;
+
     this.renderer.setSize(width, height, false);
+    this.composer.setSize(width, height);
+
+    // Pick the pixel size that lands closest to TARGET_WIDTH for this canvas.
+    this.pixelPass.setPixelSize(Math.max(1, Math.round(width / TARGET_WIDTH)));
+
     this.fitCamera();
   }
 
@@ -266,8 +331,13 @@ export class Renderer {
   }
 
   dispose(): void {
+    this.moving.clear();
     this.disposed = true;
     cancelAnimationFrame(this.frameHandle);
     this.renderer.dispose();
   }
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
 }
