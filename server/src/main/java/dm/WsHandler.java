@@ -2,6 +2,7 @@ package dm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dm.ai.DmService;
 import dm.engine.GameEngine;
 import dm.model.Diff;
 import dm.model.Mode;
@@ -12,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * One session, one connection (M0). Everything the client is told goes through here.
@@ -21,11 +24,16 @@ public final class WsHandler {
     private static final Logger log = LoggerFactory.getLogger(WsHandler.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** One virtual thread per turn, so a streaming DM call never blocks the socket. */
+    private final ExecutorService turns = Executors.newVirtualThreadPerTaskExecutor();
+
     private final GameEngine engine;
+    private final DmService dm;
     private final boolean demoMode;
 
-    public WsHandler(GameEngine engine, boolean demoMode) {
+    public WsHandler(GameEngine engine, DmService dm, boolean demoMode) {
         this.engine = engine;
+        this.dm = dm;
         this.demoMode = demoMode;
     }
 
@@ -56,6 +64,10 @@ public final class WsHandler {
         String type = message.path("type").asText();
 
         switch (type) {
+            case "freeText" -> freeText(ctx,
+                    message.path("actorId").asText(),
+                    message.path("text").asText());
+
             case "moveTo" -> sendDiffs(ctx, engine.moveTo(
                     message.path("actorId").asText(),
                     message.path("x").asInt(),
@@ -77,6 +89,26 @@ public final class WsHandler {
 
             default -> throw new IllegalArgumentException("Unknown message type: " + type);
         }
+    }
+
+    private void freeText(WsContext ctx, String actorId, String text) {
+        if (dm == null) {
+            send(ctx, new ServerMessage.Error(
+                    "No DM configured. Set VENICE_API_KEY in .env and restart the server."));
+            return;
+        }
+        if (text.isBlank()) {
+            return;
+        }
+
+        // Off the socket thread: this call streams for seconds.
+        turns.submit(() -> dm.handleFreeText(
+                actorId,
+                text,
+                segment -> send(ctx, new ServerMessage.Narration(segment)),
+                () -> send(ctx, new ServerMessage.NarrationEnd()),
+                error -> send(ctx, new ServerMessage.Error(
+                        "The DM stumbled: " + error.getMessage()))));
     }
 
     private void sendDiffs(WsContext ctx, List<Diff> diffs) {

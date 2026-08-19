@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { useGame } from "./store";
 import { connect, send } from "./ws";
 import { Canvas } from "./ui/Canvas";
+import { InputBox } from "./ui/InputBox";
+import { Transcript } from "./ui/Transcript";
 
 export function App() {
   const connected = useGame((s) => s.connected);
@@ -9,10 +11,13 @@ export function App() {
   const scene = useGame((s) => s.scene);
   const mode = useGame((s) => s.mode);
   const error = useGame((s) => s.error);
+  const setError = useGame((s) => s.setError);
 
   useEffect(() => {
     connect();
   }, []);
+
+  const party = scene?.entities.filter((e) => e.isPlayerControlled) ?? [];
 
   return (
     <div style={styles.page}>
@@ -23,63 +28,45 @@ export function App() {
         </span>
         <span style={styles.pill}>{mode}</span>
         {demoMode && <span style={{ ...styles.pill, background: "#6b4a12" }}>demo dice</span>}
+
         <span style={{ flex: 1 }} />
-        {scene && (
-          <span style={{ ...styles.pill, background: "transparent", opacity: 0.5 }}>
-            {scene.roomId} · {scene.width}×{scene.height} · {scene.entities.length} entities
+
+        {/* HP and AC as text is sufficient — no character sheet UI (§12). */}
+        {party.map((member) => (
+          <span key={member.id} style={styles.pill}>
+            {member.name} {member.hp}/{member.maxHp} hp
           </span>
-        )}
+        ))}
       </header>
 
-      {error && <div style={styles.error}>{error}</div>}
+      {error && (
+        <div style={styles.error} onClick={() => setError(null)} title="click to dismiss">
+          {error}
+        </div>
+      )}
 
-      <main style={styles.stage}>
-        <Canvas />
+      <main style={styles.body}>
+        <section style={styles.stage}>
+          <Canvas />
+          <footer style={styles.debug}>
+            <span style={styles.debugLabel}>debug</span>
+            <button style={styles.button} onClick={() => send({ type: "debugSpawnGoblin" } as never)}>
+              spawn goblin
+            </button>
+            <button
+              style={styles.button}
+              onClick={() => send({ type: "debugReveal", propId: "alcove" } as never)}
+            >
+              reveal alcove
+            </button>
+          </footer>
+        </section>
+
+        <aside style={styles.sidebar}>
+          <Transcript />
+          <InputBox />
+        </aside>
       </main>
-
-      {/* T5 debug rig: proves diffs render with no model anywhere in the path. */}
-      <footer style={styles.debug}>
-        <span style={styles.debugLabel}>debug</span>
-        <button style={styles.button} onClick={() => send({ type: "debugSpawnGoblin" } as never)}>
-          spawn goblin
-        </button>
-        <button
-          style={styles.button}
-          onClick={() => send({ type: "debugReveal", propId: "alcove" } as never)}
-        >
-          reveal alcove
-        </button>
-        <button
-          style={styles.button}
-          onClick={() => {
-            const fighter = scene?.entities.find((e) => e.isPlayerControlled);
-            if (!fighter) return;
-            send({
-              type: "moveTo",
-              actorId: fighter.id,
-              x: Math.max(0, Math.min((scene?.width ?? 12) - 1, fighter.x + 1)),
-              y: fighter.y,
-            });
-          }}
-        >
-          move east
-        </button>
-        <button
-          style={styles.button}
-          onClick={() => {
-            const fighter = scene?.entities.find((e) => e.isPlayerControlled);
-            if (!fighter) return;
-            send({
-              type: "moveTo",
-              actorId: fighter.id,
-              x: fighter.x,
-              y: Math.max(0, Math.min((scene?.height ?? 12) - 1, fighter.y + 1)),
-            });
-          }}
-        >
-          move north
-        </button>
-      </footer>
     </div>
   );
 }
@@ -112,13 +99,23 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#4a1414",
     borderBottom: "1px solid #7a2020",
     padding: ".5rem .9rem",
+    cursor: "pointer",
   },
-  stage: { flex: 1, minHeight: 0, position: "relative" },
+  body: { flex: 1, minHeight: 0, display: "flex" },
+  stage: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
+  sidebar: {
+    width: 380,
+    flexShrink: 0,
+    borderLeft: "1px solid #23212b",
+    display: "flex",
+    flexDirection: "column",
+    background: "#0a0910",
+  },
   debug: {
     display: "flex",
     gap: ".4rem",
     alignItems: "center",
-    padding: ".5rem .9rem",
+    padding: ".45rem .9rem",
     borderTop: "1px solid #23212b",
   },
   debugLabel: { fontSize: 10, opacity: 0.4, letterSpacing: ".1em", marginRight: ".3rem" },
@@ -127,9 +124,9 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#d8cfc2",
     border: "1px solid #34313d",
     borderRadius: 3,
-    padding: ".3rem .7rem",
+    padding: ".26rem .7rem",
     fontFamily: "inherit",
-    fontSize: 11,
+    fontSize: 10,
     cursor: "pointer",
   },
 };

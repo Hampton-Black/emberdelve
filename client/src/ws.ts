@@ -56,7 +56,10 @@ function dispatch(message: ServerMessage): void {
       game.applyDiffs(message.diffs);
       break;
     case "narration":
-      game.appendNarration(message.segment, message.final);
+      game.appendNarration(message.segment);
+      break;
+    case "narrationEnd":
+      game.endNarration();
       break;
     case "roll":
       game.addRoll(message.result);

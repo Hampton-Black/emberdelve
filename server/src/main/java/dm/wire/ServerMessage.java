@@ -1,6 +1,5 @@
 package dm.wire;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import dm.model.Diff;
@@ -23,6 +22,7 @@ import java.util.List;
         @JsonSubTypes.Type(value = ServerMessage.Scene.class, name = "scene"),
         @JsonSubTypes.Type(value = ServerMessage.Diffs.class, name = "diffs"),
         @JsonSubTypes.Type(value = ServerMessage.Narration.class, name = "narration"),
+        @JsonSubTypes.Type(value = ServerMessage.NarrationEnd.class, name = "narrationEnd"),
         @JsonSubTypes.Type(value = ServerMessage.Roll.class, name = "roll"),
         @JsonSubTypes.Type(value = ServerMessage.Error.class, name = "error"),
 })
@@ -34,9 +34,11 @@ public sealed interface ServerMessage {
 
     record Diffs(List<Diff> diffs) implements ServerMessage {}
 
-    /** {@code isFinal} goes over the wire as {@code final} — a reserved word in Java, not in JSON. */
-    record Narration(NarrationSegment segment, @JsonProperty("final") boolean isFinal)
-            implements ServerMessage {}
+    /** One speaker-attributed span of narration, emitted as soon as its sentence completes. */
+    record Narration(NarrationSegment segment) implements ServerMessage {}
+
+    /** The DM's turn is over. Separate from {@link Narration} so "final" is never ambiguous. */
+    record NarrationEnd() implements ServerMessage {}
 
     record Roll(RollResult result) implements ServerMessage {}
 

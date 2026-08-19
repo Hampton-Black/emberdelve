@@ -87,13 +87,20 @@ export interface NarrationSegment {
   text: string;
 }
 
+/** One paragraph in the transcript. `player` is a local speaker, never sent by the server. */
+export interface TranscriptEntry {
+  speakerId: string;
+  text: string;
+}
+
 // ---- Wire envelopes ----
 
 export type ServerMessage =
   | { type: "hello"; demoMode: boolean }
   | { type: "scene"; scene: SceneState }
   | { type: "diffs"; diffs: Diff[] }
-  | { type: "narration"; segment: NarrationSegment; final: boolean }
+  | { type: "narration"; segment: NarrationSegment }
+  | { type: "narrationEnd" }
   | { type: "roll"; result: RollResult }
   | { type: "error"; message: string };
 

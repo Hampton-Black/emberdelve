@@ -49,7 +49,8 @@ Resolved in a design review before implementation. Do not silently revisit these
 | Area | Decision |
 |---|---|
 | Assets | Kenney CC0. Architecture from Modular Dungeon Kit; props procedural until a kit provides them. |
-| LLM | `claude-opus-5`, `effort: low`, adaptive thinking **on**, `strict: true` tools. Model and speed are config. |
+| LLM provider | **Venice.ai**, OpenAI-compatible, `https://api.venice.ai/api/v1`. One key, one endpoint, 100+ models. |
+| LLM model | Build on a strong tool-caller; A/B down at T13. **The model is a config string, never a literal.** |
 | Narration | **Text channel**, not a tool. Inline `[[speaker]]` markers, validated against live entities. |
 | TTS | ElevenLabs Flash v2.5 behind `TtsClient`. Web Speech API is the working placeholder. |
 | Build | Gradle + Kotlin DSL. |
@@ -70,12 +71,28 @@ The plan is the spec; these are the agreed amendments to it.
 
 ---
 
-## Never disable thinking on Opus 5
+## The failure mode to watch for
 
-With `thinking: {type: "disabled"}` the model sometimes writes a tool call into **visible text**
-instead of emitting a `tool_use` block. The turn succeeds, the call silently never runs, and no
-error is raised. For a DM whose every mechanical effect is a tool call, that is silent state
-corruption. Use `effort: "low"` to reduce latency instead.
+The load-bearing dependency in this architecture is **tool-calling reliability**, not prose
+quality and not price. Every mechanical effect goes through a validated tool call.
+
+A model that narrates beautifully but forgets to call `spawn_entity` produces a goblin that is
+vividly described and never appears. That failure is **silent** and it looks like a rendering
+bug. When something in the world does not match the narration, suspect a dropped tool call
+before you suspect the renderer.
+
+Related, if you ever route to Claude directly: never set `thinking: {type: "disabled"}` on
+Opus 5 — it can write a tool call into visible text instead of emitting a `tool_use` block, with
+no error raised. Use a low effort setting instead.
+
+## Model selection notes
+
+- Venice exposes `supportsFunctionCalling` and `supportsResponseSchema` per model. **Require
+  both.** Check before switching to any model.
+- Most `e2ee-*` models report `supportsFunctionCalling: false` and are incompatible with this
+  architecture, despite being the strongest privacy tier.
+- Uncensored models that do support both: `venice-uncensored-1-2`,
+  `venice-uncensored-role-play`, `gemma-4-uncensored`.
 
 ---
 
