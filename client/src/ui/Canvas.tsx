@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Renderer } from "../scene/Renderer";
 import { useGame } from "../store";
 import type { SceneState } from "../types";
@@ -9,10 +9,17 @@ import type { SceneState } from "../types";
  * <p>The renderer lives in a ref and is created exactly once (invariant #4). It subscribes to
  * the Zustand store directly rather than receiving props, so a React re-render can never
  * re-create the canvas — the failure mode invariant #3 exists to prevent.
+ *
+ * <p>Camera facing is deliberately <em>not</em> in the store: it is view state, not game state.
+ * The server neither knows nor cares which corner you are looking from.
  */
 export function Canvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
+
+  const rotate = useCallback((direction: -1 | 1) => {
+    rendererRef.current?.rotate(direction);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -50,16 +57,38 @@ export function Canvas() {
     const onResize = () => renderer.resize();
     window.addEventListener("resize", onResize);
 
+    const onKey = (event: KeyboardEvent) => {
+      // Never steal keys from the input box.
+      if (event.target instanceof HTMLInputElement) return;
+
+      if (event.key === "q" || event.key === "Q") renderer.rotate(-1);
+      if (event.key === "e" || event.key === "E") renderer.rotate(1);
+    };
+    window.addEventListener("keydown", onKey);
+
     return () => {
       cancelled = true;
       unsubscribe();
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("keydown", onKey);
       renderer.dispose();
       rendererRef.current = null;
     };
   }, []);
 
-  return <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />;
+  return (
+    <div style={styles.wrap}>
+      <canvas ref={canvasRef} style={styles.canvas} />
+      <div style={styles.controls}>
+        <button style={styles.rotateButton} onClick={() => rotate(-1)} title="Rotate left (Q)">
+          ⟲
+        </button>
+        <button style={styles.rotateButton} onClick={() => rotate(1)} title="Rotate right (E)">
+          ⟳
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -90,3 +119,26 @@ function reconcile(renderer: Renderer, previous: SceneState, next: SceneState): 
     if (!knownProps.has(prop.id)) renderer.addProp(prop);
   }
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  wrap: { position: "relative", width: "100%", height: "100%" },
+  canvas: { width: "100%", height: "100%", display: "block" },
+  controls: {
+    position: "absolute",
+    right: ".7rem",
+    bottom: ".7rem",
+    display: "flex",
+    gap: ".3rem",
+  },
+  rotateButton: {
+    background: "rgba(35, 33, 43, .78)",
+    color: "#d8cfc2",
+    border: "1px solid #34313d",
+    borderRadius: 3,
+    width: 30,
+    height: 26,
+    fontSize: 14,
+    lineHeight: 1,
+    cursor: "pointer",
+  },
+};

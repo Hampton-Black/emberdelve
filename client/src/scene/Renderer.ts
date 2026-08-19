@@ -13,6 +13,17 @@ import { buildToken } from "./tokens";
  */
 const TARGET_WIDTH = 480;
 
+/**
+ * The camera snaps between four fixed isometric corners rather than orbiting freely.
+ *
+ * <p>Free orbit would break the look: the pixelation pass and the whole isometric read only hold
+ * at the canonical elevation, and off-angle views make grid picking ambiguous. Ninety-degree
+ * snapping is the tactical-RPG convention for exactly these reasons, and it solves the real
+ * problem — props occluding tokens behind them.
+ */
+const ROTATION_STEP = Math.PI / 2;
+const ROTATION_SECONDS = 0.42;
+
 const LIGHTING: Record<LightingPreset, {
   ambient: number;
   intensity: number;
@@ -40,6 +51,10 @@ export class Renderer {
   private readonly composer: EffectComposer;
   private readonly pixelPass: RenderPixelatedPass;
   private readonly moving = new Map<string, { from: THREE.Vector3; to: THREE.Vector3; t: number }>();
+  private azimuth = Math.PI / 4;
+  private azimuthFrom = Math.PI / 4;
+  private azimuthTo = Math.PI / 4;
+  private rotationT = 1;
   private kit: { floor: KitPiece; wall: KitPiece } | null = null;
   private dims = { width: 12, height: 12 };
   private frameHandle = 0;
@@ -71,19 +86,40 @@ export class Renderer {
     this.resize();
   }
 
-  /** True isometric: 45 degrees around Y, atan(1/sqrt(2)) down. */
+  /** True isometric: atan(1/sqrt(2)) down, at whatever corner the player has rotated to. */
   private positionCamera(): void {
     // Orthographic, so distance only sets the clip range — not apparent size.
     const distance = 30;
-    const angle = Math.PI / 4;
     const elevation = Math.atan(1 / Math.SQRT2);
 
     this.camera.position.set(
-      distance * Math.cos(elevation) * Math.sin(angle),
+      distance * Math.cos(elevation) * Math.sin(this.azimuth),
       distance * Math.sin(elevation),
-      distance * Math.cos(elevation) * Math.cos(angle),
+      distance * Math.cos(elevation) * Math.cos(this.azimuth),
     );
     this.camera.lookAt(0, 0, 0);
+  }
+
+  /** Snap to the next corner. `direction` is -1 (counter-clockwise) or +1 (clockwise). */
+  rotate(direction: -1 | 1): void {
+    // Start from the target, not the current angle, so rapid presses queue rather than fight.
+    this.azimuthFrom = this.azimuth;
+    this.azimuthTo = this.azimuthTo + direction * ROTATION_STEP;
+    this.rotationT = 0;
+  }
+
+  /** Which of the four corners the camera is heading to, for the compass readout. */
+  facing(): number {
+    return ((Math.round((this.azimuthTo - Math.PI / 4) / ROTATION_STEP) % 4) + 4) % 4;
+  }
+
+  private advanceRotation(delta: number): void {
+    if (this.rotationT >= 1) return;
+
+    this.rotationT = Math.min(this.rotationT + delta / ROTATION_SECONDS, 1);
+    const eased = easeInOutCubic(this.rotationT);
+    this.azimuth = this.azimuthFrom + (this.azimuthTo - this.azimuthFrom) * eased;
+    this.positionCamera();
   }
 
   async init(): Promise<void> {
@@ -287,6 +323,7 @@ export class Renderer {
       const t = clock.elapsedTime;
 
       this.advanceMovement(delta);
+      this.advanceRotation(delta);
       // Cheap two-frequency flicker so the braziers never pulse in lockstep.
       this.flames.forEach((flame, i) => {
         flame.intensity =
@@ -340,4 +377,8 @@ export class Renderer {
 
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }

@@ -56,6 +56,7 @@ Resolved in a design review before implementation. Do not silently revisit these
 | Build | Gradle + Kotlin DSL. |
 | Determinism | Real DM discretion. `ScriptedDiceRoller` behind `--demo` for reproducible tuning runs. |
 | Combat VO | **Dramatic beats only** — kills, crits, and the goblin's turn. Ordinary hits resolve instantly. |
+| Camera | Four fixed isometric corners, 90° snap (Q/E). Never free orbit — it breaks the pixel look and grid picking. |
 
 ### Deviations from `docs/m0-build-plan.md` as written
 
@@ -85,14 +86,38 @@ Related, if you ever route to Claude directly: never set `thinking: {type: "disa
 Opus 5 — it can write a tool call into visible text instead of emitting a `tool_use` block, with
 no error raised. Use a low effort setting instead.
 
-## Model selection notes
+## Model selection — measured, not guessed
 
-- Venice exposes `supportsFunctionCalling` and `supportsResponseSchema` per model. **Require
-  both.** Check before switching to any model.
-- Most `e2ee-*` models report `supportsFunctionCalling: false` and are incompatible with this
-  architecture, despite being the strongest privacy tier.
-- Uncensored models that do support both: `venice-uncensored-1-2`,
-  `venice-uncensored-role-play`, `gemma-4-uncensored`.
+Venice exposes `supportsFunctionCalling` and `supportsResponseSchema` per model. **Require
+both.** But the capability flag is not the same as the behaviour: several models that advertise
+function calling simply narrate instead of calling anything.
+
+Measured against the real tool schema, one round, "heave the sarcophagus lid open":
+
+| Model | TTFT | Calls `roll_check` correctly? |
+|---|---|---|
+| `qwen3-coder-480b-a35b-instruct-turbo` | 795ms | yes |
+| `qwen3-next-80b` | 834ms | yes |
+| `qwen3-235b-a22b-instruct-2507` | 1605ms | yes |
+| `zai-org-glm-5-2` | 1924ms | yes |
+| `deepseek-v4-flash` | 2437ms | yes |
+| `claude-opus-5` | 2679ms | yes |
+| `grok-4-6` | 5042ms | yes |
+| `venice-uncensored-1-2` | 728ms | **no — narrates instead** |
+| `venice-uncensored-role-play` | 914ms | **no — narrates instead** |
+| `mistral-small-3-2-24b-instruct` | 1017ms | **no — narrates instead** |
+
+Two findings that should survive this milestone:
+
+1. **Reasoning models cannot hit the 800ms gate.** Reasoning-on models land at 1.9–5.0s to
+   first token; reasoning-off models land at 0.7–1.6s. The split is clean. Worse, the agentic
+   loop multiplies it: a turn with three tool calls on `grok-4-6` measured **44 seconds**.
+2. **The uncensored and roleplay models are the ones that cannot drive this architecture.**
+   They write the best prose and never call a tool — the exact silent failure this design is
+   most vulnerable to.
+
+Most `e2ee-*` models report `supportsFunctionCalling: false` and are incompatible outright,
+despite being the strongest privacy tier.
 
 ---
 
