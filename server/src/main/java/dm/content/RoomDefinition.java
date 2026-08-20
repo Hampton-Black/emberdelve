@@ -53,7 +53,12 @@ public record RoomDefinition(
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record DmNotes(String overview, String sensory, String theSarcophagus, String theDoor) {
+    /**
+     * @param theSarcophagus       while Vessk is still inside it
+     * @param theSarcophagusOpened once he is out — see the swap in {@code DmService.worldState}
+     */
+    public record DmNotes(String overview, String sensory, String theSarcophagus,
+                          String theSarcophagusOpened, String theDoor) {
     }
 
     public List<Prop> toProps() {

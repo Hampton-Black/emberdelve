@@ -6,19 +6,22 @@
   "floorType": "CRACKED_STONE",
   "wallType": "CARVED",
   "lighting": "TORCHLIT",
-
   "props": [
     {
       "id": "door-north",
       "type": "DOOR",
-      "x": 6, "y": 11, "rotation": 180,
+      "x": 6,
+      "y": 11,
+      "rotation": 180,
       "hidden": false,
       "description": "A slab door on the north wall, banded in tarnished iron. It has no handle on this side."
     },
     {
       "id": "sarcophagus",
       "type": "SARCOPHAGUS",
-      "x": 6, "y": 7, "rotation": 0,
+      "x": 6,
+      "y": 7,
+      "rotation": 0,
       "hidden": false,
       "description": "A stone sarcophagus on a low dais. The lid is carved with a robed figure whose face has been deliberately chiselled away. The seam is scored with fresh scratches, as though something has worked at it from beneath.",
       "contains": "goblin"
@@ -26,57 +29,76 @@
     {
       "id": "brazier-west",
       "type": "BRAZIER",
-      "x": 2, "y": 8, "rotation": 0,
+      "x": 2,
+      "y": 8,
+      "rotation": 0,
       "hidden": false,
       "description": "An iron brazier burning low and green. It gives heat but no smoke."
     },
     {
       "id": "brazier-east",
       "type": "BRAZIER",
-      "x": 9, "y": 8, "rotation": 0,
+      "x": 9,
+      "y": 8,
+      "rotation": 0,
       "hidden": false,
       "description": "A second brazier, matching the first, its flame guttering as if in a draught you cannot feel."
     },
     {
       "id": "pillar-west",
       "type": "PILLAR",
-      "x": 3, "y": 4, "rotation": 0,
+      "x": 3,
+      "y": 4,
+      "rotation": 0,
       "hidden": false,
       "description": "A squat pillar, its base ringed with old wax."
     },
     {
       "id": "pillar-east",
       "type": "PILLAR",
-      "x": 8, "y": 4, "rotation": 0,
+      "x": 8,
+      "y": 4,
+      "rotation": 0,
       "hidden": false,
-      "description": "A squat pillar. Something has scratched a tally into it — eleven marks, the last one incomplete."
+      "description": "A squat pillar. Something has scratched a tally into it \u2014 eleven marks, the last one incomplete."
     },
     {
       "id": "rubble",
       "type": "RUBBLE",
-      "x": 2, "y": 2, "rotation": 45,
+      "x": 2,
+      "y": 2,
+      "rotation": 45,
       "hidden": false,
       "description": "A spill of fallen masonry where the ceiling has given way."
     },
     {
       "id": "alcove",
       "type": "ALCOVE",
-      "x": 9, "y": 6, "rotation": 270,
+      "x": 9,
+      "y": 6,
+      "rotation": 270,
       "hidden": true,
       "revealHint": "A votive alcove behind a loose facing stone, level with the sarcophagus. Careful examination of the sarcophagus or the surrounding wall would find it.",
       "description": "A shallow alcove behind a displaced stone, holding a clay votive lamp and a bundle of grave-cloth gone black with age."
     }
   ],
-
   "startPositions": {
-    "party": [{ "x": 6, "y": 1 }],
-    "goblinSpawn": { "x": 6, "y": 6 }
+    "party": [
+      {
+        "x": 6,
+        "y": 1
+      }
+    ],
+    "goblinSpawn": {
+      "x": 6,
+      "y": 6
+    }
   },
-
   "dmNotes": {
     "overview": "A single burial chamber beneath a ruined chapel. Cold, close, and lit green by two braziers that should have burned out centuries ago. The only exit the party knows of is the stair behind them to the south.",
     "sensory": "Air like a held breath. The braziers hiss. Every sound arrives a half-second late, as if the room is deciding whether to allow it.",
     "theSarcophagus": "A goblin scavenger named Vessk crawled in through a collapsed shaft two days ago, levered the lid aside looking for grave-goods, and got trapped when it settled back. It is hungry, frightened, and will come out fighting. The scratches on the seam are its work.",
-    "theDoor": "The north door is sealed and will not open in this session. Handle it in fiction — the mechanism is broken, the stone has settled, something heavy rests against it on the far side. Do not tell the player the room is unfinished."
+    "theDoor": "The north door is sealed and will not open in this session. Handle it in fiction \u2014 the mechanism is broken, the stone has settled, something heavy rests against it on the far side. Do not tell the player the room is unfinished.",
+    "theSarcophagusOpened": "Vessk is out. The sarcophagus held nothing else \u2014 no body, no occupant, no second thing clawing at the lid. It is an empty stone box with grave-dust in the bottom and a lid that no longer sits flush. If the player looks inside, that is what they find."
   }
 }

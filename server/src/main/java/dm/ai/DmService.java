@@ -436,18 +436,23 @@ public final class DmService {
         }
 
         sb.append("\n## Secrets you know and the player does not\n\n");
-        // A secret stops being one the moment it happens. This note promises a goblin that is
-        // still in the sarcophagus and will come out fighting — true until it does, and after
-        // that a contradiction handed to the model every turn, under a heading telling it this
-        // is something the player has not seen yet. Observed re-introducing Vessk as a fresh
-        // menace under the lid several turns after the player had killed him.
+        // A secret stops being one the moment it happens, but the facts underneath it do not stop
+        // being true. The first version of this promised a goblin still inside the sarcophagus
+        // who would come out fighting, restated every turn under a heading saying the player has
+        // not seen it yet — so the DM re-introduced Vessk as a fresh menace under the lid several
+        // turns after the player had killed him.
         //
-        // The door note is not like this and stays: "the north door never opens" is a standing
-        // constraint rather than a pending beat, and it is exactly as true on the last turn as
-        // on the first.
-        if (engine.repo().find("goblin").isEmpty()) {
-            sb.append(room.dmNotes().theSarcophagus()).append("\n\n");
-        }
+        // Deleting it once he was out fixed that and caused the opposite: with no note at all,
+        // the DM forgot the thing in the sarcophagus had *been* Vessk, kept the "something
+        // inside" thread running, and invented a robed corpse it can never spawn. So the note is
+        // swapped rather than dropped — the premise while it is pending, and what is true
+        // afterwards once it is spent.
+        //
+        // The door note is neither: "the north door never opens" is a standing constraint rather
+        // than a pending beat, and it is exactly as true on the last turn as on the first.
+        sb.append(engine.repo().find("goblin").isEmpty()
+                ? room.dmNotes().theSarcophagus()
+                : room.dmNotes().theSarcophagusOpened()).append("\n\n");
         sb.append(room.dmNotes().theDoor()).append("\n\n");
 
         sb.append("## Entities present\n\n");
