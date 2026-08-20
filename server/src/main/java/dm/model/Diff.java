@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = Diff.StatChanged.class, name = "StatChanged"),
         @JsonSubTypes.Type(value = Diff.ModeChanged.class, name = "ModeChanged"),
         @JsonSubTypes.Type(value = Diff.PropRevealed.class, name = "PropRevealed"),
+        @JsonSubTypes.Type(value = Diff.CombatChanged.class, name = "CombatChanged"),
 })
 public sealed interface Diff {
 
@@ -35,4 +36,14 @@ public sealed interface Diff {
     record ModeChanged(Mode mode) implements Diff {}
 
     record PropRevealed(Prop prop) implements Diff {}
+
+    /**
+     * The whole combat picture, replaced wholesale: order, whose turn it is, and what that
+     * combatant may legally do. Coarse on purpose — a fine-grained "movement decremented"
+     * diff would let the client's idea of the legal set drift from the server's, which is
+     * the one thing invariant #1 exists to prevent.
+     *
+     * <p>A null {@code combat} means the fight is over.
+     */
+    record CombatChanged(CombatView combat) implements Diff {}
 }

@@ -44,6 +44,40 @@ export interface SceneState {
   props: Prop[];
   entities: EntityView[];
   lighting: LightingPreset;
+  mode: Mode;
+  /** The fight in progress, or null. Rides along so a reconnect lands mid-combat intact. */
+  combat: CombatView | null;
+}
+
+// ---- Combat ----
+
+export interface Square {
+  x: number;
+  y: number;
+}
+
+export interface Combatant {
+  entityId: string;
+  name: string;
+  initiative: number;
+  isPlayerControlled: boolean;
+}
+
+/**
+ * The server's answer to "what may this combatant do right now", not the inputs to work it out.
+ *
+ * <p>`legalMoves` and `legalTargets` arrive finished. Nothing on the client knows about speed,
+ * reach or blocking props — it highlights what it is handed (invariant #1). When those rules
+ * grow, no code in here changes.
+ */
+export interface CombatView {
+  order: Combatant[];
+  activeId: string;
+  round: number;
+  movementRemaining: number;
+  actionAvailable: boolean;
+  legalMoves: Square[];
+  legalTargets: string[];
 }
 
 // ---- Diffs: the tagged union that arrives after the initial scene ----
@@ -54,7 +88,8 @@ export type Diff =
   | { kind: "EntityMoved"; entityId: string; fromX: number; fromY: number; x: number; y: number }
   | { kind: "StatChanged"; entityId: string; stat: string; from: number; to: number }
   | { kind: "ModeChanged"; mode: Mode }
-  | { kind: "PropRevealed"; prop: Prop };
+  | { kind: "PropRevealed"; prop: Prop }
+  | { kind: "CombatChanged"; combat: CombatView | null };
 
 // ---- Dice ----
 
@@ -69,10 +104,15 @@ export interface RollRequest {
   advantage: Advantage;
   purpose: RollPurpose;
   actorId: string;
-  targetId?: string;
-  dc?: number;
+  /**
+   * Null, not absent. These are `Optional` on the server and Jackson writes an empty one as
+   * `null`, so `x === undefined` silently misses every one of them — which is how an initiative
+   * roll ends up captioned "DC null".
+   */
+  targetId: string | null;
+  dc: number | null;
   /** Present on skill checks, so the log and the tray can name what was tested. */
-  skill?: Skill;
+  skill: Skill | null;
 }
 
 export interface RollResult {

@@ -40,6 +40,16 @@ export const FADE_OUT_MS = 420;
 /** How long the tray waits for narration that never comes. */
 export const HOLD_MS = 9000;
 
+/**
+ * The same wait, in combat.
+ *
+ * <p>Out of combat a roll is a question the DM is about to answer, so the tray holds until the
+ * narration arrives. In combat nobody is going to say anything — the next thing that happens is
+ * the next roll — and nine seconds of a tray covering a third of the board between swings is
+ * how a fight stops feeling like a fight. Long enough to read, and then gone.
+ */
+export const COMBAT_HOLD_MS = 2200;
+
 const LOB = 10;
 const BOUNCE_HEIGHT = 12;
 /** Whole turns, so the flight ease converges on upright rather than an arbitrary angle. */
@@ -144,13 +154,23 @@ export function sample(result: RollResult, elapsed: number, dismissAt: number): 
  * two seconds each that is twenty-four seconds of watching dice, and combat dies. Dramatic beats
  * only — the rest resolve straight into the log.
  *
- * M0 animates essentially everything because M0 only ever rolls for the player, but the gate
- * lives here now so T10 and T11 have nothing to retrofit.
+ * Purpose decides, not who rolled. An incoming attack is the tensest die in the game and the
+ * goblin throws it, so "animate the player's rolls" would gate out exactly the wrong ones.
  */
-export function isDramatic(result: RollResult, playerControlled: ReadonlySet<string>): boolean {
-  if (result.outcome === "CRIT" || result.outcome === "CRIT_FAIL") return true;
-  if (playerControlled.has(result.request.actorId)) return true;
-  return result.request.purpose === "INITIATIVE";
+export function isDramatic(result: RollResult): boolean {
+  switch (result.request.purpose) {
+    // A batch, not a moment: initiative is every combatant at once and the tray throws one roll
+    // at a time. The second throw would replace the first mid-flight. T12 owns that beat.
+    case "INITIATIVE":
+      return false;
+    // The consequence, not the question. Animating to-hit and then damage makes one swing read
+    // as two — and by the time damage is rolled the interesting thing has already happened.
+    case "DAMAGE":
+      return false;
+    // Attacks, saves and skill checks: whoever is rolling, this is the moment in doubt.
+    default:
+      return true;
+  }
 }
 
 // ---- Wording, shared by the tray and the transcript log so they cannot drift
@@ -187,9 +207,7 @@ export function caption(result: RollResult): RollCaption {
     ];
 
   const target =
-    request.dc === undefined
-      ? ""
-      : `${request.purpose === "ATTACK" ? "AC" : "DC"} ${request.dc}`;
+    request.dc == null ? "" : `${request.purpose === "ATTACK" ? "AC" : "DC"} ${request.dc}`;
 
   const sum = counted.join(" + ");
   const modifier = request.modifier === 0 ? "" : ` ${signed(request.modifier)}`;
@@ -198,7 +216,18 @@ export function caption(result: RollResult): RollCaption {
       ? `${sum}`
       : `${sum}${modifier} = ${result.total}`;
 
-  return { label, target, arithmetic, outcome: pretty(result.outcome), tone: toneOf(result.outcome) };
+  // Damage and initiative are adjudicated as SUCCESS because every roll needs an outcome, but
+  // printing that word next to "5 + 2 = 7" says nothing and reads as though it could have failed.
+  const decided =
+    request.purpose !== "DAMAGE" && request.purpose !== "INITIATIVE";
+
+  return {
+    label,
+    target,
+    arithmetic,
+    outcome: decided ? pretty(result.outcome) : "",
+    tone: decided ? toneOf(result.outcome) : "neutral",
+  };
 }
 
 function pretty(outcome: Outcome): string {

@@ -14,7 +14,10 @@ public record SceneState(
         WallType wallType,
         List<Prop> props,
         List<EntityView> entities,
-        LightingPreset lighting
+        LightingPreset lighting,
+        Mode mode,
+        /** The fight in progress, or null. Rides along so a reconnect lands mid-combat intact. */
+        CombatView combat
 ) {
     /** Props the player can currently see. Hidden ones stay server-side until revealed. */
     public List<Prop> visibleProps() {
@@ -24,6 +27,6 @@ public record SceneState(
     /** The scene as the client should first see it — hidden props stripped out entirely. */
     public SceneState asSeenByPlayer() {
         return new SceneState(roomId, width, height, floorType, wallType,
-                visibleProps(), entities, lighting);
+                visibleProps(), entities, lighting, mode, combat);
     }
 }

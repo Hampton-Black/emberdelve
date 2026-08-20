@@ -17,6 +17,8 @@ public record Entity(
         String damageDice,
         int damageModifier,
         int speedFeet,
+        /** DEX, and the only ability score the engine ever consults. Combat rolls initiative. */
+        int initiativeModifier,
         int x,
         int y,
         boolean isPlayerControlled,
@@ -41,12 +43,13 @@ public record Entity(
 
     public Entity movedTo(int newX, int newY) {
         return new Entity(id, kind, name, ac, hp, maxHp, toHit, damageDice, damageModifier,
-                speedFeet, newX, newY, isPlayerControlled, skillModifiers);
+                speedFeet, initiativeModifier, newX, newY, isPlayerControlled, skillModifiers);
     }
 
     public Entity withHp(int newHp) {
         return new Entity(id, kind, name, ac, Math.clamp(newHp, 0, maxHp), maxHp, toHit,
-                damageDice, damageModifier, speedFeet, x, y, isPlayerControlled, skillModifiers);
+                damageDice, damageModifier, speedFeet, initiativeModifier, x, y,
+                isPlayerControlled, skillModifiers);
     }
 
     public Entity damaged(int amount) {

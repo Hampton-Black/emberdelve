@@ -13,6 +13,13 @@ import { instanceCharacter } from "./assets";
 /** The clips this game actually asks for. The kits ship 32; the rest are for wheelchairs. */
 export type TokenClip = "idle" | "walk" | "attack-melee-right" | "die";
 
+/** How long a hit point bar takes to catch up, and how long it waits before starting. */
+const DRAIN_DELAY_SECONDS = 0.22;
+const DRAIN_RATE = 5;
+
+const BAR_WIDTH = 0.72;
+const BAR_HEIGHT = 0.085;
+
 /**
  * Which model plays which creature.
  *
@@ -56,21 +63,50 @@ const CROSSFADE_SECONDS = 0.2;
 const SELF_LIT = 0.22;
 
 export class Token {
+  /** Position only — never rotated, so the health bar above it can face the camera freely. */
   readonly group = new THREE.Group();
+
+  /** Everything that turns to face a direction of travel. */
+  private readonly pivot = new THREE.Group();
 
   private readonly mixer: THREE.AnimationMixer | null;
   private readonly actions = new Map<string, THREE.AnimationAction>();
   private current: THREE.AnimationAction | null = null;
 
+  private readonly bar: THREE.Group;
+  private readonly barFill: THREE.Mesh;
+  private readonly barFillMaterial: THREE.MeshBasicMaterial;
+  private hp: number;
+  private maxHp: number;
+  /** What the bar is showing, chasing `hp`. The gap is the drain. */
+  private shownHp: number;
+  private drainDelay = 0;
+  private barWanted = false;
+  private striking = 0;
+  private dead = false;
+
   constructor(entity: EntityView) {
     this.group.name = `entity:${entity.id}`;
-    this.group.add(buildBase(entity.kind));
+    this.group.add(this.pivot);
+    this.pivot.add(buildBase(entity.kind));
+
+    this.hp = entity.hp;
+    this.maxHp = entity.maxHp;
+    this.shownHp = entity.hp;
 
     const config = MODELS[entity.kind];
     const model = config ? instanceCharacter(config.path) : null;
 
+    const height = config?.height ?? 1.15;
+    this.bar = buildBar();
+    this.bar.position.y = height + 0.3;
+    this.bar.visible = false;
+    this.group.add(this.bar);
+    this.barFill = this.bar.children[1] as THREE.Mesh;
+    this.barFillMaterial = this.barFill.material as THREE.MeshBasicMaterial;
+
     if (!model || !config) {
-      this.group.add(buildPlaceholder());
+      this.pivot.add(buildPlaceholder());
       this.mixer = null;
       return;
     }
@@ -106,7 +142,7 @@ export class Token {
       mesh.material = material;
     });
 
-    this.group.add(figure);
+    this.pivot.add(figure);
 
     this.mixer = new THREE.AnimationMixer(figure);
     for (const clip of model.animations) {
@@ -137,11 +173,103 @@ export class Token {
   /** Turn to face a direction of travel. Kenney characters model forward as +Z. */
   faceTowards(dx: number, dz: number): void {
     if (dx === 0 && dz === 0) return;
-    this.group.rotation.y = Math.atan2(dx, dz);
+    this.pivot.rotation.y = Math.atan2(dx, dz);
   }
 
-  update(delta: number): void {
+  /**
+   * One swing, then back to idle. Bypasses {@link play}'s same-clip guard on purpose: two
+   * attacks in a row are two swings, and the second must restart the clip rather than be
+   * swallowed as a no-op.
+   */
+  strike(): void {
+    const action = this.actions.get("attack-melee-right");
+    if (!action) return;
+
+    action.reset();
+    action.setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = false;
+    if (this.current && this.current !== action) this.current.fadeOut(CROSSFADE_SECONDS);
+    action.fadeIn(0.05).play();
+    this.current = action;
+    this.striking = action.getClip().duration;
+  }
+
+  /**
+   * Hit points, as the server last reported them. The bar chases rather than snaps: the number
+   * changes on the frame the diff lands, but the swing that caused it is still mid-animation,
+   * and a bar that empties before the sword arrives reads as a bug.
+   */
+  setHp(hp: number, maxHp: number): void {
+    if (hp === this.hp && maxHp === this.maxHp) return;
+    if (hp < this.hp) this.drainDelay = DRAIN_DELAY_SECONDS;
+    this.hp = hp;
+    this.maxHp = maxHp;
+
+    if (hp <= 0 && !this.dead) {
+      this.dead = true;
+      this.play("die");
+    } else if (hp > 0 && this.dead) {
+      // A creature is dead exactly when the server says its hit points are zero — never because
+      // it once was. M0's goblin has a fixed id, so spawning a second one replaces the first,
+      // and a token that remembered the corpse would leave the new one face down on the floor.
+      this.dead = false;
+      this.shownHp = hp;
+      this.current = null;
+      this.play("idle");
+    }
+    this.refreshBar();
+  }
+
+  /**
+   * Whether this token wants a health bar at all. Shown in combat, and whenever something is
+   * hurt — a full bar over every figure in a quiet room is an MMO, not a crypt.
+   */
+  setBarVisible(inCombat: boolean): void {
+    this.barWanted = inCombat;
+    this.refreshBar();
+  }
+
+  private refreshBar(): void {
+    this.bar.visible = !this.dead && this.maxHp > 0 && (this.barWanted || this.hp < this.maxHp);
+  }
+
+  get isDead(): boolean {
+    return this.dead;
+  }
+
+  /** @param faceTo the camera's world orientation, so the health bar can billboard to it */
+  update(delta: number, faceTo?: THREE.Quaternion): void {
     this.mixer?.update(delta);
+
+    if (this.striking > 0) {
+      this.striking -= delta;
+      if (this.striking <= 0) {
+        this.current = null;
+        this.play("idle");
+      }
+    }
+
+    if (faceTo) this.bar.quaternion.copy(faceTo);
+
+    if (this.drainDelay > 0) {
+      this.drainDelay -= delta;
+    } else if (Math.abs(this.shownHp - this.hp) > 0.01) {
+      this.shownHp += (this.hp - this.shownHp) * Math.min(1, delta * DRAIN_RATE);
+      this.drawBar();
+    } else if (this.shownHp !== this.hp) {
+      this.shownHp = this.hp;
+      this.drawBar();
+    }
+  }
+
+  private drawBar(): void {
+    const fraction = Math.max(0, Math.min(1, this.shownHp / Math.max(this.maxHp, 1)));
+    // Scaled from the left edge, so a draining bar shortens rather than shrinking to its middle.
+    this.barFill.scale.x = fraction;
+    this.barFill.position.x = -(BAR_WIDTH / 2) * (1 - fraction);
+    this.barFillMaterial.color.setHex(
+      fraction > 0.55 ? 0x7fae56 : fraction > 0.25 ? 0xd0a13c : 0xc0453c,
+    );
   }
 
   dispose(): void {
@@ -185,6 +313,38 @@ function buildPlaceholder(): THREE.Group {
     if ((child as THREE.Mesh).isMesh) {
       child.castShadow = true;
       child.receiveShadow = true;
+    }
+  });
+  return group;
+}
+
+/**
+ * Two unlit quads: a dark backing and a fill scaled along x.
+ *
+ * <p>Unlit on purpose. The crypt is dark and a health bar is chrome, not scenery — a bar that
+ * dims when a brazier gutters is a bar you cannot read at the moment you most need to.
+ */
+function buildBar(): THREE.Group {
+  const group = new THREE.Group();
+
+  const backing = new THREE.Mesh(
+    new THREE.PlaneGeometry(BAR_WIDTH + 0.05, BAR_HEIGHT + 0.05),
+    new THREE.MeshBasicMaterial({ color: 0x14131a, transparent: true, opacity: 0.85 }),
+  );
+
+  const fill = new THREE.Mesh(
+    new THREE.PlaneGeometry(BAR_WIDTH, BAR_HEIGHT),
+    new THREE.MeshBasicMaterial({ color: 0x7fae56 }),
+  );
+  fill.position.z = 0.001;
+
+  group.add(backing, fill);
+  // Drawn last and never occluded: a bar hidden behind the sarcophagus is worse than no bar.
+  group.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (mesh.isMesh) {
+      (mesh.material as THREE.Material).depthTest = false;
+      mesh.renderOrder = 10;
     }
   });
   return group;

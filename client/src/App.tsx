@@ -4,6 +4,7 @@ import { unlock } from "./audio/sfx";
 import { useGame } from "./store";
 import { connect, send } from "./ws";
 import { Canvas } from "./ui/Canvas";
+import { CombatBar } from "./ui/CombatBar";
 import { DiceTray } from "./ui/DiceTray";
 import { InputBox } from "./ui/InputBox";
 import { Transcript } from "./ui/Transcript";
@@ -76,6 +77,7 @@ export function App() {
         <section style={styles.stage}>
           <div style={styles.viewport}>
             <Canvas />
+            <CombatBar />
             <DiceTray />
           </div>
           <footer style={styles.debug}>
@@ -98,6 +100,13 @@ export function App() {
               }}
             >
               walk
+            </button>
+            {/* Combat with no model in the path, for the same reason `roll d20` exists. */}
+            <button
+              style={styles.button}
+              onClick={() => send({ type: "debugStartCombat" } as never)}
+            >
+              start combat
             </button>
             {/* A real roll down the real path — how the dice get tuned without burning a turn. */}
             <button

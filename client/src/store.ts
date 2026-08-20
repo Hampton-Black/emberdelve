@@ -31,6 +31,13 @@ interface GameState {
   /** When the tray began fading, in `performance.now()` terms. Null while it is still held. */
   diceDismissAt: number | null;
 
+  /**
+   * The most recent attack, published once its dice have landed. The renderer watches this and
+   * plays the swing; it is a notification rather than state, which is why it carries `at` — two
+   * identical misses in a row are two separate events and must not collapse into one.
+   */
+  strike: { actorId: string; targetId: string; at: number } | null;
+
   setConnected: (connected: boolean) => void;
   setDemoMode: (demoMode: boolean) => void;
   setScene: (scene: SceneState) => void;
@@ -42,7 +49,7 @@ interface GameState {
   setError: (error: string | null) => void;
 }
 
-export const useGame = create<GameState>((set, get) => ({
+export const useGame = create<GameState>((set) => ({
   connected: false,
   demoMode: false,
   scene: null,
@@ -53,75 +60,92 @@ export const useGame = create<GameState>((set, get) => ({
   awaitingDm: false,
   activeRoll: null,
   diceDismissAt: null,
+  strike: null,
 
   setConnected: (connected) => set({ connected }),
   setDemoMode: (demoMode) => set({ demoMode }),
-  setScene: (scene) => set({ scene }),
+  // Mode rides with the scene rather than being left to the diff that changed it: a client
+  // that connects mid-fight gets one message, and it has to be the whole truth.
+  setScene: (scene) => set({ scene, mode: scene.mode }),
 
+  /**
+   * Held behind the dice for the same reason narration is: a hit point bar that empties while
+   * the attack die is still in the air has answered the question the die was asking. When no
+   * roll is in flight — every move, every reveal — the gate is open and this runs on the spot,
+   * which is what keeps click-to-move inside its 100ms budget.
+   */
   applyDiffs: (diffs) =>
-    set((state) => {
-      if (!state.scene) return state;
+    throughGate(() =>
+      set((state) => {
+        if (!state.scene) return state;
 
-      let scene = state.scene;
-      let mode = state.mode;
+        let scene = state.scene;
+        let mode = state.mode;
 
-      for (const diff of diffs) {
-        switch (diff.kind) {
-          case "EntityAdded":
-            // Idempotent by id. M0's goblin has a hardcoded id, so spawning a second one
-            // replaces the first server-side — appending here would leave a phantom behind.
-            scene = {
-              ...scene,
-              entities: scene.entities.some((e) => e.id === diff.entity.id)
-                ? scene.entities.map((e) => (e.id === diff.entity.id ? diff.entity : e))
-                : [...scene.entities, diff.entity],
-            };
-            break;
+        for (const diff of diffs) {
+          switch (diff.kind) {
+            case "EntityAdded":
+              // Idempotent by id. M0's goblin has a hardcoded id, so spawning a second one
+              // replaces the first server-side — appending here would leave a phantom behind.
+              scene = {
+                ...scene,
+                entities: scene.entities.some((e) => e.id === diff.entity.id)
+                  ? scene.entities.map((e) => (e.id === diff.entity.id ? diff.entity : e))
+                  : [...scene.entities, diff.entity],
+              };
+              break;
 
-          case "EntityRemoved":
-            scene = {
-              ...scene,
-              entities: scene.entities.filter((e) => e.id !== diff.entityId),
-            };
-            break;
+            case "EntityRemoved":
+              scene = {
+                ...scene,
+                entities: scene.entities.filter((e) => e.id !== diff.entityId),
+              };
+              break;
 
-          case "EntityMoved":
-            scene = {
-              ...scene,
-              entities: scene.entities.map((e) =>
-                e.id === diff.entityId ? { ...e, x: diff.x, y: diff.y } : e,
-              ),
-            };
-            break;
+            case "EntityMoved":
+              scene = {
+                ...scene,
+                entities: scene.entities.map((e) =>
+                  e.id === diff.entityId ? { ...e, x: diff.x, y: diff.y } : e,
+                ),
+              };
+              break;
 
-          case "StatChanged":
-            scene = {
-              ...scene,
-              entities: scene.entities.map((e) =>
-                e.id === diff.entityId && diff.stat === "hp"
-                  ? { ...e, hp: diff.to }
-                  : e,
-              ),
-            };
-            break;
+            case "StatChanged":
+              scene = {
+                ...scene,
+                entities: scene.entities.map((e) =>
+                  e.id === diff.entityId && diff.stat === "hp"
+                    ? { ...e, hp: diff.to }
+                    : e,
+                ),
+              };
+              break;
 
-          case "ModeChanged":
-            mode = diff.mode;
-            break;
+            case "ModeChanged":
+              mode = diff.mode;
+              break;
 
-          case "PropRevealed":
-            scene = {
-              ...scene,
-              props: scene.props.some((p) => p.id === diff.prop.id)
-                ? scene.props.map((p) => (p.id === diff.prop.id ? diff.prop : p))
-                : [...scene.props, diff.prop],
-            };
-            break;
+            case "PropRevealed":
+              scene = {
+                ...scene,
+                props: scene.props.some((p) => p.id === diff.prop.id)
+                  ? scene.props.map((p) => (p.id === diff.prop.id ? diff.prop : p))
+                  : [...scene.props, diff.prop],
+              };
+              break;
+
+            case "CombatChanged":
+              // Replaced wholesale, never merged. The server sends the entire legal picture each
+              // time precisely so the client has no chance to hold a half-updated one.
+              scene = { ...scene, combat: diff.combat };
+              break;
+          }
         }
-      }
 
-      return { scene, mode };
-    }),
+        return { scene, mode };
+      }),
+    ),
 
   /**
    * Narration arrives a sentence at a time. Consecutive sentences from the same speaker
@@ -182,7 +206,7 @@ export const useGame = create<GameState>((set, get) => ({
    * one would otherwise announce the outcome over a die still in the air.
    */
   addRoll: (result) => {
-    const dramatic = isDramatic(result, playerIds(get().scene));
+    const dramatic = isDramatic(result);
     const startedAt = performance.now();
 
     if (dramatic) closeGateUntil(startedAt + revealAt(result.faces.length));
@@ -195,7 +219,20 @@ export const useGame = create<GameState>((set, get) => ({
     // The log is a record, and records lag. Appending it now would print the total in the
     // sidebar while the die is still in the air, which spoils the throw.
     throughGate(() =>
-      set((state) => ({ transcript: [...state.transcript, { kind: "roll", result }] })),
+      set((state) => ({
+        transcript: [...state.transcript, { kind: "roll", result }],
+        // Released here rather than on arrival so the swing plays when the die answers, not
+        // when the server decided. Same gate, so it cannot get ahead of the damage it caused.
+        ...(result.request.purpose === "ATTACK" && result.request.targetId
+          ? {
+              strike: {
+                actorId: result.request.actorId,
+                targetId: result.request.targetId,
+                at: performance.now(),
+              },
+            }
+          : {}),
+      })),
     );
   },
 
@@ -214,10 +251,6 @@ function joinProse(existing: string, addition: string): string {
   if (!left) return right;
   if (!right) return left;
   return `${left} ${right}`;
-}
-
-function playerIds(scene: SceneState | null): ReadonlySet<string> {
-  return new Set(scene?.entities.filter((e) => e.isPlayerControlled).map((e) => e.id) ?? []);
 }
 
 // ---- The narration gate ----

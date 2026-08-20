@@ -31,12 +31,14 @@ public final class GameEngine {
     private final GameRepository repo;
     private final DiceRoller dice;
     private final RoomDefinition room;
+    private final CombatEngine combat;
 
     public GameEngine(ContentLoader content, GameRepository repo, DiceRoller dice) {
         this.content = content;
         this.repo = repo;
         this.dice = dice;
         this.room = content.room(ROOM_ID);
+        this.combat = new CombatEngine(repo, dice, room);
     }
 
     /** Spawn the party at the room's start positions. M0's party has exactly one member. */
@@ -68,6 +70,10 @@ public final class GameEngine {
         return repo;
     }
 
+    public CombatEngine combat() {
+        return combat;
+    }
+
     /**
      * The scene as the client is allowed to see it: hidden props are omitted entirely until
      * revealed, so a curious player cannot read the secrets out of a websocket frame.
@@ -86,7 +92,8 @@ public final class GameEngine {
                 .toList();
 
         return new SceneState(room.roomId(), room.width(), room.height(),
-                room.floorType(), room.wallType(), visible, entities, room.lighting());
+                room.floorType(), room.wallType(), visible, entities, room.lighting(),
+                repo.mode(), combat.view());
     }
 
     public Mode mode() {
@@ -95,17 +102,35 @@ public final class GameEngine {
 
     // ---- Mutations. Each returns the diffs the client needs to catch up. ----
 
-    public List<Diff> moveTo(String actorId, int x, int y) {
+    /**
+     * In combat this is the same call the goblin makes, spending the same movement and checked
+     * against the same reachable set. Out of combat there is nothing to spend, so a move is
+     * whatever the player clicked.
+     */
+    public void moveTo(String actorId, int x, int y, CombatSink sink) {
+        if (combat.isActive()) {
+            combat.moveTo(actorId, x, y, sink);
+            return;
+        }
+
         var entity = repo.find(actorId).orElseThrow(
                 () -> new IllegalArgumentException("No such entity: " + actorId));
 
         if (!isInBounds(x, y)) {
             throw new IllegalArgumentException("Off the grid: " + x + "," + y);
         }
+        if (room.isObstructed(x, y)) {
+            throw new IllegalArgumentException("Something solid is already at " + x + "," + y);
+        }
+        boolean occupied = repo.entities().stream()
+                .anyMatch(e -> e.isAlive() && !e.id().equals(actorId) && e.x() == x && e.y() == y);
+        if (occupied) {
+            throw new IllegalArgumentException("Someone is standing at " + x + "," + y);
+        }
 
         repo.put(entity.movedTo(x, y));
         repo.append(Event.action(actorId, "moved to " + x + "," + y));
-        return List.of(new Diff.EntityMoved(actorId, entity.x(), entity.y(), x, y));
+        sink.diffs(List.of(new Diff.EntityMoved(actorId, entity.x(), entity.y(), x, y)));
     }
 
     public List<Diff> revealProp(String propId) {
@@ -133,8 +158,12 @@ public final class GameEngine {
         return room.startPositions().goblinSpawn();
     }
 
+    /**
+     * Entering {@link Mode#COMBAT} goes through {@link CombatEngine#start} instead — a mode flag
+     * without an initiative order is a UI that says COMBAT while nobody has a turn.
+     */
     public List<Diff> setMode(Mode mode) {
-        if (repo.mode() == mode) {
+        if (repo.mode() == mode || mode == Mode.COMBAT) {
             return List.of();
         }
         repo.setMode(mode);

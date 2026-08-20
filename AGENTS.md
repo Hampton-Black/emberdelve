@@ -71,6 +71,16 @@ The plan is the spec; these are the agreed amendments to it.
   visible world change rather than narration alone.
 - **`RollRequest` gains `Optional<Skill> skill`.** Without it the event log records that
   *something* was tested but not what, and the dice tray can only say "SKILL CHECK 22 vs DC 15".
+- **`Diff` gains `CombatChanged`, and `SceneState` gains `mode` and `combat`.** The client cannot
+  be told "it is your turn" without also being told what that turn permits. Coarse on purpose —
+  see *Combat* below.
+- **`Entity` gains `initiativeModifier`.** DEX is the only ability score the engine consults; the
+  rest stay on the content definition. Without it every initiative roll is a coin flip between
+  two flat d20s, and a tie is broken by nothing.
+- **T10 includes `GoblinAi`,** which the plan's table lists under T11. Its deliverable is "a full
+  fight is playable with **zero AI involvement**", and a goblin that cannot act is a punching bag,
+  not a fight. The monster logic has no model in it, so it belongs on the near side of that line.
+  T11 is now exactly one thing: the narration call.
 
 ---
 
@@ -352,10 +362,66 @@ machine without those voices. On macOS: **Daniel** narrates, **Ralph** is the go
 - **Narration costs about 20 characters per second of speech.** 400 characters is ~20 seconds the
   player sits through before acting. This is the real ceiling on turn length, not the token budget.
 
+### The opening
+
+The room narrates itself on connect, before the player has typed anything (§2 step 2).
+`DmService.openScene` runs the prose phase alone — there is nothing to adjudicate yet, so the
+mechanics model is not consulted and the whole thing is one streaming call. Measured at
+**515–712ms to first token, 1.8–3.1s total**.
+
+- **It is phrased as a beat, not a request for a description.** "Open the session: what they walk
+  into" gets prose; "describe the room" gets an estate-agent listing of its contents.
+- **Once per process, not once per connection.** The client reconnects on every dropped socket and
+  every dev-server reload, and a DM that re-describes the room each time is a bug that reads as a
+  haunting. `debug → debugOpen` re-runs it past the guard for tuning, because during development
+  the guard will otherwise eat exactly the thing being tuned.
+- **The instruction stays out of `history`;** only the reply goes in. Replaying stage direction
+  every turn has the model treating it as something the player said.
+
 ### Known, unfixed
 
 The prose model sometimes **writes the player's dialogue** ("*You ask: what are you guarding?*"),
 which `dm.md` forbids outright. Invisible in text, obvious once spoken. T13.
+
+**A dead player character is only a dropped token.** Combat ends, the mode pill flips back to
+EXPLORATION, and nothing says what happened or offers a way on. M0 has no save and restarting the
+process is fine (§12), but the moment itself is unmarked. T12/T13.
+
+**The opening may be silent on a cold load.** Browsers gate audio behind a user gesture, and the
+opening narration arrives before the player has made one. The text always streams; whether the
+voice does depends on the browser. If it turns out to matter, the fix is a "click to begin"
+title beat, which solves the unlock definitively — but that is a design decision, not a patch.
+
+---
+
+## Combat
+
+Initiative, movement, one melee attack. Attack resolution is about forty lines in
+`CombatEngine.resolveAttack` and is meant to stay that way — the §12 anti-goal is
+*do not build a rules engine*. No reach, no cover, no opportunity attacks, no conditions.
+
+**The server ships the legal sets, not the inputs to compute them.** `CombatView` carries
+`legalMoves` and `legalTargets` already decided. Nothing on the client knows about speed,
+blocking props or reach; `intent()` in `Canvas.tsx` asks whether the clicked square is in a list
+that arrived over the wire, and that is the entire client-side movement rule. This is invariant #1
+taken literally, and it is why M1 can add difficult terrain without touching the client.
+
+- **`CombatChanged` replaces the whole picture.** A fine-grained "movement decremented" diff would
+  let the client's idea of the legal set drift from the server's, which is the one thing
+  invariant #1 exists to prevent.
+- **Terrain belongs to the room** (`RoomDefinition.isObstructed`), not to combat. Walking into the
+  sarcophagus is impossible whether or not anyone has rolled initiative.
+- **Both metrics are Chebyshev.** Diagonals cost one square, matching `Entity.isAdjacentTo`. Two
+  distance metrics in one combat system is how "why can it hit me from there" bugs start.
+- **The goblin's turn is paced by the server** (`WsHandler.BEAT_MS`). This looks like a layering
+  violation and is not: the beat between "it reaches you" and "it hits you" is the DM's, not the
+  renderer's. `runAutomaticTurns` takes the beat as a parameter, so tests spend none of it.
+- **Death leaves a body.** The entity stays in the repository at 0 hp, the token clamps on its
+  `die` clip, and the DM's world state marks it `[dead]`. Tokens revive if the server ever reports
+  hit points above zero again — dead is what the server says now, never what it once said.
+
+`debug → start combat` runs the whole fight with no model in the path, for the same reason
+`debug → roll d20` exists.
 
 ---
 
@@ -372,9 +438,20 @@ weight happens at ~1s, and the narration lands while the player is still watchin
   driven by the tray component, so the gate still opens if the tray never mounts. Today the
   prose model is slow enough that ordering is never in doubt; a faster one would otherwise
   announce the outcome over a die still in the air.
-- **The sidebar log is also gated.** A record that arrives before the throw finishes spoils it.
-- **Not every roll animates** — `isDramatic()`. M0 only rolls for the player so everything
-  animates, but T10/T11 will not have to retrofit the gate.
+- **The sidebar log is also gated,** and so are diffs. A record that arrives before the throw
+  finishes spoils it, and a hit point bar that empties while the attack die is still in the air
+  has answered the question the die was asking. When no roll is in flight the gate is open and
+  everything passes straight through, which is what keeps click-to-move inside 100ms.
+- **Not every roll animates** — `isDramatic()`, and it keys off *purpose*, not off who rolled.
+  Attacks, saves and skill checks throw; damage and initiative go straight to the log. An
+  incoming attack is the tensest die in the game and the goblin throws it, so "animate the
+  player's rolls" would gate out exactly the wrong ones. Damage animating after to-hit makes one
+  swing read as two; initiative is every combatant at once and the tray throws one roll at a time
+  (T12 owns that beat).
+- **The tray leaves faster in combat** (`COMBAT_HOLD_MS`, 2.2s vs 9s). Out of combat a roll is a
+  question the DM is about to answer, so the tray waits for the answer. In a fight nothing is
+  coming but the next roll, and a tray covering a third of the board between swings is how combat
+  stops feeling like combat.
 - **Audio carries most of the satisfaction.** Rattle at 0ms, throw at 240ms, one clack per die
   staggered 130ms apart. Every clip gets random pitch jitter; without it the clatter sounds
   canned by the third roll.
@@ -390,7 +467,7 @@ feel gets tuned without burning a turn or an API key.
 
 ```bash
 cd server && ./gradlew run          # server on :7070
-cd server && ./gradlew test         # dice + attack resolution
+cd server && ./gradlew test         # dice, attack resolution, combat legality
 cd server && ./gradlew run --args='--demo'   # scripted dice, reproducible
 cd client && npm run dev            # vite on :5173
 ```

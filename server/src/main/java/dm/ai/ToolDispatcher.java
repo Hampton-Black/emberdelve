@@ -2,6 +2,7 @@ package dm.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dm.wire.Json;
+import dm.engine.CombatSink;
 import dm.engine.GameEngine;
 import dm.model.Diff;
 import dm.model.Difficulty;
@@ -38,16 +39,17 @@ public final class ToolDispatcher {
      * @param ok      whether the call was applied
      * @param message what the model is told — the roll outcome, or why it was rejected
      * @param diffs   what the client must be shown
-     * @param roll    present when this call produced dice, so the UI can animate them
+     * @param rolls   dice this call produced, in the order they were thrown, so the UI can
+     *                animate them — starting combat rolls one per combatant
      */
-    public record Result(boolean ok, String message, List<Diff> diffs, Optional<RollResult> roll) {
+    public record Result(boolean ok, String message, List<Diff> diffs, List<RollResult> rolls) {
 
         static Result rejected(String why) {
-            return new Result(false, "REJECTED: " + why, List.of(), Optional.empty());
+            return new Result(false, "REJECTED: " + why, List.of(), List.of());
         }
 
         static Result applied(String message, List<Diff> diffs) {
-            return new Result(true, message, diffs, Optional.empty());
+            return new Result(true, message, diffs, List.of());
         }
     }
 
@@ -101,7 +103,7 @@ public final class ToolDispatcher {
                 result.total(),
                 result.outcome());
 
-        return new Result(true, message, List.of(), Optional.of(result));
+        return new Result(true, message, List.of(), List.of(result));
     }
 
     private Result revealProp(JsonNode args) {
@@ -157,8 +159,17 @@ public final class ToolDispatcher {
                     "there is nothing to fight — spawn a creature before starting combat");
         }
 
-        List<Diff> diffs = engine.setMode(Mode.COMBAT);
-        return Result.applied("Combat has begun. Initiative is being rolled.", diffs);
+        var buffer = new CombatSink.Buffer();
+        engine.combat().start(buffer);
+
+        String order = engine.combat().view().order().stream()
+                .map(c -> c.name() + " (" + c.initiative() + ")")
+                .collect(java.util.stream.Collectors.joining(", "));
+
+        return new Result(true,
+                "Combat has begun. Initiative order: " + order + ". "
+                        + "Describe the moment the fight starts — do not list the order.",
+                buffer.collectedDiffs(), buffer.collectedRolls());
     }
 
     private static <E extends Enum<E>> Optional<E> parseEnum(Class<E> type, String raw) {

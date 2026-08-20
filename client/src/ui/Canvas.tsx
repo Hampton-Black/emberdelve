@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { Renderer } from "../scene/Renderer";
 import { useGame } from "../store";
-import type { SceneState } from "../types";
+import { send } from "../ws";
+import type { CombatView, SceneState, Square } from "../types";
 
 /**
  * The Three.js boundary.
@@ -57,12 +58,57 @@ export function Canvas() {
         known = scene;
       };
 
-      apply(useGame.getState().scene);
-      unsubscribe = useGame.subscribe((state) => apply(state.scene));
+      // One listener for everything the canvas shows, so the renderer can only ever be a
+      // function of the store — never of a second stream of events arriving on its own path.
+      let shownCombat: CombatView | null | undefined;
+      let shownStrike = 0;
+
+      const sync = () => {
+        const state = useGame.getState();
+        apply(state.scene);
+
+        const combat = state.scene?.combat ?? null;
+        if (combat !== shownCombat) {
+          renderer.setCombat(combat);
+          shownCombat = combat;
+        }
+
+        // `at` is the event identity: two identical misses in a row are two swings.
+        if (state.strike && state.strike.at !== shownStrike) {
+          shownStrike = state.strike.at;
+          renderer.strike(state.strike.actorId, state.strike.targetId);
+        }
+      };
+
+      sync();
+      unsubscribe = useGame.subscribe(sync);
     });
 
     const onResize = () => renderer.resize();
     window.addEventListener("resize", onResize);
+
+    const onPointerMove = (event: PointerEvent) => {
+      const move = intent(renderer, event);
+      renderer.setHover(move?.square ?? null);
+      canvas.style.cursor = move ? "pointer" : "default";
+    };
+
+    const onClick = (event: PointerEvent) => {
+      const move = intent(renderer, event);
+      if (!move) return;
+
+      // Sent, never applied locally. The token does not budge until the server says it moved
+      // (invariant #1) — which on localhost is the same frame, and in M1 will not be.
+      send(
+        move.kind === "attack"
+          ? { type: "attack", actorId: move.actorId, targetId: move.targetId }
+          : { type: "moveTo", actorId: move.actorId, x: move.square.x, y: move.square.y },
+      );
+    };
+
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("click", onClick as EventListener);
+    canvas.addEventListener("pointerleave", () => renderer.setHover(null));
 
     const onKey = (event: KeyboardEvent) => {
       // Never steal keys from the input box.
@@ -78,6 +124,8 @@ export function Canvas() {
       unsubscribe();
       window.removeEventListener("resize", onResize);
       window.removeEventListener("keydown", onKey);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("click", onClick as EventListener);
       renderer.dispose();
       rendererRef.current = null;
     };
@@ -98,6 +146,47 @@ export function Canvas() {
   );
 }
 
+/** What clicking here would do, or null if it would do nothing. */
+type Intent =
+  | { kind: "attack"; actorId: string; targetId: string; square: Square | null }
+  | { kind: "move"; actorId: string; square: Square };
+
+/**
+ * Reads the pointer against the rules the server sent.
+ *
+ * <p>Every branch below tests membership in a list that arrived over the wire. There is no
+ * distance check, no speed arithmetic and no reach rule anywhere in this file — asking whether
+ * the square is in `legalMoves` is the entire client-side movement rule (invariant #1).
+ */
+function intent(renderer: Renderer, event: PointerEvent): Intent | null {
+  const scene = useGame.getState().scene;
+  if (!scene) return null;
+
+  const { entityId, square } = renderer.pick(event.clientX, event.clientY);
+  const combat = scene.combat;
+
+  if (combat) {
+    const actor = scene.entities.find((e) => e.id === combat.activeId);
+    // The goblin's turn is not the player's to click through.
+    if (!actor?.isPlayerControlled) return null;
+
+    if (entityId && combat.legalTargets.includes(entityId)) {
+      return { kind: "attack", actorId: actor.id, targetId: entityId, square };
+    }
+    if (square && combat.legalMoves.some((s) => s.x === square.x && s.y === square.y)) {
+      return { kind: "move", actorId: actor.id, square };
+    }
+    return null;
+  }
+
+  // Out of combat there is no turn and nothing to spend, so anywhere on the floor will do.
+  // The server still refuses squares with something solid on them.
+  const player = scene.entities.find((e) => e.isPlayerControlled);
+  if (!player || !square) return null;
+  if (square.x === player.x && square.y === player.y) return null;
+  return { kind: "move", actorId: player.id, square };
+}
+
 /**
  * Bring the canvas in line with the store.
  *
@@ -114,6 +203,9 @@ function reconcile(renderer: Renderer, previous: SceneState, next: SceneState): 
       renderer.addEntity(entity);
     } else if (old.x !== entity.x || old.y !== entity.y) {
       renderer.moveEntity(id, entity.x, entity.y);
+    }
+    if (!old || old.hp !== entity.hp || old.maxHp !== entity.maxHp) {
+      renderer.setHp(id, entity.hp, entity.maxHp);
     }
   }
 

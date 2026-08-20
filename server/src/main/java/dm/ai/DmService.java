@@ -2,6 +2,7 @@ package dm.ai;
 
 import dm.content.RoomDefinition;
 import dm.engine.GameEngine;
+import dm.model.Combatant;
 import dm.model.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,14 @@ public final class DmService {
     /** Bounded so a confused model cannot spin through tool rounds forever. */
     private static final int MAX_TOOL_ROUNDS = 4;
 
+    /**
+     * What the DM is asked at the top of the session. Phrased as a beat to narrate rather than
+     * as a request for a room description, because asking a model to "describe the room" gets
+     * an estate-agent listing of its contents.
+     */
+    private static final String OPENING = "The party has just come through the entrance and is "
+            + "standing inside. Open the session: what they walk into.";
+
     /** §7: reject, let it retry once, then take the tools away. */
     private static final int REJECTIONS_BEFORE_DEGRADING = 2;
 
@@ -48,6 +57,10 @@ public final class DmService {
 
     /** The durable conversation: what the player said, and what the narrator said back. */
     private final List<DmClient.ChatMessage> history = new ArrayList<>();
+
+    /** The room is described once per session, not once per reconnect. */
+    private final java.util.concurrent.atomic.AtomicBoolean opened =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     public DmService(DmClient toolClient, DmClient proseClient, GameEngine engine,
                      String toolPrompt, String prosePrompt) {
@@ -85,6 +98,38 @@ public final class DmService {
         } else {
             log.info("{} model '{}' healthy: {}ms", role, client.modelId(), ms);
         }
+    }
+
+    /**
+     * Narrates the room unprompted, before the player has typed anything (§2 step 2).
+     *
+     * <p>Prose only — there is nothing to adjudicate yet, so the mechanics model is not consulted
+     * and the whole turn is one streaming call. Runs at most once per process: the client
+     * reconnects on every dropped socket and on every dev-server reload, and a DM that
+     * re-describes the room each time would be a bug that reads as a haunting.
+     *
+     * @param force ignores the once-per-session guard, for iterating on the opening by hand
+     */
+    public void openScene(TurnSink sink, boolean force) {
+        if (!opened.compareAndSet(false, true) && !force) {
+            return;
+        }
+
+        var failed = new boolean[]{false};
+        long started = System.nanoTime();
+        var prose = runProsePhase(OPENING, List.of(), sink, failed);
+        if (failed[0]) {
+            return;
+        }
+
+        // The instruction itself stays out of the history: it is stage direction, and replaying
+        // it every turn would have the model treating it as something the player said.
+        history.add(DmClient.ChatMessage.assistant(prose.text()));
+
+        log.info("OPENING  first token {}ms  total {}ms  {} chars",
+                prose.firstTokenMs(), (System.nanoTime() - started) / 1_000_000,
+                prose.text().length());
+        sink.complete();
     }
 
     /**
@@ -186,7 +231,7 @@ public final class DmService {
                             call.name(), call.argumentsJson(), outcome.message());
                 }
 
-                boolean visible = !outcome.diffs().isEmpty() || outcome.roll().isPresent();
+                boolean visible = !outcome.diffs().isEmpty() || !outcome.rolls().isEmpty();
                 if (visible && firstFeedback < 0) {
                     firstFeedback = (System.nanoTime() - phaseStart) / 1_000_000;
                 }
@@ -194,9 +239,9 @@ public final class DmService {
                 if (!outcome.diffs().isEmpty()) {
                     sink.diffs(outcome.diffs());
                 }
-                // Pushing the roll here is what starts the dice animating, which is the whole
+                // Pushing the rolls here is what starts the dice animating, which is the whole
                 // reason the prose model is allowed to be slow.
-                outcome.roll().ifPresent(sink::roll);
+                outcome.rolls().forEach(sink::roll);
 
                 localRounds.add(DmClient.ChatMessage.toolResult(call.id(), outcome.message()));
             }
@@ -310,7 +355,21 @@ public final class DmService {
                     .append(", ").append(entity.hp()).append("/").append(entity.maxHp())
                     .append(" hp, at (").append(entity.x()).append(",").append(entity.y())
                     .append(")").append(entity.isPlayerControlled() ? " [the player]" : "")
+                    .append(entity.isAlive() ? "" : " [dead]")
                     .append("\n");
+        }
+
+        var combat = engine.combat();
+        if (combat.isActive()) {
+            var view = combat.view();
+            sb.append("\n## The fight\n\n");
+            sb.append("Round ").append(view.round()).append(". Initiative order: ")
+                    .append(view.order().stream().map(Combatant::name)
+                            .collect(Collectors.joining(", ")))
+                    .append(".\n");
+            sb.append("It is `").append(view.activeId()).append("`'s turn.\n");
+            sb.append("Never narrate a turn that has not happened, and never state the order, "
+                    + "the round number, or anyone's hit points. Those are on screen.\n");
         }
 
         sb.append("\nThe grid is ").append(room.width()).append("x").append(room.height())

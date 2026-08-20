@@ -27,7 +27,15 @@ public record EntityDefinition(
     /** Instantiate at full health at the given square. */
     public Entity spawn(String entityId, int x, int y) {
         return new Entity(entityId, kind, name, ac, maxHp, maxHp, toHit, damageDice,
-                damageModifier, speedFeet, x, y, isPlayerControlled,
+                damageModifier, speedFeet, ability("DEX"), x, y, isPlayerControlled,
                 skillModifiers == null ? Map.of() : skillModifiers);
+    }
+
+    /**
+     * Ability scores stay on the definition rather than the entity: DEX is the only one the
+     * engine consults (initiative), and the rest are content the DM prompt may one day read.
+     */
+    private int ability(String name) {
+        return abilityModifiers == null ? 0 : abilityModifiers.getOrDefault(name, 0);
     }
 }

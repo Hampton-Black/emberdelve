@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { play } from "../audio/sfx";
 import {
   caption,
+  COMBAT_HOLD_MS,
   HOLD_MS,
   landAt,
   DISPLAY_SCALE,
@@ -52,7 +53,7 @@ export function DiceTray() {
     const tick = () => {
       frame = requestAnimationFrame(tick);
 
-      const { activeRoll, diceDismissAt } = useGame.getState();
+      const { activeRoll, diceDismissAt, scene } = useGame.getState();
       if (!activeRoll) {
         g.clearRect(0, 0, TRAY_WIDTH, TRAY_HEIGHT);
         return;
@@ -66,11 +67,14 @@ export function DiceTray() {
       const { result, startedAt } = activeRoll;
       const elapsed = performance.now() - startedAt;
 
-      // Narration is the tray's cue to leave; if none arrives, it leaves on its own.
-      // Never before the total is readable, whatever the server does.
+      // Narration is the tray's cue to leave; if none arrives, it leaves on its own — sooner
+      // in a fight, where none is coming. Never before the total is readable, whatever the
+      // server does.
       const dismissAt =
         diceDismissAt === null
-          ? HOLD_MS
+          ? scene?.combat
+            ? COMBAT_HOLD_MS
+            : HOLD_MS
           : Math.max(diceDismissAt - startedAt, revealAt(result.faces.length) + 250);
 
       const visual = sample(result, elapsed, dismissAt);

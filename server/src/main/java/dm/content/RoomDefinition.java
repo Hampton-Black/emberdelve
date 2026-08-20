@@ -67,6 +67,18 @@ public record RoomDefinition(
                 .orElseThrow(() -> new IllegalArgumentException("No such prop: " + id));
     }
 
+    /**
+     * Whether a solid prop stands on this square.
+     *
+     * <p>Terrain belongs to the room, not to combat: walking into the sarcophagus is impossible
+     * whether or not anyone has rolled initiative, and a rule that only existed inside
+     * {@code CombatEngine} would let the player stroll through it between fights.
+     */
+    public boolean isObstructed(int x, int y) {
+        return props.stream()
+                .anyMatch(p -> p.x() == x && p.y() == y && p.type().blocksMovement());
+    }
+
     /** The ids the {@code reveal_prop} tool is allowed to name right now — a closed set. */
     public List<String> hiddenPropIds() {
         return props.stream().filter(PropDefinition::hidden).map(PropDefinition::id).toList();
