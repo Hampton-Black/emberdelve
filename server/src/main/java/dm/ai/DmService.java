@@ -379,6 +379,11 @@ public final class DmService {
         var parser = new NarrationParser(liveSpeakers(), seed, segment -> {
             narrated.append(segment.text());
             engine.repo().append(Event.narration(segment.speakerId(), segment.text()));
+            // The transcript, in the server log, one segment per line. The log recorded every
+            // tool call, every timing and every rejection, and not one word of what was actually
+            // said — so "the DM quoted its own prompt" and "there was an empty line from
+            // Roderick" were reports that could only be reasoned about, never checked.
+            log.info("| {} | {}", segment.speakerId(), segment.text().strip());
             sink.narration(segment);
         });
 

@@ -203,8 +203,10 @@ public final class NarrationParser {
         String text = TOOL_CALL.matcher(raw).replaceAll("");
         text = ASIDE.matcher(text).replaceAll("").replace("`", "");
         // Nothing pronounceable, nothing to say. Models occasionally emit a stray markdown fence
-        // or a lone divider, and the queue would dutifully read it as its own line.
-        if (text.isBlank() || text.chars().noneMatch(Character::isLetterOrDigit)) {
+        // or a lone divider, and the queue would dutifully read it as its own line. The same test
+        // runs again per segment in push(): this one catches a whole chunk that says nothing,
+        // that one catches a chunk with real prose in it that still splits off a silent piece.
+        if (unspeakable(text)) {
             return;
         }
         // Whose voice quoted speech belongs to right now. Until a creature has spoken this turn
@@ -247,10 +249,25 @@ public final class NarrationParser {
         push(insideQuote ? quoted : NarrationSegment.NARRATOR, text.substring(start));
     }
 
+    /**
+     * Emits one segment, unless there is nothing in it worth saying out loud.
+     *
+     * <p>Tested per segment rather than only per chunk because the split itself can manufacture
+     * an empty one. A quotation containing no words — {@code ""} — is a line in the transcript
+     * attributed to whoever was speaking and a moment of silence in their voice; the player sees
+     * their own character apparently saying nothing. It arrives when the model reproduces
+     * something example-shaped from its own prompt, which is not a thing that can be prevented
+     * upstream with any confidence.
+     */
     private void push(String voice, String text) {
-        if (!text.isBlank()) {
+        if (!unspeakable(text)) {
             onSegment.accept(new NarrationSegment(voice, text));
         }
+    }
+
+    /** Whether this is worth handing to a voice: blank, or punctuation with nothing inside it. */
+    private static boolean unspeakable(String text) {
+        return text.isBlank() || text.chars().noneMatch(Character::isLetterOrDigit);
     }
 
     private static boolean isQuote(char c) {

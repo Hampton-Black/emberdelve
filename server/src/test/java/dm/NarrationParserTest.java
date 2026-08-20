@@ -398,4 +398,29 @@ class NarrationParserTest {
         assertEquals("", textOf("goblin"));
         assertTrue(textOf("narrator").contains("Come out of the box"));
     }
+
+    @Test
+    @DisplayName("a quotation with no words in it never reaches a voice")
+    void emptyQuotationIsDropped() {
+        var p = parser();
+        // What a recited prompt skeleton looks like by the time it reaches the parser. The
+        // player saw their own character credited with a line and heard nothing said.
+        p.accept("[[fighter]] \"...\" [[narrator]] The chamber stays quiet.");
+        p.finish();
+
+        assertEquals("", textOf("fighter"),
+                "an empty line was attributed to the player: " + segments);
+        assertTrue(textOf("narrator").contains("stays quiet"));
+    }
+
+    @Test
+    @DisplayName("an empty quotation inside real prose is dropped without taking the prose")
+    void emptyQuotationInsideProseIsDropped() {
+        var p = parser();
+        p.accept("[[goblin]] \"\" [[narrator]] It works its jaw and manages nothing.");
+        p.finish();
+
+        assertEquals("", textOf("goblin"));
+        assertTrue(textOf("narrator").contains("works its jaw"));
+    }
 }
