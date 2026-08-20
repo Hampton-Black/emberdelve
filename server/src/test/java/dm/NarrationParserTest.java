@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,13 +22,18 @@ class NarrationParserTest {
 
     private final List<NarrationSegment> segments = new ArrayList<>();
 
+    /** Ids and display names both, as {@code DmService.liveSpeakers} builds it. */
+    private static final Map<String, String> SPEAKERS = Map.of(
+            "goblin", "goblin", "vessk", "goblin",
+            "fighter", "fighter", "roderick", "fighter");
+
     private NarrationParser parser() {
-        return new NarrationParser(Set.of("goblin", "fighter"), null, segments::add);
+        return new NarrationParser(SPEAKERS, null, segments::add);
     }
 
-    /** As the game builds it when one creature is in the room and can be inferred from. */
+    /** As the game builds it for a combat beat, where the creature is the only one talking. */
     private NarrationParser parserWithCreature() {
-        return new NarrationParser(Set.of("goblin", "fighter"), "goblin", segments::add);
+        return new NarrationParser(SPEAKERS, "goblin", segments::add);
     }
 
     private String textOf(String speaker) {
@@ -352,5 +357,45 @@ class NarrationParserTest {
         p.finish();
 
         assertTrue(segments.stream().allMatch(x -> x.speakerId().equals("narrator")));
+    }
+
+    @Test
+    @DisplayName("a speaker marked by display name resolves to the entity")
+    void displayNameResolvesToId() {
+        var p = parser();
+        // The state lists `goblin` — Vessk, and the model marks with whichever it feels like.
+        p.accept("It shoulders the lid aside. [[Vessk]] \"Sssomeone elssse can have it.\"");
+        p.finish();
+
+        assertTrue(textOf("goblin").contains("Sssomeone elssse"),
+                "a name-marked line was demoted to narration: " + segments);
+        assertEquals("", textOf("Vessk"));
+    }
+
+    @Test
+    @DisplayName("the player's own line is voiced as the player, not as what they are taunting")
+    void playerDialogueIsAttributedToThePlayer() {
+        var p = parser();
+        p.accept("[[roderick]] \"Come out of the box, then.\" [[narrator]] "
+                + "The words come back off the stone flatter than you meant them.");
+        p.finish();
+
+        assertTrue(textOf("fighter").contains("Come out of the box"));
+        assertEquals("", textOf("goblin"),
+                "the player's taunt landed in the mouth of the thing being taunted: " + segments);
+        assertTrue(textOf("narrator").contains("flatter than you meant"));
+    }
+
+    @Test
+    @DisplayName("on a free-text turn an unmarked quotation is nobody's but the narrator's")
+    void unmarkedQuoteIsNotGuessedOnAFreeTextTurn() {
+        var p = parser();
+        // Both the goblin and the player can be talking here, so there is nothing to infer from.
+        // parserWithCreature() is the combat beat, where only the creature can be.
+        p.accept("The sound bounces off the vault. \"Come out of the box, then.\"");
+        p.finish();
+
+        assertEquals("", textOf("goblin"));
+        assertTrue(textOf("narrator").contains("Come out of the box"));
     }
 }

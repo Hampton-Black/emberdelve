@@ -2,7 +2,7 @@ package dm.ai;
 
 import dm.model.NarrationSegment;
 
-import java.util.Set;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.function.Consumer;
 
@@ -48,7 +48,8 @@ public final class NarrationParser {
                     ToolSchema.SPAWN_ENTITY, ToolSchema.START_COMBAT, "narrate")
                     + ")\\s*\\([^)]*\\)");
 
-    private final Set<String> knownSpeakers;
+    /** Every string the model might write between the brackets, mapped to the entity it means. */
+    private final Map<String, String> knownSpeakers;
     private final Consumer<NarrationSegment> onSegment;
 
     private final StringBuilder buffer = new StringBuilder();
@@ -69,17 +70,28 @@ public final class NarrationParser {
      * marker had the narrator reading the goblin's surrender in its own voice, while an earlier
      * turn that happened to include one got it right. Whether the goblin sounds like the goblin
      * should not depend on which call it spoke in.
+     *
+     * <p>The seed is only supplied where the creature is the only thing that <em>can</em> be
+     * talking — a combat beat. On a free-text turn the narrator writes the player's dialogue too,
+     * and a wrong guess there is not a flat voice but somebody else's: the player's taunt read
+     * back in the snarl of the thing they taunted.
      */
     private String lastCreature;
 
     /**
-     * @param soleCreature the one living creature in the room, or null when there is not exactly
-     *                     one. With two, an unattributed quotation is a guess rather than an
-     *                     inference, and the narrator keeps it.
+     * @param knownSpeakers what the model may write between the brackets, mapped to the entity id
+     *                      it resolves to. Both ids and display names are accepted: a model told
+     *                      the party contains {@code fighter} named Roderick writes
+     *                      {@code [[roderick]]} about as often as {@code [[fighter]]}, and the
+     *                      cost of not accepting it is the line landing in the narrator's voice.
+     * @param soleCreature  the one living creature in the room, or null when there is not exactly
+     *                      one, or when an unmarked quotation is not safe to guess at. With two
+     *                      candidates it is a guess rather than an inference, and the narrator
+     *                      keeps it.
      */
-    public NarrationParser(Set<String> knownSpeakers, String soleCreature,
+    public NarrationParser(Map<String, String> knownSpeakers, String soleCreature,
                            Consumer<NarrationSegment> onSegment) {
-        this.knownSpeakers = Set.copyOf(knownSpeakers);
+        this.knownSpeakers = Map.copyOf(knownSpeakers);
         this.lastCreature = soleCreature;
         this.onSegment = onSegment;
     }
@@ -248,9 +260,9 @@ public final class NarrationParser {
     /** The model can write any string between the brackets; only live entities are honoured. */
     private String resolve(String candidate) {
         String normalized = candidate.toLowerCase();
-        if (NarrationSegment.NARRATOR.equals(normalized) || knownSpeakers.contains(normalized)) {
+        if (NarrationSegment.NARRATOR.equals(normalized)) {
             return normalized;
         }
-        return NarrationSegment.NARRATOR;
+        return knownSpeakers.getOrDefault(normalized, NarrationSegment.NARRATOR);
     }
 }

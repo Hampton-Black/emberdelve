@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -147,7 +147,7 @@ public final class DmService {
 
         narrating.lock();
         try {
-            var prose = runProsePhase(OPENING, List.of(), sink, failed);
+            var prose = runProsePhase(OPENING, List.of(), sink, failed, false);
             if (failed[0]) {
                 return;
             }
@@ -191,7 +191,9 @@ public final class DmService {
         try {
             var failed = new boolean[]{false};
             long started = System.nanoTime();
-            var prose = runProsePhase(COMBAT_BEAT, facts, sink, failed);
+            // The player is not talking during an enemy's swing, so an unmarked quotation here
+            // is the creature and nothing else. This is the call that needs the seed.
+            var prose = runProsePhase(COMBAT_BEAT, facts, sink, failed, true);
             if (failed[0]) {
                 return false;
             }
@@ -239,7 +241,7 @@ public final class DmService {
         }
 
         long proseStart = System.nanoTime();
-        var prose = runProsePhase(text, mechanics.results(), sink, failed);
+        var prose = runProsePhase(text, mechanics.results(), sink, failed, false);
         long proseMs = (System.nanoTime() - proseStart) / 1_000_000;
 
         if (failed[0]) {
@@ -294,7 +296,7 @@ public final class DmService {
             }
 
             var conversation = new ArrayList<DmClient.ChatMessage>();
-            conversation.add(DmClient.ChatMessage.system(toolPrompt + "\n\n" + worldState()));
+            conversation.add(DmClient.ChatMessage.system(toolPrompt + "\n\n" + worldState(false)));
             conversation.addAll(history);
             conversation.add(DmClient.ChatMessage.user(text));
             conversation.addAll(localRounds);
@@ -344,10 +346,21 @@ public final class DmService {
     private record Prose(String text, long firstTokenMs) {
     }
 
+    /**
+     * @param inferUnmarkedQuotes whether a quotation with no marker before it may be handed to the
+     *                            one creature in the room. True only where the creature is the
+     *                            only thing that can be talking. On a free-text turn it is not:
+     *                            the narrator now writes the player's dialogue too, and guessing
+     *                            wrong there puts the player's own taunt in the mouth — and the
+     *                            colour, and the voice — of the thing they were taunting. Falling
+     *                            back to the narrator is also wrong, but it is wrong in the way
+     *                            that does not attribute words to a character who never said them.
+     */
     private Prose runProsePhase(String text, List<String> mechanics, TurnSink sink,
-                                boolean[] failed) {
+                                boolean[] failed, boolean inferUnmarkedQuotes) {
         var narrated = new StringBuilder();
-        var parser = new NarrationParser(liveSpeakers(), soleCreature(), segment -> {
+        var seed = inferUnmarkedQuotes ? soleCreature() : null;
+        var parser = new NarrationParser(liveSpeakers(), seed, segment -> {
             narrated.append(segment.text());
             engine.repo().append(Event.narration(segment.speakerId(), segment.text()));
             sink.narration(segment);
@@ -374,7 +387,7 @@ public final class DmService {
 
         var conversation = new ArrayList<DmClient.ChatMessage>();
         // World state is recomputed here: phase 1 may have spawned or revealed things.
-        conversation.add(DmClient.ChatMessage.system(prosePrompt + "\n\n" + worldState()));
+        conversation.add(DmClient.ChatMessage.system(prosePrompt + "\n\n" + worldState(true)));
         conversation.addAll(history);
         conversation.add(DmClient.ChatMessage.user(text));
 
@@ -408,7 +421,12 @@ public final class DmService {
 
     // ---- Context ----
 
-    private String worldState() {
+    /**
+     * @param forProse the two models are told the same facts and given opposite permissions. Only
+     *                 the mechanics model can change anything, so only it is invited to act on
+     *                 what it reads here.
+     */
+    private String worldState(boolean forProse) {
         RoomDefinition room = engine.room();
         var revealed = engine.repo().revealedPropIds();
         var sb = new StringBuilder();
@@ -442,6 +460,18 @@ public final class DmService {
         }
 
         sb.append("\n## Secrets you know and the player does not\n\n");
+        // The one block that reads as a promise rather than a fact, and the narrator kept it.
+        // Told a goblin is inside the sarcophagus and "will come out fighting", the prose model
+        // wrote it climbing out — lid grinding open, hand on the rim, claws at the player's
+        // throat — on a turn where the mechanics model had spawned nothing and started no fight.
+        // Nothing appeared on the grid and the player kept walking around an empty room that had
+        // just attacked them. It was not disobeying: its own prompt used to describe tools it has
+        // never been given, so it believed writing a thing was how a thing happens.
+        if (forProse) {
+            sb.append("This is background, not a cue. None of it becomes true because you "
+                    + "narrate it: a creature is in the room when it is listed under Entities "
+                    + "present, and at no other time.\n\n");
+        }
         // A secret stops being one the moment it happens, but the facts underneath it do not stop
         // being true. The first version of this promised a goblin still inside the sarcophagus
         // who would come out fighting, restated every turn under a heading saying the player has
@@ -528,8 +558,9 @@ public final class DmService {
     /**
      * The one living creature in the room, or null when there is not exactly one.
      *
-     * <p>Handed to the parser so an unmarked quotation can be attributed. M0 has a single goblin,
-     * which is precisely the case where the inference is safe.
+     * <p>Handed to the parser so an unmarked quotation can be attributed — but only on a combat
+     * beat, where nobody else is talking. M0 has a single goblin, which is precisely the case
+     * where the inference is safe when it is safe at all.
      */
     private String soleCreature() {
         var creatures = engine.repo().entities().stream()
@@ -539,10 +570,22 @@ public final class DmService {
         return creatures.size() == 1 ? creatures.getFirst() : null;
     }
 
-    /** Speaker ids the narration parser will honour — everything else falls back to narrator. */
-    private Set<String> liveSpeakers() {
-        return engine.repo().entities().stream()
-                .map(e -> e.id().toLowerCase())
-                .collect(Collectors.toSet());
+    /**
+     * What the narration parser will honour in a {@code [[speaker]]} marker, mapped to the entity
+     * id it means. Everything else falls back to the narrator.
+     *
+     * <p>Names as well as ids. The model is shown {@code `fighter` — Roderick} and writes whichever
+     * of the two it feels like; an id-only lookup silently demoted half of those to narration.
+     * Ids win a collision, so a creature cannot be renamed into somebody else's voice.
+     */
+    private Map<String, String> liveSpeakers() {
+        var speakers = new java.util.HashMap<String, String>();
+        for (var entity : engine.repo().entities()) {
+            speakers.putIfAbsent(entity.name().toLowerCase(), entity.id().toLowerCase());
+        }
+        for (var entity : engine.repo().entities()) {
+            speakers.put(entity.id().toLowerCase(), entity.id().toLowerCase());
+        }
+        return speakers;
     }
 }
