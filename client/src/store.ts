@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { combatBegins, fell, initiativeSet } from "./audio/combat";
-import { mark, silence, silenceNow, speak } from "./audio/narration";
+import { hold, mark, silence, silenceNow, speak } from "./audio/narration";
 import { footsteps, lidOpens, revealed } from "./audio/world";
 import { CEREMONY_MS } from "./combat/opening";
 import { IMPACT_BEAT_MS, isDramatic, revealAt } from "./dice/tumble";
@@ -125,13 +125,19 @@ export const useGame = create<GameState>((set) => ({
     }),
 
   /**
-   * Held behind the dice for the same reason narration is: a hit point bar that empties while
-   * the attack die is still in the air has answered the question the die was asking. When no
-   * roll is in flight — every move, every reveal — the gate is open and this runs on the spot,
-   * which is what keeps click-to-move inside its 100ms budget.
+   * Queued with the narration, in arrival order, and released when the voice reaches it.
+   *
+   * <p>A hit point bar that empties while the attack die is still in the air has answered the
+   * question the die was asking — and one that empties twenty seconds before the narrator says
+   * the blow was struck is worse still. Both are the same bug: the world moving on a different
+   * clock from the voice describing it.
+   *
+   * <p>When nothing is queued this runs on the spot, which is every move and every reveal the
+   * player makes for themselves — so click-to-move keeps its 100ms budget. It waits only when
+   * the DM is mid-sentence, and then it should.
    */
   applyDiffs: (diffs) =>
-    throughGate(() =>
+    mark(() =>
       set((state) => {
         if (!state.scene) return state;
 
@@ -230,43 +236,47 @@ export const useGame = create<GameState>((set) => ({
    * extend the current paragraph, so the transcript reads as prose rather than as a list
    * of fragments. A speaker change starts a new paragraph.
    *
-   * Held behind the dice: see {@link throughGate}.
+   * Paced by the voice like everything else: see the queue in `audio/narration.ts`.
+   */
+  // The transcript update is the queue's callback rather than something that happens now: the
+  // voice paces the text, so the player reads at the speed the DM is talking instead of racing
+  // twenty seconds ahead of it.
+  /**
+   * Narration arrives a sentence at a time. Consecutive sentences from the same speaker extend
+   * the current paragraph, so the transcript reads as prose rather than as a list of fragments.
+   * A speaker change starts a new paragraph.
+   *
+   * <p>The transcript update is the queue's callback rather than something that happens now: the
+   * voice paces the text, so the player reads at the speed the DM is talking instead of racing
+   * twenty seconds ahead of it.
    */
   appendNarration: (segment) =>
-    throughGate(() => {
-      // Queued from inside the gate, so the DM never announces an outcome over a die still in
-      // the air. The queue itself knows nothing about dice — it inherits the ordering.
-      //
-      // The transcript update is the queue's callback rather than something that happens now:
-      // the voice paces the text, so the player reads at the speed the DM is talking instead of
-      // racing twenty seconds ahead of it.
-      speak(segment, () =>
-        set((state) => {
-          // The first word of narration is the tray's cue to leave.
-          const dismiss =
-            state.activeRoll && state.diceDismissAt === null
-              ? { diceDismissAt: performance.now() }
-              : {};
+    speak(segment, () =>
+      set((state) => {
+        // The first word of narration is the tray's cue to leave.
+        const dismiss =
+          state.activeRoll && state.diceDismissAt === null
+            ? { diceDismissAt: performance.now() }
+            : {};
 
-          const last = state.transcript.at(-1);
-          if (state.awaitingDm && last?.kind === "prose" && last.speakerId === segment.speakerId) {
-            const transcript = state.transcript.slice(0, -1);
-            transcript.push({ ...last, text: joinProse(last.text, segment.text) });
-            return { transcript, ...dismiss };
-          }
+        const last = state.transcript.at(-1);
+        if (state.awaitingDm && last?.kind === "prose" && last.speakerId === segment.speakerId) {
+          const transcript = state.transcript.slice(0, -1);
+          transcript.push({ ...last, text: joinProse(last.text, segment.text) });
+          return { transcript, ...dismiss };
+        }
 
-          return {
-            transcript: [...state.transcript, { kind: "prose", ...segment }],
-            awaitingDm: true,
-            ...dismiss,
-          };
-        }),
-      );
-    }),
+        return {
+          transcript: [...state.transcript, { kind: "prose", ...segment }],
+          awaitingDm: true,
+          ...dismiss,
+        };
+      }),
+    ),
 
-  // Behind the queue, not just the gate: clearing this early would end the thinking indicator
-  // while lines were still appearing, and break the paragraph merging in appendNarration.
-  endNarration: () => throughGate(() => mark(() => set({ awaitingDm: false }))),
+  // Behind the queue: clearing this early would end the thinking indicator while lines were
+  // still appearing, and break the paragraph merging in appendNarration.
+  endNarration: () => mark(() => set({ awaitingDm: false })),
 
   sayAsPlayer: (text) => {
     // A new turn drops the rest of the last one, but lets the sentence in the air finish.
@@ -278,33 +288,37 @@ export const useGame = create<GameState>((set) => ({
   },
 
   /**
-   * Every roll reaches the log; only dramatic ones get thrown. Closing the narration gate here
-   * is what makes "the dice decide, then the DM speaks" true by construction rather than by
-   * luck — today the prose model is slow enough that the order is never in doubt, but a faster
-   * one would otherwise announce the outcome over a die still in the air.
+   * Every roll reaches the log; only dramatic ones get thrown.
+   *
+   * <p>Queued like everything else, so "the dice decide, then the DM speaks" is true by
+   * construction rather than by luck. A dramatic roll holds the queue for as long as it is in
+   * the air, which is what stops narration that commits to a result from arriving ahead of the
+   * die showing it.
    */
   addRoll: (result) => {
     const dramatic = isDramatic(result);
-    const startedAt = performance.now();
 
-    // Delaying the gate rather than the swing alone is what keeps the order true: the hit point
-    // bar, the damage line and the blow are all consequences of this roll, and none of them may
-    // arrive before the player has read what the roll said.
+    // Holding the whole queue rather than the swing alone is what keeps the order true: the hit
+    // point bar, the damage line and the blow are all consequences of this roll, and none of
+    // them may arrive before the player has read what the roll said.
     const beat = result.request.purpose === "ATTACK" ? IMPACT_BEAT_MS : 0;
-    if (dramatic) closeGateUntil(startedAt + revealAt(result.faces.length) + beat);
+    const airtime = dramatic ? revealAt(result.faces.length) + beat : 0;
 
-    set((state) => ({
-      rolls: [...state.rolls, result],
-      ...(dramatic ? { activeRoll: { result, startedAt }, diceDismissAt: null } : {}),
-    }));
+    const throwIt = () =>
+      set((state) => ({
+        rolls: [...state.rolls, result],
+        ...(dramatic
+          ? { activeRoll: { result, startedAt: performance.now() }, diceDismissAt: null }
+          : {}),
+      }));
 
-    // The log is a record, and records lag. Appending it now would print the total in the
-    // sidebar while the die is still in the air, which spoils the throw.
-    throughGate(() =>
+    // The log is a record, and records lag. Appending it as the die is thrown would print the
+    // total in the sidebar while it was still in the air, which spoils the throw.
+    const settle = () =>
       set((state) => ({
         transcript: [...state.transcript, { kind: "roll", result }],
-        // Released here rather than on arrival so the swing plays when the die answers, not
-        // when the server decided. Same gate, so it cannot get ahead of the damage it caused.
+        // Released here rather than on arrival so the swing plays when the die answers, not when
+        // the server decided.
         ...(result.request.purpose === "ATTACK" && result.request.targetId
           ? {
               strike: {
@@ -314,17 +328,26 @@ export const useGame = create<GameState>((set) => ({
                 at: performance.now(),
               },
               // The blow is the tray's cue to leave, exactly as narration is out of combat. The
-              // readout dissolves as the sword comes down, which is what moves the eye from the
-              // tray back to the board. COMBAT_HOLD_MS is only the backstop for rolls with no
-              // swing behind them.
+              // readout dissolves as the sword comes down, which moves the eye from the tray
+              // back to the board. COMBAT_HOLD_MS is only the backstop for rolls with no swing
+              // behind them.
               ...(state.diceDismissAt === null ? { diceDismissAt: performance.now() } : {}),
             }
           : {}),
-      })),
-    );
+      }));
+
+    if (dramatic) {
+      hold(airtime, throwIt);
+      mark(settle);
+    } else {
+      mark(() => {
+        throwIt();
+        settle();
+      });
+    }
   },
 
-  // Errors bypass the gate: a stuck turn must never be hidden behind a die.
+  // Errors bypass the queue: a stuck turn must never be hidden behind a die or a sentence.
   setError: (error) => {
     // An error is the one case worth cutting mid-word for.
     silenceNow();
@@ -352,7 +375,7 @@ function beatFor(
     // Everything downstream waits behind the ceremony: the DM's first line about the fight, the
     // goblin's opening move, and every consequence of it. The same gate the dice use, for the
     // same reason — a beat the narrator talks over is not a beat.
-    closeGateUntil(now + CEREMONY_MS);
+    holdFloor(CEREMONY_MS);
     initiativeSet(combat.order.length);
     return { view: combat, openedAt: now, closingAt: null };
   }
@@ -381,57 +404,12 @@ function joinProse(existing: string, addition: string): string {
   return `${left} ${right}`;
 }
 
-// ---- The narration gate ----
-//
-// Narration is withheld until the dice it describes have landed, and released in arrival order.
-// Deliberately timer-based rather than driven by the tray component: if the tray never mounts,
-// the gate must still open.
-
-let gateOpensAt = 0;
-let held: Array<() => void> = [];
-let timer: ReturnType<typeof setTimeout> | null = null;
-
-function throughGate(action: () => void): void {
-  if (gateOpensAt - performance.now() <= 0 && held.length === 0) {
-    action();
-    return;
-  }
-  held.push(action);
-  if (timer === null) {
-    timer = setTimeout(openGate, Math.max(gateOpensAt - performance.now(), 0));
-  }
-}
-
-function openGate(): void {
-  timer = null;
-
-  // A second roll may have extended the hold while narration was queued.
-  const remaining = gateOpensAt - performance.now();
-  if (remaining > 0 && held.length > 0) {
-    timer = setTimeout(openGate, remaining);
-    return;
-  }
-
-  const queued = held;
-  held = [];
-  gateOpensAt = 0;
-
-  for (let i = 0; i < queued.length; i++) {
-    queued[i]();
-
-    // An action may have closed the gate behind itself — the mode flipping to COMBAT does
-    // exactly that, to buy the initiative ceremony its stage. Anything still queued belongs
-    // behind the new hold rather than in front of it, and running it here would let the
-    // goblin's first move land during the drums.
-    const reclosed = gateOpensAt - performance.now();
-    if (reclosed > 0) {
-      held = queued.slice(i + 1).concat(held);
-      timer = setTimeout(openGate, reclosed);
-      return;
-    }
-  }
-}
-
-function closeGateUntil(at: number): void {
-  gateOpensAt = Math.max(gateOpensAt, at);
+/**
+ * Take the floor for a while with nothing to say.
+ *
+ * <p>The combat ceremony is the only thing that needs this: it is a beat made of drums, a camera
+ * move and a bar assembling, none of which the queue would otherwise know to wait for.
+ */
+function holdFloor(ms: number): void {
+  hold(ms, () => {});
 }

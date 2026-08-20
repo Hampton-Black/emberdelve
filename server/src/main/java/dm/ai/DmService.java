@@ -372,18 +372,23 @@ public final class DmService {
         conversation.addAll(history);
         conversation.add(DmClient.ChatMessage.user(text));
 
-        if (!mechanics.isEmpty()) {
-            // The engine's rulings, not the model's tool calls — the prose model never made
-            // those, and replaying them as tool_calls confuses models that did not emit them.
-            // Deliberately plain prose with no brackets, headings or bullets. An earlier
-            // version wrapped this in [square brackets] and the model started emitting its own
-            // bracketed stage directions, which the voice then read aloud. Models imitate the
-            // shape of what you send them.
-            conversation.add(DmClient.ChatMessage.user(
-                    "The engine has already resolved this action. Narrate the following as "
-                            + "something that has happened.\n\n"
-                            + String.join("\n", mechanics)));
-        }
+        // The engine's rulings, not the model's tool calls — the prose model never made those,
+        // and replaying them as tool_calls confuses models that did not emit them. Deliberately
+        // plain prose with no brackets, headings or bullets. An earlier version wrapped this in
+        // [square brackets] and the model started emitting its own bracketed stage directions,
+        // which the voice then read aloud. Models imitate the shape of what you send them.
+        //
+        // The length limit is repeated here rather than left to the system prompt alone. It is
+        // stated there and was being ignored — six sentences against a stated three — and this
+        // is the message the model is actually answering. Length is not a style preference now
+        // that a real voice reads it: three sentences is about fifteen seconds of audio and the
+        // whole world waits behind it.
+        conversation.add(DmClient.ChatMessage.user(mechanics.isEmpty()
+                ? "Three sentences at most."
+                : "The engine has already resolved this action. Narrate the following as "
+                        + "something that has happened.\n\n"
+                        + String.join("\n", mechanics)
+                        + "\n\nThree sentences at most."));
 
         // No tools in this phase: narration only.
         proseClient.streamTurn(conversation, null, listener);
