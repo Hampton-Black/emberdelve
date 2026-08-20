@@ -277,6 +277,15 @@ a spoken DM can do. A new turn silences whatever is left from the last one.
 Ordering against the dice is not handled there — it is inherited, because the queue is fed from
 the gated path in `store.ts`.
 
+**The voice also paces the transcript.** The model streams a whole turn in about three seconds
+and the voice takes twenty to say it, so text appended on arrival has the player speed-reading
+ahead of the narrator. Each line is committed to the transcript by the queue, as it starts being
+spoken — measured within 1ms of the utterance. No words-per-minute constant to tune, and it stays
+correct if the voice changes. With voice off, lines reveal on arrival, which is right for reading.
+
+Dropped lines are still revealed. Interrupting stops the *speech*, not the *record* — text that
+vanished from the transcript because nobody got round to saying it would be a bug.
+
 `VoiceBackend` is the seam. Web Speech today (free, local, and the dev default); ElevenLabs Flash
 v2.5 next, synthesised **server-side** because the key must never reach the browser. `speak()`
 resolves on end, error, or cancel and never rejects — a rejection would stall every line behind it.

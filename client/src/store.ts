@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { silence, silenceNow, speak } from "./audio/narration";
+import { mark, silence, silenceNow, speak } from "./audio/narration";
 import { isDramatic, revealAt } from "./dice/tumble";
 import type {
   Diff,
@@ -132,33 +132,39 @@ export const useGame = create<GameState>((set, get) => ({
    */
   appendNarration: (segment) =>
     throughGate(() => {
-      // Spoken from inside the gate, so the DM never announces an outcome over a die still in
+      // Queued from inside the gate, so the DM never announces an outcome over a die still in
       // the air. The queue itself knows nothing about dice — it inherits the ordering.
-      speak(segment);
+      //
+      // The transcript update is the queue's callback rather than something that happens now:
+      // the voice paces the text, so the player reads at the speed the DM is talking instead of
+      // racing twenty seconds ahead of it.
+      speak(segment, () =>
+        set((state) => {
+          // The first word of narration is the tray's cue to leave.
+          const dismiss =
+            state.activeRoll && state.diceDismissAt === null
+              ? { diceDismissAt: performance.now() }
+              : {};
 
-      set((state) => {
-        // The first word of narration is the tray's cue to leave.
-        const dismiss =
-          state.activeRoll && state.diceDismissAt === null
-            ? { diceDismissAt: performance.now() }
-            : {};
+          const last = state.transcript.at(-1);
+          if (state.awaitingDm && last?.kind === "prose" && last.speakerId === segment.speakerId) {
+            const transcript = state.transcript.slice(0, -1);
+            transcript.push({ ...last, text: joinProse(last.text, segment.text) });
+            return { transcript, ...dismiss };
+          }
 
-        const last = state.transcript.at(-1);
-        if (state.awaitingDm && last?.kind === "prose" && last.speakerId === segment.speakerId) {
-          const transcript = state.transcript.slice(0, -1);
-          transcript.push({ ...last, text: joinProse(last.text, segment.text) });
-          return { transcript, ...dismiss };
-        }
-
-        return {
-          transcript: [...state.transcript, { kind: "prose", ...segment }],
-          awaitingDm: true,
-          ...dismiss,
-        };
-      });
+          return {
+            transcript: [...state.transcript, { kind: "prose", ...segment }],
+            awaitingDm: true,
+            ...dismiss,
+          };
+        }),
+      );
     }),
 
-  endNarration: () => throughGate(() => set({ awaitingDm: false })),
+  // Behind the queue, not just the gate: clearing this early would end the thinking indicator
+  // while lines were still appearing, and break the paragraph merging in appendNarration.
+  endNarration: () => throughGate(() => mark(() => set({ awaitingDm: false }))),
 
   sayAsPlayer: (text) => {
     // A new turn drops the rest of the last one, but lets the sentence in the air finish.
