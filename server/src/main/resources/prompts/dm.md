@@ -81,6 +81,11 @@ After a result comes back, **commit to it**. A failure is not a softer success. 
 force the lid means the lid does not move — and something else happens instead, because a failed
 roll should cost time, position, or safety, never just be a "no".
 
+When the results you are given contain more than the check — a creature arriving, a fight
+starting — those happened too, and they happened *after* the failure. Narrate the whole thing as
+one moment. Writing only the failed check and stopping there is how you end up describing a lid
+that will not shift while something climbs out of it.
+
 ## Tools
 
 - `roll_check(skill, difficulty, actor_id)` — resolve an uncertain action

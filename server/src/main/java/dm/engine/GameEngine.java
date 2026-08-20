@@ -6,6 +6,7 @@ import dm.model.Diff;
 import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Mode;
+import dm.model.Outcome;
 import dm.model.PartyMember;
 import dm.model.Prop;
 import dm.model.RollRequest;
@@ -32,6 +33,9 @@ public final class GameEngine {
     private final DiceRoller dice;
     private final RoomDefinition room;
     private final CombatEngine combat;
+
+    /** See {@link #consecutiveFailedChecks()}. Session state, like the fight's turn order. */
+    private int consecutiveFailedChecks;
 
     public GameEngine(ContentLoader content, GameRepository repo, DiceRoller dice) {
         this.content = content;
@@ -69,6 +73,7 @@ public final class GameEngine {
     public void restart() {
         combat.reset();
         repo.clear();
+        consecutiveFailedChecks = 0;
         start();
     }
 
@@ -213,7 +218,27 @@ public final class GameEngine {
         var result = dice.roll(
                 RollRequest.skillCheck(actorId, skill, actor.skillModifier(skill), difficulty));
         repo.append(Event.roll(result));
+
+        // Deliberately not keyed by skill. Shoving the lid, failing, then searching the wall and
+        // failing again is not two unrelated attempts — it is a player who is stuck, and being
+        // stuck is the thing worth reacting to.
+        if (result.outcome() == Outcome.SUCCESS || result.outcome() == Outcome.CRIT) {
+            consecutiveFailedChecks = 0;
+        } else {
+            consecutiveFailedChecks++;
+        }
         return result;
+    }
+
+    /**
+     * How many checks have failed in a row, with no success since.
+     *
+     * <p>Handed to the DM as a fact so escalation cannot drift. Whether the model does anything
+     * with it is its own decision; whether it is true is not. Reported rather than acted on here
+     * — the engine has no opinion about what a stuck player deserves.
+     */
+    public int consecutiveFailedChecks() {
+        return consecutiveFailedChecks;
     }
 
     public boolean isInBounds(int x, int y) {

@@ -385,8 +385,10 @@ public final class DmService {
         // whole world waits behind it.
         conversation.add(DmClient.ChatMessage.user(mechanics.isEmpty()
                 ? "Three sentences at most."
-                : "The engine has already resolved this action. Narrate the following as "
-                        + "something that has happened.\n\n"
+                : "The engine has already resolved this action. Every line below happened, in "
+                        + "this order. Narrate all of them as one continuous moment — a failed "
+                        + "check followed by something else means the attempt failed AND the "
+                        + "something else happened anyway.\n\n"
                         + String.join("\n", mechanics)
                         + "\n\nThree sentences at most."));
 
@@ -484,6 +486,15 @@ public final class DmService {
         // can simply carry on — observed ending a piece of narration with "Mode: EXPLORATION
         // Position: (6,1)", which the voice then read aloud. Models imitate the shape of what
         // you send them, so the shape has to be obviously not prose.
+        // A fact, not an instruction. What to do about it is in the tool prompt, because it is
+        // the tool model that owns the verbs capable of changing anything.
+        int stuck = engine.consecutiveFailedChecks();
+        if (stuck > 0) {
+            sb.append("\n## Momentum\n\n")
+                    .append(stuck).append(stuck == 1 ? " check has" : " checks have")
+                    .append(" failed in a row, with no success since.\n");
+        }
+
         sb.append("\n## Grid\n\n")
                 .append("- size: ").append(room.width()).append("x").append(room.height())
                 .append("\n- axes: x eastward, y northward")
