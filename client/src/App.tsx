@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { isEnabled, setEnabled } from "./audio/narration";
 import { unlock } from "./audio/sfx";
 import { useGame } from "./store";
 import { connect, send } from "./ws";
@@ -14,6 +15,9 @@ export function App() {
   const mode = useGame((s) => s.mode);
   const error = useGame((s) => s.error);
   const setError = useGame((s) => s.setError);
+
+  // UI preference, not game state (invariant #3) — same reasoning as the input box's draft.
+  const [voice, setVoice] = useState(isEnabled());
 
   useEffect(() => {
     connect();
@@ -40,6 +44,17 @@ export function App() {
         </span>
         <span style={styles.pill}>{mode}</span>
         {demoMode && <span style={{ ...styles.pill, background: "#6b4a12" }}>demo dice</span>}
+
+        <button
+          style={{ ...styles.pill, ...styles.toggle, opacity: voice ? 1 : 0.45 }}
+          onClick={() => {
+            setEnabled(!voice);
+            setVoice(!voice);
+          }}
+          title="Speak the narration aloud"
+        >
+          {voice ? "voice on" : "voice off"}
+        </button>
 
         <span style={{ flex: 1 }} />
 
@@ -122,6 +137,12 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     padding: ".6rem .9rem",
     borderBottom: "1px solid #23212b",
+  },
+  toggle: {
+    border: "1px solid #34313d",
+    color: "#d8cfc2",
+    fontFamily: "inherit",
+    cursor: "pointer",
   },
   pill: {
     background: "#23212b",

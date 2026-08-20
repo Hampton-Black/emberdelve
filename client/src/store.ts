@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { silence, speak } from "./audio/narration";
 import { isDramatic, revealAt } from "./dice/tumble";
 import type {
   Diff,
@@ -130,7 +131,11 @@ export const useGame = create<GameState>((set, get) => ({
    * Held behind the dice: see {@link throughGate}.
    */
   appendNarration: (segment) =>
-    throughGate(() =>
+    throughGate(() => {
+      // Spoken from inside the gate, so the DM never announces an outcome over a die still in
+      // the air. The queue itself knows nothing about dice — it inherits the ordering.
+      speak(segment);
+
       set((state) => {
         // The first word of narration is the tray's cue to leave.
         const dismiss =
@@ -150,16 +155,19 @@ export const useGame = create<GameState>((set, get) => ({
           awaitingDm: true,
           ...dismiss,
         };
-      }),
-    ),
+      });
+    }),
 
   endNarration: () => throughGate(() => set({ awaitingDm: false })),
 
-  sayAsPlayer: (text) =>
+  sayAsPlayer: (text) => {
+    // A new turn cuts off whatever the DM was still saying about the last one.
+    silence();
     set((state) => ({
       transcript: [...state.transcript, { kind: "prose", speakerId: "player", text }],
       awaitingDm: true,
-    })),
+    }));
+  },
 
   /**
    * Every roll reaches the log; only dramatic ones get thrown. Closing the narration gate here
@@ -186,7 +194,10 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   // Errors bypass the gate: a stuck turn must never be hidden behind a die.
-  setError: (error) => set({ error, awaitingDm: false }),
+  setError: (error) => {
+    silence();
+    set({ error, awaitingDm: false });
+  },
 }));
 
 /** Segments arrive pre-trimmed of nothing, so join with exactly one space. */

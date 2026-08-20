@@ -20,6 +20,10 @@ import java.util.function.Consumer;
  *
  * <p>An unknown speaker falls back to the narrator — invariant #7 in the one place the model
  * writes a free-form string.
+ *
+ * <p>A creature's voice also <b>ends by itself</b>. Models reliably open a line with
+ * {@code [[goblin]]} and then never close it, so without this the goblin's voice would read the
+ * narration that follows its own dialogue. Told-not-trusted, the same way tool arguments are.
  */
 public final class NarrationParser {
 
@@ -31,6 +35,10 @@ public final class NarrationParser {
 
     private final StringBuilder buffer = new StringBuilder();
     private String speaker = NarrationSegment.NARRATOR;
+
+    /** Quote state, tracked only while a creature is speaking. See {@link #emit}. */
+    private boolean insideQuote;
+    private boolean sawQuote;
 
     public NarrationParser(Set<String> knownSpeakers, Consumer<NarrationSegment> onSegment) {
         this.knownSpeakers = Set.copyOf(knownSpeakers);
@@ -71,6 +79,8 @@ public final class NarrationParser {
 
             emit(buffer.substring(0, open));
             speaker = resolve(buffer.substring(open + OPEN.length(), close).strip());
+            insideQuote = false;
+            sawQuote = false;
             buffer.delete(0, close + CLOSE.length());
         }
     }
@@ -113,10 +123,62 @@ public final class NarrationParser {
         return remaining;
     }
 
-    private void emit(String text) {
-        if (!text.isBlank()) {
-            onSegment.accept(new NarrationSegment(speaker, text));
+    /**
+     * Emits text, ending a creature's line where the quotation ends.
+     *
+     * <p>The narrator's voice never expires; a creature's holds only for what it actually says.
+     * If the model wrote no quotation marks at all, the line ends with this segment — one
+     * sentence in the wrong voice beats a whole turn in it.
+     */
+    private void emit(String raw) {
+        String text = raw.replace("`", "");
+        // Nothing pronounceable, nothing to say. Models occasionally emit a stray markdown fence
+        // or a lone divider, and the queue would dutifully read it as its own line.
+        if (text.isBlank() || text.chars().noneMatch(Character::isLetterOrDigit)) {
+            return;
         }
+        if (NarrationSegment.NARRATOR.equals(speaker)) {
+            onSegment.accept(new NarrationSegment(speaker, text));
+            return;
+        }
+
+        int end = endOfSpokenLine(text);
+        if (end < 0) {
+            onSegment.accept(new NarrationSegment(speaker, text));
+            if (!sawQuote) {
+                speaker = NarrationSegment.NARRATOR;
+            }
+            return;
+        }
+
+        onSegment.accept(new NarrationSegment(speaker, text.substring(0, end)));
+        speaker = NarrationSegment.NARRATOR;
+
+        String rest = text.substring(end);
+        if (!rest.isBlank()) {
+            onSegment.accept(new NarrationSegment(speaker, rest));
+        }
+    }
+
+    /** Index just past the quote that closes this creature's line, or -1 if it is still open. */
+    private int endOfSpokenLine(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (!isQuote(text.charAt(i))) {
+                continue;
+            }
+            sawQuote = true;
+            if (!insideQuote) {
+                insideQuote = true;
+                continue;
+            }
+            insideQuote = false;
+            return i + 1;
+        }
+        return -1;
+    }
+
+    private static boolean isQuote(char c) {
+        return c == '"' || c == '\u201c' || c == '\u201d';
     }
 
     /** The model can write any string between the brackets; only live entities are honoured. */

@@ -268,6 +268,45 @@ Origins differ between kits — mini models stand on y=0, graveyard models are c
 
 ---
 
+## Voice
+
+Narration is spoken through an **ordered queue** (`client/src/audio/narration.ts`): one line at a
+time, strictly in arrival order, because two sentences talking over each other is the worst thing
+a spoken DM can do. A new turn silences whatever is left from the last one.
+
+Ordering against the dice is not handled there — it is inherited, because the queue is fed from
+the gated path in `store.ts`.
+
+`VoiceBackend` is the seam. Web Speech today (free, local, and the dev default); ElevenLabs Flash
+v2.5 next, synthesised **server-side** because the key must never reach the browser. `speak()`
+resolves on end, error, or cancel and never rejects — a rejection would stall every line behind it.
+
+Casting is a small closed table matched by name prefix, so it degrades to pitch and rate on a
+machine without those voices. On macOS: **Daniel** narrates, **Ralph** is the goblin.
+
+### Measured, and worth keeping
+
+- **A creature's voice ends by itself.** Models reliably open with `[[goblin]]` and then never
+  close it, which had Ralph reading the narration after the goblin's line. `NarrationParser` now
+  ends a creature's line at its closing quotation mark. Told-not-trusted, same as tool arguments —
+  do not "fix" this by adding more prompt instructions instead.
+- **Writing more about brevity made the model more verbose.** Replacing the length rule with a
+  seven-line explanation (speech rate, dead air, the arithmetic) took narration from 514 to 654
+  characters a turn. Replacing it with two blunt lines took it to **393**. Terse instructions win
+  on length; measure before believing an edit helped.
+- **The prompt's own example was a markdown code fence, and the model copied the fence.** It
+  arrived as a segment and got read aloud. `NarrationParser` now drops any segment with no letter
+  or digit in it; the example is plain prose.
+- **Narration costs about 20 characters per second of speech.** 400 characters is ~20 seconds the
+  player sits through before acting. This is the real ceiling on turn length, not the token budget.
+
+### Known, unfixed
+
+The prose model sometimes **writes the player's dialogue** ("*You ask: what are you guarding?*"),
+which `dm.md` forbids outright. Invisible in text, obvious once spoken. T13.
+
+---
+
 ## Dice
 
 The dice are not decoration. They are what makes a ~6s prose latency tolerable: something with

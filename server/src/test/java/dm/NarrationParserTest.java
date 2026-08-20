@@ -130,4 +130,68 @@ class NarrationParserTest {
         assertTrue(all.contains("Nnno!"), all);
         assertTrue(all.contains("A hand claws at the rim."), all);
     }
+
+    @Test
+    @DisplayName("a creature's voice ends with its quotation, without a closing marker")
+    void speakerRevertsAfterQuote() {
+        var p = parser();
+        // The failure this exists for: models open with [[goblin]] and never close it, so
+        // every line of narration that follows gets read in the goblin's voice.
+        p.accept("[[goblin]] \"Ssstay back!\" The braziers hiss low. A finger pokes through.");
+        p.finish();
+
+        assertEquals("\"Ssstay back!\"", textOf("goblin").strip());
+        assertTrue(textOf("narrator").contains("braziers hiss low"));
+        assertTrue(textOf("narrator").contains("finger pokes through"));
+    }
+
+    @Test
+    @DisplayName("a creature speaking twice needs a marker each time")
+    void secondQuoteNeedsItsOwnMarker() {
+        var p = parser();
+        p.accept("[[goblin]] \"I am Vessk.\" It shuffles closer. [[goblin]] \"I am hungry.\" Silence.");
+        p.finish();
+
+        assertTrue(textOf("goblin").contains("I am Vessk."));
+        assertTrue(textOf("goblin").contains("I am hungry."));
+        assertFalse(textOf("goblin").contains("shuffles closer"));
+        assertTrue(textOf("narrator").contains("shuffles closer"));
+        assertTrue(textOf("narrator").contains("Silence."));
+    }
+
+    @Test
+    @DisplayName("unquoted dialogue holds the voice for one segment, not the rest of the turn")
+    void unquotedDialogueDoesNotRunAway() {
+        var p = parser();
+        p.accept("[[goblin]] Ssstay back. ");
+        p.accept("The lid grinds another inch.");
+        p.finish();
+
+        assertTrue(textOf("goblin").contains("Ssstay back."));
+        assertTrue(textOf("narrator").contains("grinds another inch"));
+    }
+
+    @Test
+    @DisplayName("the narrator's voice never expires on its own quotes")
+    void narratorKeepsSpeakingThroughQuotes() {
+        var p = parser();
+        p.accept("A sign reads \"KEEP OUT\" in flaking paint. The door is shut.");
+        p.finish();
+
+        assertEquals("narrator", segments.getFirst().speakerId());
+        assertTrue(segments.stream().allMatch(x -> x.speakerId().equals("narrator")));
+    }
+
+    @Test
+    @DisplayName("markdown artifacts are never handed to the voice")
+    void dropsUnspeakableSegments() {
+        var p = parser();
+        p.accept("The lid gives. \n\n```\n [[goblin]] \"Nnnoooo!\" Then silence.");
+        p.finish();
+
+        assertTrue(segments.stream().noneMatch(x -> x.text().contains("`")),
+                "a code fence reached the voice: " + segments);
+        assertTrue(textOf("goblin").contains("Nnnoooo!"));
+        assertTrue(textOf("narrator").contains("Then silence."));
+    }
 }
