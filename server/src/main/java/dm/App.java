@@ -42,7 +42,23 @@ public final class App {
         // Everything up to T5 runs without a key; only narration needs one.
         DmService dm = null;
         if (config.has("VENICE_API_KEY")) {
-            dm = new DmService(new VeniceDmClient(config), engine, content.prompt("dm"));
+            // Two models, two jobs. The fast one decides mechanics and puts dice on the table;
+            // the strong one writes, while those dice are still animating. See ai/DmService.
+            // Deliberately does NOT fall back to DM_MODEL: the whole point is that the
+            // mechanics model differs from the prose one, and inheriting a single DM_MODEL
+            // would silently collapse the split back into one slow model doing both jobs.
+            String toolModel = config.get("DM_MODEL_TOOLS", "qwen3-next-80b");
+            String proseModel = config.get("DM_MODEL_PROSE",
+                    config.get("DM_MODEL", "claude-opus-5"));
+
+            // The mechanics call is on the critical path and must fail fast; the prose call
+            // runs behind dice animation and can afford to wait.
+            dm = new DmService(
+                    new VeniceDmClient(config, toolModel, java.time.Duration.ofSeconds(20)),
+                    new VeniceDmClient(config, proseModel, java.time.Duration.ofSeconds(90)),
+                    engine,
+                    content.prompt("dm-tools"),
+                    content.prompt("dm"));
         } else {
             log.warn("VENICE_API_KEY not set — narration disabled. "
                     + "Copy .env.example to .env to enable the DM.");
@@ -57,6 +73,12 @@ public final class App {
 
         var handler = new WsHandler(engine, dm, demoMode);
         app.ws("/ws", handler::register);
+
+        // Warm-check both endpoints off the startup path. A degraded Venice model looks exactly
+        // like a slow app from the inside, and this turns an hour of debugging into one log line.
+        if (dm != null) {
+            dm.warmCheck();
+        }
 
         app.start(PORT);
         log.info("Emberdelve on :{} — room '{}', {} entities, dm={}{}",

@@ -140,7 +140,8 @@ public final class WsHandler {
         try {
             ctx.send(Json.MAPPER.writeValueAsString(message));
         } catch (Exception e) {
-            log.error("failed to serialize outbound message", e);
+            // Covers send failures too — a turn that outlives its socket lands here.
+            log.error("could not deliver {} to client", message.getClass().getSimpleName(), e);
         }
     }
 }

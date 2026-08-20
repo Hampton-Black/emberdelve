@@ -22,6 +22,14 @@ public interface DmClient {
     /** What the model is currently configured to be, for the debug HUD. */
     String modelId();
 
+    /**
+     * Round-trip a trivial request, in milliseconds. Negative means it failed.
+     *
+     * <p>Exists because a Venice model can silently degrade from ~600ms to ~66s with full quota
+     * remaining, and the symptom in the app is indistinguishable from "my code is slow".
+     */
+    long ping();
+
     /** One tool invocation the model is asking for. Arguments stay raw until validated. */
     record ToolCall(String id, String name, String argumentsJson) {
     }

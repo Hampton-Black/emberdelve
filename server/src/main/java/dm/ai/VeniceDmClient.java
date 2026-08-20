@@ -30,23 +30,63 @@ public final class VeniceDmClient implements DmClient {
     private static final Logger log = LoggerFactory.getLogger(VeniceDmClient.class);
     private static final String DONE = "[DONE]";
 
+    /** Roughly the size of a real DM system prompt, so the warm-check exercises the same path. */
+    private static final String PING_PADDING =
+            ("You are a health check. Reply with the single word OK and nothing else. "
+                    + "The following text is padding to approximate a real prompt. ").repeat(40);
+
     private final HttpClient http;
     private final String baseUrl;
     private final String apiKey;
     private final String model;
+    private final Duration timeout;
 
-    public VeniceDmClient(Config config) {
+    public VeniceDmClient(Config config, String model, Duration timeout) {
         this.apiKey = config.require("VENICE_API_KEY");
         this.baseUrl = trimTrailingSlash(config.get("VENICE_BASE_URL", "https://api.venice.ai/api/v1"));
-        this.model = config.get("DM_MODEL", "claude-opus-5");
+        this.model = model;
+        this.timeout = timeout;
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-        log.info("DmClient -> {} model={}", baseUrl, model);
+        log.info("DmClient -> {} model={} timeout={}s", baseUrl, model, timeout.toSeconds());
     }
 
     @Override
     public String modelId() {
         return model;
+    }
+
+    @Override
+    public long ping() {
+        // Deliberately not a trivial request. A 4-token ping reported this endpoint healthy at
+        // 621ms and it then took 34s on a real turn — large prompts and small ones do not
+        // degrade together, so the check has to look like the thing it is checking.
+        var body = Json.MAPPER.createObjectNode();
+        body.put("model", model);
+        body.put("max_tokens", 8);
+        var messages = body.putArray("messages");
+        messages.addObject().put("role", "system").put("content", PING_PADDING);
+        messages.addObject().put("role", "user").put("content", "Reply with the word OK.");
+
+        long started = System.nanoTime();
+        try {
+            var request = HttpRequest.newBuilder(URI.create(baseUrl + "/chat/completions"))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(30))
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+
+            var response = http.send(request, HttpResponse.BodyHandlers.discarding());
+            return response.statusCode() / 100 == 2
+                    ? (System.nanoTime() - started) / 1_000_000
+                    : -1;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return -1;
+        } catch (Exception e) {
+            return -1;
+        }
     }
 
     @Override
@@ -60,7 +100,7 @@ public final class VeniceDmClient implements DmClient {
                     .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
                     .header("Accept", "text/event-stream")
-                    .timeout(Duration.ofSeconds(120))
+                    .timeout(timeout)
                     .POST(HttpRequest.BodyPublishers.ofString(body(conversation, tools)))
                     .build();
 
@@ -78,6 +118,13 @@ public final class VeniceDmClient implements DmClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             listener.onError(e);
+        } catch (java.net.http.HttpTimeoutException e) {
+            // Observed in practice: a Venice model can degrade from ~600ms to ~50s with full
+            // quota remaining. Fail fast rather than hanging the turn behind a dead endpoint.
+            log.error("model '{}' did not respond within {}s", model, timeout.toSeconds());
+            listener.onError(new IllegalStateException(
+                    "Model '" + model + "' timed out after " + timeout.toSeconds()
+                            + "s. It may be cold or overloaded — try another DM_MODEL_*.", e));
         } catch (Exception e) {
             log.error("DM turn failed", e);
             listener.onError(e);

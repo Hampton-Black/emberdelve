@@ -127,8 +127,17 @@ despite being the strongest privacy tier.
 | `qwen3-next-80b` | 540 / 771 / 577 / 586ms | 100% valid | **invents props** |
 | `deepseek-v4-flash-0731-fast` | 1195 / 1364 / 1599 / **38478**ms | 100% valid | good, stays in-world |
 
-**Current pick: `qwen3-coder-480b-a35b-instruct-turbo`.** Fastest, tightest variance, valid tool
-calls every time, and its prose is genuinely good despite being a coder model.
+**Current pick: `DM_MODEL_TOOLS=qwen3-next-80b`, `DM_MODEL_PROSE=` your best writer.**
+
+`qwen3-coder-480b-a35b-instruct-turbo` looked like the winner on first measurement and is
+**disqualified**. Over one session it went 563ms → 42s → 66s → 621ms → 34s, with full rate-limit
+quota remaining and no error. Bimodal latency is worse than consistently slow, because you cannot
+design around it. Assume any very large MoE on a smaller provider may behave this way.
+
+**Benchmark discipline learned the hard way:** a single-shot benchmark against a multi-tenant
+inference provider measures a moment, not a steady state. Sample repeatedly, and across time,
+before believing a number. Every early figure in this file was collected in one burst and the
+model rankings did not survive contact with a second burst.
 
 Two disqualifiers found by measuring rather than reasoning:
 
@@ -194,6 +203,34 @@ These are the things most likely to eat week two.
 | Full enemy round resolved and narrated | < 4s |
 
 ---
+
+## The DM is two models, not one
+
+Phase 1 — **mechanics**, `DM_MODEL_TOOLS`. Decides tool calls; any prose it writes is discarded.
+This is the phase the &lt;800ms budget applies to, because it is what puts dice on the table.
+Wants a fast, non-reasoning, reliably tool-calling model.
+
+Phase 2 — **narration**, `DM_MODEL_PROSE`. Writes the prose with the engine's real results as
+context, *while the dice are still animating*. That concurrency is what buys it permission to be
+slow, so pick the best writer you can afford.
+
+Two consequences worth knowing:
+
+- A model that writes beautifully but cannot call tools is now **usable** — it just goes in the
+  prose slot. `venice-uncensored-role-play` was disqualified outright before the split.
+- A model that calls tools reliably but hallucinates props is now **usable** — it never writes
+  narration, so it cannot invent anything. `qwen3-next-80b` was disqualified before the split.
+
+Narration stays on exactly one model. Splitting *narration* across models makes tone drift
+audible between turns (design doc §10); splitting mechanics off does not.
+
+Measured end-to-end, `--demo`, "heave the sarcophagus lid open":
+
+| Config | First dice | First word | Total |
+|---|---|---|---|
+| Single model (`grok-4-6`) | — | — | 44,000ms |
+| Split, degraded tools model | 33,908ms | 45,616ms | 48,323ms |
+| Split, healthy tools model | **1,025ms** | 7,394ms | 8,860ms |
 
 ## Commands
 
