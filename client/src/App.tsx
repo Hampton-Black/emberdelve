@@ -7,6 +7,7 @@ import { Canvas } from "./ui/Canvas";
 import { CombatBar } from "./ui/CombatBar";
 import { DiceTray } from "./ui/DiceTray";
 import { InputBox } from "./ui/InputBox";
+import { Title } from "./ui/Title";
 import { Transcript } from "./ui/Transcript";
 
 export function App() {
@@ -79,6 +80,7 @@ export function App() {
             <Canvas />
             <CombatBar />
             <DiceTray />
+            <Title />
           </div>
           <footer style={styles.debug}>
             <span style={styles.debugLabel}>debug</span>
@@ -100,6 +102,12 @@ export function App() {
               }}
             >
               walk
+            </button>
+            {/* Re-runs the opening past its once-per-session guard. A page reload gets the title
+                screen again but a server that has already narrated, so without this there is no
+                way to hear the opening twice without restarting the process. */}
+            <button style={styles.button} onClick={() => send({ type: "debugOpen" } as never)}>
+              re-open
             </button>
             {/* Combat with no model in the path, for the same reason `roll d20` exists. */}
             <button

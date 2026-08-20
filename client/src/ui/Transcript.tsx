@@ -29,7 +29,7 @@ export function Transcript() {
   return (
     <div style={styles.scroll}>
       {transcript.length === 0 && (
-        <p style={styles.empty}>The crypt is quiet. Type something to begin.</p>
+        <p style={styles.empty}>The crypt is quiet.</p>
       )}
 
       {transcript.map((entry, i) => {

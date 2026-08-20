@@ -6,6 +6,7 @@ import { send } from "../ws";
 export function InputBox() {
   const connected = useGame((s) => s.connected);
   const awaitingDm = useGame((s) => s.awaitingDm);
+  const started = useGame((s) => s.started);
   const scene = useGame((s) => s.scene);
   const sayAsPlayer = useGame((s) => s.sayAsPlayer);
 
@@ -14,7 +15,7 @@ export function InputBox() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const actorId = scene?.entities.find((e) => e.isPlayerControlled)?.id;
-  const canSend = connected && !awaitingDm && !!actorId && draft.trim().length > 0;
+  const canSend = connected && started && !awaitingDm && !!actorId && draft.trim().length > 0;
 
   const submit = () => {
     if (!canSend || !actorId) return;
@@ -43,7 +44,7 @@ export function InputBox() {
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder={awaitingDm ? "the DM is speaking…" : "I examine the sarcophagus."}
-        disabled={!connected || awaitingDm}
+        disabled={!connected || !started || awaitingDm}
         autoFocus
       />
       <button type="submit" style={{ ...styles.button, opacity: canSend ? 1 : 0.35 }}>

@@ -151,6 +151,8 @@ export type ServerMessage =
   | { type: "error"; message: string };
 
 export type ClientMessage =
+  /** "A player is here and has clicked something." Cues the opening narration. */
+  | { type: "begin" }
   | { type: "freeText"; actorId: string; text: string }
   | { type: "moveTo"; actorId: string; x: number; y: number }
   | { type: "attack"; actorId: string; targetId: string }

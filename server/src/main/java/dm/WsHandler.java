@@ -56,12 +56,7 @@ public final class WsHandler {
             log.info("client connected: {}", ctx.sessionId());
             send(ctx, new ServerMessage.Hello(demoMode));
             send(ctx, new ServerMessage.Scene(engine.scene()));
-
-            // §2 step 2: the room describes itself before the player types anything. Off the
-            // socket thread, because this streams for seconds like any other turn.
-            if (dm != null) {
-                turns.submit(() -> dm.openScene(turnSink(ctx), false));
-            }
+            // Deliberately does NOT open the scene. See the `begin` case below.
         });
 
         ws.onMessage(ctx -> {
@@ -112,6 +107,19 @@ public final class WsHandler {
 
             case "debugSetMode" -> sendDiffs(ctx,
                     engine.setMode(Mode.valueOf(message.path("mode").asText())));
+
+            // §2 step 2: the room describes itself before the player types anything.
+            //
+            // Asked for by the client rather than pushed on connect. A socket opening is not a
+            // player arriving: browsers refuse to play audio until someone has clicked something,
+            // so narrating at connect meant the opening was spoken to a page that could not make
+            // a sound, and the transcript — which is paced by the voice — desynchronised from it.
+            // The client sends this from inside the click that starts the game.
+            case "begin" -> {
+                if (dm != null) {
+                    turns.submit(() -> dm.openScene(turnSink(ctx), false));
+                }
+            }
 
             case "debugScene" -> send(ctx, new ServerMessage.Scene(engine.scene()));
 

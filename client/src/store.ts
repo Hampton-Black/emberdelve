@@ -28,6 +28,15 @@ interface GameState {
   /** True while the DM is mid-turn. Drives the thinking indicator and input lockout. */
   awaitingDm: boolean;
 
+  /**
+   * Whether the player has started the session.
+   *
+   * <p>In the store rather than in React because three things read it — the title, the input box
+   * and the canvas — and because it gates a real event: a socket opening is not a player
+   * arriving, and until someone has clicked, the browser will not make a sound.
+   */
+  started: boolean;
+
   /** The roll the tray is currently throwing, and when it arrived. Null when nothing is in flight. */
   activeRoll: { result: RollResult; startedAt: number } | null;
   /** When the tray began fading, in `performance.now()` terms. Null while it is still held. */
@@ -41,6 +50,7 @@ interface GameState {
   strike: { actorId: string; targetId: string; connected: boolean; at: number } | null;
 
   setConnected: (connected: boolean) => void;
+  setStarted: () => void;
   setDemoMode: (demoMode: boolean) => void;
   setScene: (scene: SceneState) => void;
   applyDiffs: (diffs: Diff[]) => void;
@@ -60,11 +70,15 @@ export const useGame = create<GameState>((set) => ({
   rolls: [],
   error: null,
   awaitingDm: false,
+  started: false,
   activeRoll: null,
   diceDismissAt: null,
   strike: null,
 
   setConnected: (connected) => set({ connected }),
+  // One way. A dropped socket reconnects to a session already under way; it does not put the
+  // title back up, and the server will not narrate the opening twice.
+  setStarted: () => set({ started: true }),
   setDemoMode: (demoMode) => set({ demoMode }),
   // Mode rides with the scene rather than being left to the diff that changed it: a client
   // that connects mid-fight gets one message, and it has to be the whole truth.

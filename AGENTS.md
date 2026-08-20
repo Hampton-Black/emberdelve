@@ -364,13 +364,20 @@ machine without those voices. On macOS: **Daniel** narrates, **Ralph** is the go
 
 ### The opening
 
-The room narrates itself on connect, before the player has typed anything (§2 step 2).
+The room narrates itself before the player has typed anything (§2 step 2), triggered by the click
+on the title screen.
 `DmService.openScene` runs the prose phase alone — there is nothing to adjudicate yet, so the
 mechanics model is not consulted and the whole thing is one streaming call. Measured at
 **515–712ms to first token, 1.8–3.1s total**.
 
 - **It is phrased as a beat, not a request for a description.** "Open the session: what they walk
   into" gets prose; "describe the room" gets an estate-agent listing of its contents.
+- **Asked for by the client, not pushed on connect.** A socket opening is not a player arriving.
+  Browsers refuse to play audio until someone has clicked something, so narrating at connect meant
+  the DM described the room to a page that could not make a sound — and the transcript, which is
+  paced by the voice, drifted away from it. `ui/Title.tsx` sends `begin` from inside the click that
+  unlocks audio; the ordering inside that handler is the whole mechanism. It also buys the sample
+  bank time to decode, which is why the first roll of a session no longer loses its rattle.
 - **Once per process, not once per connection.** The client reconnects on every dropped socket and
   every dev-server reload, and a DM that re-describes the room each time is a bug that reads as a
   haunting. `debug → debugOpen` re-runs it past the guard for tuning, because during development
