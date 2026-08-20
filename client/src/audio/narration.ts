@@ -39,11 +39,21 @@ export function speak(line: SpokenLine): void {
   void drain();
 }
 
-/** Stop immediately and drop anything queued. Called on a new turn and on error. */
+/**
+ * Drop everything still queued, letting the line already in the air finish.
+ *
+ * <p>Cutting a voice off mid-word is jarring in a way that cutting between sentences is not, and
+ * the player starting their next turn is not an emergency. A person interrupted finishes their
+ * sentence; so does this.
+ */
 export function silence(): void {
   generation++;
   pending.length = 0;
-  draining = false;
+}
+
+/** Stop dead, mid-word. For errors, where continuing to talk would be worse than the cut. */
+export function silenceNow(): void {
+  silence();
   backend?.stop();
 }
 
@@ -54,10 +64,15 @@ async function drain(): Promise<void> {
   const mine = generation;
   backend ??= webSpeech();
 
-  while (pending.length > 0 && mine === generation) {
-    const line = pending.shift()!;
-    await backend.speak(line);
+  try {
+    while (pending.length > 0 && mine === generation) {
+      const line = pending.shift()!;
+      await backend.speak(line);
+    }
+  } finally {
+    draining = false;
+    // A silence() during the await leaves the next turn's lines queued behind a loop that has
+    // already given up on them. Without this they never get spoken at all.
+    if (pending.length > 0) void drain();
   }
-
-  if (mine === generation) draining = false;
 }

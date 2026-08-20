@@ -247,9 +247,13 @@ public final class DmService {
         if (!mechanics.isEmpty()) {
             // The engine's rulings, not the model's tool calls — the prose model never made
             // those, and replaying them as tool_calls confuses models that did not emit them.
+            // Deliberately plain prose with no brackets, headings or bullets. An earlier
+            // version wrapped this in [square brackets] and the model started emitting its own
+            // bracketed stage directions, which the voice then read aloud. Models imitate the
+            // shape of what you send them.
             conversation.add(DmClient.ChatMessage.user(
-                    "[Engine results for this action — these already happened, narrate them "
-                            + "and commit to them]\n"
+                    "The engine has already resolved this action. Narrate the following as "
+                            + "something that has happened.\n\n"
                             + String.join("\n", mechanics)));
         }
 

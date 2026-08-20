@@ -286,10 +286,21 @@ machine without those voices. On macOS: **Daniel** narrates, **Ralph** is the go
 
 ### Measured, and worth keeping
 
-- **A creature's voice ends by itself.** Models reliably open with `[[goblin]]` and then never
-  close it, which had Ralph reading the narration after the goblin's line. `NarrationParser` now
-  ends a creature's line at its closing quotation mark. Told-not-trusted, same as tool arguments —
-  do not "fix" this by adding more prompt instructions instead.
+- **The parser decides who speaks, not the model.** The rule is one line: **quoted runs belong to
+  the marked creature, everything else belongs to the narrator.** A marker names who is speaking
+  and stays in force; an unmarked quotation goes to the last creature that spoke. Four separate
+  model behaviours forced this, all observed in dry runs — opening with `[[goblin]]` and never
+  closing it, speaking twice off one marker, putting the marker *after* the dialogue, and
+  omitting the marker entirely on a second line. Do not try to fix any of them with prompt text;
+  that was tried first and it is not reliable.
+- **Prompt and parser must agree.** `dm.md` used to say "return to `[[narrator]]` when the speech
+  ends". The model obeyed — and then never re-marked the goblin, so every later line of dialogue
+  came out in the narrator's voice. The instruction was undoing the parser's own default. It now
+  says the marker stays in force.
+- **A blank line closes a quotation.** Models write unbalanced quote marks, and without this one
+  stray `"` flips the parity and mis-voices the rest of the turn.
+- **A new turn lets the sentence in the air finish** and drops the rest. Cutting a voice mid-word
+  is jarring in a way that cutting between sentences is not. Only errors cut dead.
 - **Writing more about brevity made the model more verbose.** Replacing the length rule with a
   seven-line explanation (speech rate, dead air, the arithmetic) took narration from 514 to 654
   characters a turn. Replacing it with two blunt lines took it to **393**. Terse instructions win

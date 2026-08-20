@@ -3,6 +3,7 @@ package dm.ai;
 import dm.model.NarrationSegment;
 
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.function.Consumer;
 
 /**
@@ -30,15 +31,26 @@ public final class NarrationParser {
     private static final String OPEN = "[[";
     private static final String CLOSE = "]]";
 
+    /** {@code [Engage with the perception success]} — written for the reader, never for the room. */
+    private static final Pattern ASIDE = Pattern.compile("\\[[^\\]]*]");
+
     private final Set<String> knownSpeakers;
     private final Consumer<NarrationSegment> onSegment;
 
     private final StringBuilder buffer = new StringBuilder();
     private String speaker = NarrationSegment.NARRATOR;
 
-    /** Quote state, tracked only while a creature is speaking. See {@link #emit}. */
+    /** Whether a creature's quotation is currently open. See {@link #emit}. */
     private boolean insideQuote;
-    private boolean sawQuote;
+
+    /**
+     * The last creature named this turn, kept after the model hands the voice back.
+     *
+     * <p>Models mark a creature's first line and then let it speak again with no marker at all,
+     * which had the narrator reading the goblin's dialogue. In a scene with one creature, an
+     * unattributed quotation is that creature far more often than it is anything else.
+     */
+    private String lastCreature;
 
     public NarrationParser(Set<String> knownSpeakers, Consumer<NarrationSegment> onSegment) {
         this.knownSpeakers = Set.copyOf(knownSpeakers);
@@ -79,8 +91,10 @@ public final class NarrationParser {
 
             emit(buffer.substring(0, open));
             speaker = resolve(buffer.substring(open + OPEN.length(), close).strip());
+            if (!NarrationSegment.NARRATOR.equals(speaker)) {
+                lastCreature = speaker;
+            }
             insideQuote = false;
-            sawQuote = false;
             buffer.delete(0, close + CLOSE.length());
         }
     }
@@ -124,57 +138,79 @@ public final class NarrationParser {
     }
 
     /**
-     * Emits text, ending a creature's line where the quotation ends.
+     * Emits text, attributing each run to the voice that should say it.
      *
-     * <p>The narrator's voice never expires; a creature's holds only for what it actually says.
-     * If the model wrote no quotation marks at all, the line ends with this segment — one
-     * sentence in the wrong voice beats a whole turn in it.
+     * <p>The rule is deliberately blunt: <b>quoted runs belong to the marked creature, and
+     * everything else belongs to the narrator.</b> A {@code [[goblin]]} marker names who is
+     * currently speaking and stays in force until a different marker; it does not wrap a line.
+     *
+     * <p>Three separate model behaviours pushed it here, all observed:
+     *
+     * <ul>
+     *   <li>Opening with {@code [[goblin]]} and never closing it — so prose must default to
+     *       the narrator, or the goblin reads the rest of the scene.
+     *   <li>Speaking twice off one marker — so a creature must keep its voice for later
+     *       quotations, not just the first.
+     *   <li>Putting the marker <em>after</em> the dialogue, then following it with narration —
+     *       which is why unquoted text is never given to a creature, even right after a marker.
+     * </ul>
+     *
+     * <p>The cost is that genuinely unquoted dialogue is read by the narrator. That has not been
+     * seen once in practice, whereas the failure it replaces was in every other turn.
      */
     private void emit(String raw) {
-        String text = raw.replace("`", "");
+        // Square brackets never appear in narration prose, and stage directions arrive both
+        // inline and on their own line — so strip the span rather than test the whole segment.
+        String text = ASIDE.matcher(raw).replaceAll("").replace("`", "");
         // Nothing pronounceable, nothing to say. Models occasionally emit a stray markdown fence
         // or a lone divider, and the queue would dutifully read it as its own line.
         if (text.isBlank() || text.chars().noneMatch(Character::isLetterOrDigit)) {
             return;
         }
-        if (NarrationSegment.NARRATOR.equals(speaker)) {
-            onSegment.accept(new NarrationSegment(speaker, text));
+        // Whose voice quoted speech belongs to right now. Until a creature has spoken this turn
+        // there is nobody to hand a quotation to, so the narrator keeps it — that is what lets
+        // it read a sign or a letter aloud in its own voice.
+        String quoted = NarrationSegment.NARRATOR.equals(speaker) ? lastCreature : speaker;
+        if (quoted == null) {
+            push(NarrationSegment.NARRATOR, text);
             return;
         }
 
-        int end = endOfSpokenLine(text);
-        if (end < 0) {
-            onSegment.accept(new NarrationSegment(speaker, text));
-            if (!sawQuote) {
-                speaker = NarrationSegment.NARRATOR;
+        int start = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            // A quotation never spans a blank line. Without this, one unbalanced quote mark —
+            // which models do write — puts every voice after it on the wrong side of the parity
+            // for the rest of the turn.
+            if (insideQuote && c == '\n' && i + 1 < text.length() && text.charAt(i + 1) == '\n') {
+                insideQuote = false;
+                push(quoted, text.substring(start, i));
+                start = i;
+                continue;
             }
-            return;
+
+            if (!isQuote(c)) {
+                continue;
+            }
+            if (insideQuote) {
+                insideQuote = false;
+                push(quoted, text.substring(start, i + 1));
+                start = i + 1;
+            } else {
+                push(NarrationSegment.NARRATOR, text.substring(start, i));
+                insideQuote = true;
+                start = i;
+            }
         }
 
-        onSegment.accept(new NarrationSegment(speaker, text.substring(0, end)));
-        speaker = NarrationSegment.NARRATOR;
-
-        String rest = text.substring(end);
-        if (!rest.isBlank()) {
-            onSegment.accept(new NarrationSegment(speaker, rest));
-        }
+        push(insideQuote ? quoted : NarrationSegment.NARRATOR, text.substring(start));
     }
 
-    /** Index just past the quote that closes this creature's line, or -1 if it is still open. */
-    private int endOfSpokenLine(String text) {
-        for (int i = 0; i < text.length(); i++) {
-            if (!isQuote(text.charAt(i))) {
-                continue;
-            }
-            sawQuote = true;
-            if (!insideQuote) {
-                insideQuote = true;
-                continue;
-            }
-            insideQuote = false;
-            return i + 1;
+    private void push(String voice, String text) {
+        if (!text.isBlank()) {
+            onSegment.accept(new NarrationSegment(voice, text));
         }
-        return -1;
     }
 
     private static boolean isQuote(char c) {

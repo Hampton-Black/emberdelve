@@ -52,6 +52,11 @@ export function webSpeech(): VoiceBackend {
   let settle: (() => void) | null = null;
 
   const pick = (speakerId: string): SpeechSynthesisVoice | undefined => {
+    // getVoices() is empty for the first moments of a page's life and `voiceschanged` may
+    // already have fired before this module existed. Cheap to re-ask than to lose the casting
+    // on the session's first line.
+    if (voices.length === 0) refresh();
+
     const cast = CASTING[speakerId] ?? DEFAULT_CAST;
     for (const name of cast.prefer) {
       const match = voices.find((v) => v.name.startsWith(name));

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { silence, speak } from "./audio/narration";
+import { silence, silenceNow, speak } from "./audio/narration";
 import { isDramatic, revealAt } from "./dice/tumble";
 import type {
   Diff,
@@ -161,7 +161,7 @@ export const useGame = create<GameState>((set, get) => ({
   endNarration: () => throughGate(() => set({ awaitingDm: false })),
 
   sayAsPlayer: (text) => {
-    // A new turn cuts off whatever the DM was still saying about the last one.
+    // A new turn drops the rest of the last one, but lets the sentence in the air finish.
     silence();
     set((state) => ({
       transcript: [...state.transcript, { kind: "prose", speakerId: "player", text }],
@@ -195,7 +195,8 @@ export const useGame = create<GameState>((set, get) => ({
 
   // Errors bypass the gate: a stuck turn must never be hidden behind a die.
   setError: (error) => {
-    silence();
+    // An error is the one case worth cutting mid-word for.
+    silenceNow();
     set({ error, awaitingDm: false });
   },
 }));
