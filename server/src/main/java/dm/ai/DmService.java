@@ -133,6 +133,12 @@ public final class DmService {
      */
     public void openScene(TurnSink sink, boolean force) {
         if (!opened.compareAndSet(false, true) && !force) {
+            // Still has to close the turn. The client gives the DM the floor the moment the
+            // player clicks through the title and waits for this to hand it back — so a reload
+            // against a server that has already opened the scene, which is every reload during
+            // development, used to leave the input box disabled and a thinking cursor blinking
+            // forever. Nothing was wrong except that nobody said the turn was over.
+            sink.complete();
             return;
         }
 
