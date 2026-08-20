@@ -1,0 +1,199 @@
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+
+> Task :run
+[main] INFO dm.ai.VeniceDmClient - DmClient -> https://api.venice.ai/api/v1 model=qwen3-next-80b timeout=20s
+[main] INFO dm.ai.VeniceDmClient - DmClient -> https://api.venice.ai/api/v1 model=venice-uncensored-role-play timeout=90s
+[main] INFO io.javalin.Javalin - Starting Javalin ...
+[main] INFO org.eclipse.jetty.server.Server - jetty-11.0.25; built: 2025-03-13T00:15:57.301Z; git: a2e9fae3ad8320f2a713d4fa29bba356a99d1295; jvm 25.0.2+10-69
+[main] INFO org.eclipse.jetty.server.session.DefaultSessionIdManager - Session workerName=node0
+[main] INFO org.eclipse.jetty.server.handler.ContextHandler - Started o.e.j.s.ServletContextHandler@362045c0{/,null,AVAILABLE}
+[main] INFO org.eclipse.jetty.server.AbstractConnector - Started ServerConnector@106cc338{HTTP/1.1, (http/1.1)}{0.0.0.0:7070}
+[main] INFO org.eclipse.jetty.server.Server - Started Server@66c92293{STARTING}[11.0.25,sto=0] @302ms
+[main] INFO io.javalin.Javalin - 
+       __                  ___           _____
+      / /___ __   ______ _/ (_)___      / ___/
+ __  / / __ `/ | / / __ `/ / / __ \    / __ \
+/ /_/ / /_/ /| |/ / /_/ / / / / / /   / /_/ /
+\____/\__,_/ |___/\__,_/_/_/_/ /_/    \____/
+
+       https://javalin.io/documentation
+
+[main] INFO io.javalin.Javalin - Javalin started in 52ms \o/
+[main] INFO io.javalin.Javalin - Listening on http://localhost:7070/
+[main] INFO io.javalin.Javalin - You are running Javalin 6.7.0 (released June 22, 2025. Your Javalin version is 424 days old. Consider checking for a newer version.).
+[main] INFO dm.App - Emberdelve on :7070 — room 'The Ashen Crypt', 1 entities, dm=qwen3-next-80b + venice-uncensored-role-play
+[JettyServerThreadPool-77] INFO dm.WsHandler - client connected: bccd3540-5868-4b4e-85a6-ee63ad8f9134
+[warm-check] INFO dm.ai.DmService - tools model 'qwen3-next-80b' healthy: 784ms
+[warm-check] INFO dm.ai.DmService - prose model 'venice-uncensored-role-play' healthy: 584ms
+[JettyServerThreadPool-75] ERROR dm.WsHandler - ws error
+java.nio.channels.ClosedChannelException
+	at org.eclipse.jetty.websocket.core.internal.WebSocketSessionState.onEof(WebSocketSessionState.java:169)
+	at org.eclipse.jetty.websocket.core.internal.WebSocketCoreSession.onEof(WebSocketCoreSession.java:253)
+	at org.eclipse.jetty.websocket.core.internal.WebSocketConnection.fillAndParse(WebSocketConnection.java:491)
+	at org.eclipse.jetty.websocket.core.internal.WebSocketConnection.onFillable(WebSocketConnection.java:349)
+	at org.eclipse.jetty.io.AbstractConnection$ReadCallback.succeeded(AbstractConnection.java:314)
+	at org.eclipse.jetty.io.FillInterest.fillable(FillInterest.java:100)
+	at org.eclipse.jetty.io.SelectableChannelEndPoint$1.run(SelectableChannelEndPoint.java:53)
+	at org.eclipse.jetty.util.thread.strategy.AdaptiveExecutionStrategy.runTask(AdaptiveExecutionStrategy.java:421)
+	at org.eclipse.jetty.util.thread.strategy.AdaptiveExecutionStrategy.consumeTask(AdaptiveExecutionStrategy.java:390)
+	at org.eclipse.jetty.util.thread.strategy.AdaptiveExecutionStrategy.tryProduce(AdaptiveExecutionStrategy.java:277)
+	at org.eclipse.jetty.util.thread.strategy.AdaptiveExecutionStrategy.run(AdaptiveExecutionStrategy.java:199)
+	at org.eclipse.jetty.util.thread.ReservedThreadExecutor$ReservedThread.run(ReservedThreadExecutor.java:411)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool.runJob(QueuedThreadPool.java:969)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool$Runner.doRunJob(QueuedThreadPool.java:1194)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool$Runner.run(QueuedThreadPool.java:1149)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+[JettyServerThreadPool-75] INFO dm.WsHandler - client disconnected: bccd3540-5868-4b4e-85a6-ee63ad8f9134
+[JettyServerThreadPool-56] INFO dm.WsHandler - client connected: d9bdbeb5-6ae4-48d8-a122-ffb25c143d34
+[] INFO dm.ai.DmService - | narrator | You step into the chamber.
+[JettyServerThreadPool-82] INFO dm.ai.TtsClient - TTS      275ms  26375 bytes  narrator  <- 26 chars
+[] INFO dm.ai.DmService - | narrator | The air is thick with the smell of cold ashes and something older, more decayed.
+[] INFO dm.ai.DmService - | narrator | The braziers gutter and hiss, casting a sickly green light across the walls.
+[] INFO dm.ai.DmService - OPENING  first token 772ms  total 1480ms  184 chars
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      315ms  81964 bytes  narrator  <- 81 chars
+[JettyServerThreadPool-84] INFO dm.ai.TtsClient - TTS      329ms  91577 bytes  narrator  <- 77 chars
+[] INFO dm.ai.DmService - | narrator | The sarcophagus lid is heavy, gruelling to move.
+[] INFO dm.ai.DmService - | narrator | Over the scratching, you hear a thin scratching sound from inside.
+[JettyServerThreadPool-82] INFO dm.ai.TtsClient - TTS      370ms  60648 bytes  narrator  <- 48 chars
+[] INFO dm.ai.DmService - | narrator | A gust of stale air escapes the seam as it shifts.
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK nonems | tools 1639ms (0 calls, 0 rejected) | prose 1663ms first-token 960ms | reconcile 718ms (0 applied) | total 4020ms | session: 0/1 turns used dice, 0 reconciled
+[JettyServerThreadPool-90] INFO dm.ai.TtsClient - TTS      262ms  53960 bytes  narrator  <- 51 chars
+[JettyServerThreadPool-62] INFO dm.ai.TtsClient - TTS      305ms  76112 bytes  narrator  <- 67 chars
+[JettyServerThreadPool-90] ERROR dm.WsHandler - failed to handle message: {"type":"moveTo","actorId":"fighter","x":6,"y":7}
+java.lang.IllegalArgumentException: Something solid is already at 6,7
+	at dm.engine.GameEngine.moveTo(GameEngine.java:158)
+	at dm.WsHandler.lambda$handle$0(WsHandler.java:99)
+	at dm.WsHandler.act(WsHandler.java:185)
+	at dm.WsHandler.handle(WsHandler.java:99)
+	at dm.WsHandler.lambda$register$1(WsHandler.java:78)
+	at io.javalin.websocket.WsConnection$onMessage$1.invoke(WsConnection.kt:38)
+	at io.javalin.websocket.WsConnection$onMessage$1.invoke(WsConnection.kt:38)
+	at io.javalin.websocket.WsConnection.tryBeforeAndEndpointHandlers(WsConnection.kt:72)
+	at io.javalin.websocket.WsConnection.onMessage(WsConnection.kt:38)
+	at org.eclipse.jetty.websocket.core.internal.messages.StringMessageSink.accept(StringMessageSink.java:54)
+	at org.eclipse.jetty.websocket.common.JettyWebSocketFrameHandler.acceptMessage(JettyWebSocketFrameHandler.java:351)
+	at org.eclipse.jetty.websocket.common.JettyWebSocketFrameHandler.onTextFrame(JettyWebSocketFrameHandler.java:437)
+	at org.eclipse.jetty.websocket.common.JettyWebSocketFrameHandler.onFrame(JettyWebSocketFrameHandler.java:241)
+	at org.eclipse.jetty.websocket.core.internal.WebSocketCoreSession$IncomingAdaptor.lambda$onFrame$1(WebSocketCoreSession.java:671)
+	at org.eclipse.jetty.server.handler.ContextHandler.handle(ContextHandler.java:1466)
+	at org.eclipse.jetty.server.handler.ContextHandler.handle(ContextHandler.java:1485)
+	at org.eclipse.jetty.websocket.core.server.internal.AbstractHandshaker$1.handle(AbstractHandshaker.java:212)
+	at org.eclipse.jetty.websocket.core.internal.WebSocketCoreSession$IncomingAdaptor.onFrame(WebSocketCoreSession.java:671)
+	at org.eclipse.jetty.websocket.core.AbstractExtension.nextIncomingFrame(AbstractExtension.java:145)
+	at org.eclipse.jetty.websocket.core.internal.PerMessageDeflateExtension.nextIncomingFrame(PerMessageDeflateExtension.java:236)
+	at org.eclipse.jetty.websocket.core.internal.DemandingFlusher.emitFrame(DemandingFlusher.java:145)
+	at org.eclipse.jetty.websocket.core.internal.PerMessageDeflateExtension$IncomingFlusher.inflate(PerMessageDeflateExtension.java:487)
+	at org.eclipse.jetty.websocket.core.internal.PerMessageDeflateExtension$IncomingFlusher.handle(PerMessageDeflateExtension.java:413)
+	at org.eclipse.jetty.websocket.core.internal.DemandingFlusher.process(DemandingFlusher.java:169)
+	at org.eclipse.jetty.util.IteratingCallback.processing(IteratingCallback.java:243)
+	at org.eclipse.jetty.util.IteratingCallback.succeeded(IteratingCallback.java:371)
+	at org.eclipse.jetty.websocket.core.internal.DemandingFlusher.onFrame(DemandingFlusher.java:104)
+	at org.eclipse.jetty.websocket.core.internal.PerMessageDeflateExtension.onFrame(PerMessageDeflateExtension.java:93)
+	at org.eclipse.jetty.websocket.core.internal.ExtensionStack.onFrame(ExtensionStack.java:120)
+	at org.eclipse.jetty.websocket.core.internal.WebSocketCoreSession.onFrame(WebSocketCoreSession.java:481)
+	at org.eclipse.jetty.websocket.core.internal.WebSocketConnection.onFrame(WebSocketConnection.java:271)
+	at org.eclipse.jetty.websocket.core.internal.WebSocketConnection.fillAndParse(WebSocketConnection.java:464)
+	at org.eclipse.jetty.websocket.core.internal.WebSocketConnection.onFillable(WebSocketConnection.java:349)
+	at org.eclipse.jetty.io.AbstractConnection$ReadCallback.succeeded(AbstractConnection.java:314)
+	at org.eclipse.jetty.io.FillInterest.fillable(FillInterest.java:100)
+	at org.eclipse.jetty.io.SelectableChannelEndPoint$1.run(SelectableChannelEndPoint.java:53)
+	at org.eclipse.jetty.util.thread.strategy.AdaptiveExecutionStrategy.runTask(AdaptiveExecutionStrategy.java:421)
+	at org.eclipse.jetty.util.thread.strategy.AdaptiveExecutionStrategy.consumeTask(AdaptiveExecutionStrategy.java:390)
+	at org.eclipse.jetty.util.thread.strategy.AdaptiveExecutionStrategy.tryProduce(AdaptiveExecutionStrategy.java:277)
+	at org.eclipse.jetty.util.thread.strategy.AdaptiveExecutionStrategy.run(AdaptiveExecutionStrategy.java:199)
+	at org.eclipse.jetty.util.thread.ReservedThreadExecutor$ReservedThread.run(ReservedThreadExecutor.java:411)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool.runJob(QueuedThreadPool.java:969)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool$Runner.doRunJob(QueuedThreadPool.java:1194)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool$Runner.run(QueuedThreadPool.java:1149)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+[] INFO dm.ai.DmService - | narrator | You press your shoulder to the heavy stone and shove.
+[JettyServerThreadPool-75] INFO dm.ai.TtsClient - TTS      310ms  50199 bytes  narrator  <- 53 chars
+[] INFO dm.ai.DmService - | narrator | The lid grinds a fraction to the side before something inside lurches against it with a rasping cry.
+[] INFO dm.ai.DmService - | narrator | With a final heave, the lid shifts and slams open.
+[] INFO dm.ai.DmService - | narrator | A gust of stale air rushes out, carrying an unearthly stench.
+[] INFO dm.ai.DmService - | narrator | From the dark depths of the sarcophagus, a wiry form scrambles up and out, spitting grave-dust.
+[] INFO dm.ai.DmService - | narrator | It looks around in panic, eyes wide and unblinking.
+[] INFO dm.ai.DmService - | narrator | "Y-you!"
+[] INFO dm.ai.DmService - | narrator | the goblin shrieks, brandishing a rusty shortsword.
+[] INFO dm.ai.DmService - | narrator | "Y-you opened the box!"
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK 1555ms | tools 7218ms (3 calls, 0 rejected) | prose 2986ms first-token 850ms | reconcile 0ms (0 applied) | total 10204ms | session: 1/2 turns used dice, 0 reconciled
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      331ms  51035 bytes  narrator  <- 51 chars
+[JettyServerThreadPool-55] INFO dm.ai.TtsClient - TTS      351ms  99936 bytes  narrator  <- 101 chars
+[JettyServerThreadPool-82] INFO dm.ai.TtsClient - TTS      287ms  63573 bytes  narrator  <- 63 chars
+[JettyServerThreadPool-98] INFO dm.ai.TtsClient - TTS      426ms  113311 bytes  narrator  <- 96 chars
+[JettyServerThreadPool-98] INFO dm.ai.TtsClient - TTS      263ms  56050 bytes  narrator  <- 52 chars
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      164ms  17598 bytes  narrator  <- 10 chars
+[JettyServerThreadPool-82] INFO dm.ai.TtsClient - TTS      324ms  59812 bytes  narrator  <- 52 chars
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      159ms  27629 bytes  narrator  <- 24 chars
+[] INFO dm.ai.DmService - | goblin | "F-f-fuck!
+[] INFO dm.ai.DmService - | goblin | My clothes!"
+[JettyServerThreadPool-61] INFO dm.ai.TtsClient - TTS      159ms  16762 bytes  goblin  <- 10 chars
+[] INFO dm.ai.DmService - | narrator | the goblin yells, spitting and clawing at his gravedust-grimed tunic in disgust.
+[] INFO dm.ai.DmService - | narrator | He stumbles back from the sarcophagus, sword still brandished, eyes darting between you and the open tomb.
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK 1887ms | tools 7601ms (1 calls, 0 rejected) | prose 1876ms first-token 881ms | reconcile 0ms (0 applied) | total 9477ms | session: 2/3 turns used dice, 0 reconciled
+[JettyServerThreadPool-79] INFO dm.ai.TtsClient - TTS      152ms  18852 bytes  goblin  <- 13 chars
+[JettyServerThreadPool-82] INFO dm.ai.TtsClient - TTS      303ms  94084 bytes  narrator  <- 81 chars
+[JettyServerThreadPool-61] INFO dm.ai.TtsClient - TTS      393ms  111221 bytes  narrator  <- 107 chars
+[] WARN dm.ai.DmService - tool rejected: start_combat({}) -> REJECTED: combat has already started
+[] INFO dm.ai.DmService - | narrator | The goblin's eyes widen in horror as his form warps and stretches.
+[JettyServerThreadPool-75] INFO dm.ai.TtsClient - TTS      364ms  78202 bytes  narrator  <- 66 chars
+[] INFO dm.ai.DmService - | narrator | In a flash, Vessk transforms into an immense, steaming hotdog, lying prone on the crypt floor.
+[] INFO dm.ai.DmService - | narrator | The smell of strange spices and burnt bread fills the air.
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK nonems | tools 5108ms (1 calls, 1 rejected) | prose 1742ms first-token 924ms | reconcile 0ms (0 applied) | total 6850ms | session: 3/4 turns used dice, 0 reconciled
+[JettyServerThreadPool-82] INFO dm.ai.TtsClient - TTS      273ms  58140 bytes  narrator  <- 59 chars
+[JettyServerThreadPool-75] INFO dm.ai.TtsClient - TTS      356ms  113311 bytes  narrator  <- 95 chars
+[] INFO dm.ai.DmService - | goblin | "You stay down, filth!"
+[] INFO dm.ai.DmService - | narrator | the goblin yells, lunging forward with a flash of rust.
+[] INFO dm.ai.DmService - | narrator | His blade catches Roderick a painful glancing blow across the shoulder of his cuirass as you step back.
+[] INFO dm.ai.DmService - | narrator | The steel bites through the faded blue and green, leaving a deep red gash that soaks your tunic beneath.
+[] INFO dm.ai.DmService - COMBAT   first token 894ms  total 2121ms  289 chars  <- [Vessk lands a critical hit on Roderick for 9 damage., Roderick is now badly hurt.]
+[JettyServerThreadPool-99] INFO dm.ai.TtsClient - TTS      253ms  29301 bytes  goblin  <- 23 chars
+[JettyServerThreadPool-77] INFO dm.ai.TtsClient - TTS      359ms  56886 bytes  narrator  <- 56 chars
+[JettyServerThreadPool-84] INFO dm.ai.TtsClient - TTS      400ms  102026 bytes  narrator  <- 105 chars
+[JettyServerThreadPool-84] INFO dm.ai.TtsClient - TTS      436ms  110385 bytes  narrator  <- 105 chars
+[] WARN dm.ai.DmService - tool rejected: start_combat({}) -> REJECTED: combat has already started
+[] INFO dm.ai.DmService - | narrator | You press your shoulder to the heavy stone and shove.
+[JettyServerThreadPool-84] INFO dm.ai.TtsClient - TTS      325ms  51453 bytes  narrator  <- 53 chars
+[] INFO dm.ai.DmService - | narrator | The lid grinds a fraction to the side before something inside lurches against it with a rasping cry.
+[] INFO dm.ai.DmService - | narrator | With a final heave, the lid shifts and slams open.
+[] INFO dm.ai.DmService - | narrator | A gust of stale air rushes out, carrying an unearthly stench.
+[] INFO dm.ai.DmService - | narrator | From the dark depths of the sarcophagus, a wiry form scrambles up and out, spitting grave-dust.
+[] INFO dm.ai.DmService - | narrator | It looks around in panic, eyes wide and unblinking.
+[] INFO dm.ai.DmService - | goblin | "Y-you!"
+[] INFO dm.ai.DmService - | narrator | the goblin shrieks, brandishing a rusty shortsword.
+[] INFO dm.ai.DmService - | goblin | "Y-you opened the box!"
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK 6717ms | tools 14261ms (2 calls, 1 rejected) | prose 2966ms first-token 819ms | reconcile 0ms (0 applied) | total 17227ms | session: 4/5 turns used dice, 0 reconciled
+[JettyServerThreadPool-100] INFO dm.ai.TtsClient - TTS      264ms  53124 bytes  narrator  <- 51 chars
+[JettyServerThreadPool-90] INFO dm.ai.TtsClient - TTS      374ms  108713 bytes  narrator  <- 101 chars
+[JettyServerThreadPool-90] INFO dm.ai.TtsClient - TTS      371ms  73186 bytes  narrator  <- 63 chars
+[] INFO dm.ai.DmService - | narrator | Vessk reels back from the blow, his sword clattering to the floor.
+[] INFO dm.ai.DmService - | narrator | He staggers a step, tumbling over the edge of the dais to land face-down in a puddle of his own blood.
+[] INFO dm.ai.DmService - | narrator | His twitching legs slowly still.
+[] INFO dm.ai.DmService - COMBAT   first token 692ms  total 1514ms  202 chars  <- [Roderick hits Vessk for 7 damage., Vessk is killed by the blow.]
+[JettyServerThreadPool-75] INFO dm.ai.TtsClient - TTS      336ms  115400 bytes  narrator  <- 96 chars
+[JettyServerThreadPool-75] INFO dm.ai.TtsClient - TTS      290ms  54378 bytes  narrator  <- 52 chars
+[JettyServerThreadPool-55] INFO dm.ai.TtsClient - TTS      158ms  16762 bytes  goblin  <- 8 chars
+[JettyServerThreadPool-90] INFO dm.ai.TtsClient - TTS      339ms  57722 bytes  narrator  <- 52 chars
+[JettyServerThreadPool-55] INFO dm.ai.TtsClient - TTS      222ms  41004 bytes  goblin  <- 23 chars
+[JettyServerThreadPool-55] INFO dm.ai.TtsClient - TTS      287ms  74440 bytes  narrator  <- 66 chars
+[JettyServerThreadPool-90] INFO dm.ai.TtsClient - TTS      486ms  95338 bytes  narrator  <- 103 chars
+[JettyServerThreadPool-75] INFO dm.ai.TtsClient - TTS      304ms  37660 bytes  narrator  <- 33 chars
+
+> Task :run FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':run' (registered by plugin 'org.gradle.application').
+> Process 'command '/Users/hampton/.sdkman/candidates/java/25.0.2-open/bin/java'' finished with non-zero exit value 143 (this value may indicate that the process was terminated with the SIGTERM signal)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 40m 52s
+3 actionable tasks: 1 executed, 2 up-to-date

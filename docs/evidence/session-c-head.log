@@ -1,0 +1,38 @@
+[main] INFO dm.ai.VeniceDmClient - DmClient -> https://api.venice.ai/api/v1 model=qwen3-next-80b timeout=20s
+[main] INFO dm.ai.VeniceDmClient - DmClient -> https://api.venice.ai/api/v1 model=venice-uncensored-role-play timeout=90s
+[main] INFO dm.App - Emberdelve on :7070 — room 'The Ashen Crypt', 1 entities, dm=qwen3-next-80b + venice-uncensored-role-play
+[warm-check] INFO dm.ai.DmService - tools model 'qwen3-next-80b' healthy: 940ms
+[warm-check] WARN dm.ai.DmService - prose model 'venice-uncensored-role-play' is sluggish: 2379ms for a 4-token request
+[] INFO dm.ai.DmService - | narrator | You step into the crypt.
+[] INFO dm.ai.DmService - | narrator | The air is thick, stifling.
+[] INFO dm.ai.DmService - | narrator | The braziers gutter and hiss, their green flames making the shadows crawl across the walls.
+[] INFO dm.ai.DmService - OPENING  first token 633ms  total 1229ms  144 chars
+[] INFO dm.ai.DmService - | fighter | I slowly walk forward, trying to find anything worth checking out
+[] INFO dm.ai.DmService - | narrator | You walk forward, stepping through the room.
+[] INFO dm.ai.DmService - | narrator | Your boot scuffs dust from the floor.
+[] INFO dm.ai.DmService - | narrator | The green light makes no shadow.
+[] INFO dm.ai.DmService - | narrator | Vessk scrambles out of the rubble at (2,2), hisses in surprise, and scurries to stand behind the sarcophagus, clutching a notched shortsword.
+[] INFO dm.ai.DmService - | narrator | A fight breaks out between you and Vessk.
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK 1054ms | tools 6584ms (3 calls, 0 rejected) | prose 2062ms first-token 676ms | reconcile 0ms (0 applied) | total 8646ms | session: 1/1 turns used dice, 0 reconciled
+[] INFO dm.ai.DmService - | fighter | I ask, "what are you doing here?"
+[] INFO dm.ai.DmService - | goblin | "I...
+[] INFO dm.ai.DmService - | goblin | I don't know!"
+[] INFO dm.ai.DmService - | narrator | Vessk stammers.
+[] INFO dm.ai.DmService - | narrator | He shuffles back, eyes darting to the shadows behind him.
+[] INFO dm.ai.DmService - | goblin | "I picked the lock!
+[] INFO dm.ai.DmService - | goblin | I thought there might be something valuable inside!"
+[] INFO dm.ai.DmService - | narrator | In two quick strides, you close the distance and grab him by the scruff of his neck.
+[] INFO dm.ai.DmService - | narrator | With your other hand, you turn his head towards the empty sarcophagus.
+[] INFO dm.ai.DmService - | goblin | "What else did you see in there?"
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK 1085ms | tools 3060ms (1 calls, 0 rejected) | prose 2548ms first-token 871ms | reconcile 0ms (0 applied) | total 5608ms | session: 2/2 turns used dice, 0 reconciled
+[] INFO dm.ai.DmService - | narrator | You jerk Vessk off his feet and drive him backwards over the sarcophagus.
+[] INFO dm.ai.DmService - | narrator | He lands in an untidy heap on the other side, sprawling onto his back.
+[] INFO dm.ai.DmService - | goblin | "Oof!
+[] INFO dm.ai.DmService - | goblin | What was that for?"
+[] INFO dm.ai.DmService - | narrator | He lies still for a moment, groaning, before slowly sitting up and rubbing his head.
+[] INFO dm.ai.DmService - | narrator | He still clutches his shortsword, but it trembles in his grip.
+[] INFO dm.ai.DmService - COMBAT   first token 850ms  total 2371ms  317 chars  <- [Vessk hits Roderick for 6 damage., Roderick is now wounded.]
+[] INFO dm.ai.DmService - | narrator | Vessk's blade bites deep into your side.
+[] INFO dm.ai.DmService - | narrator | You stagger back, clutching at the gaping wound as dark blood wells between your fingers.
+[] INFO dm.ai.DmService - | narrator | Your legs give way beneath you and you crumple to the stone floor, the last of your strength ebbing away.
+[] INFO dm.ai.DmService - COMBAT   first token 953ms  total 1827ms  236 chars  <- [Vessk hits Roderick for 5 damage., Roderick is killed by the blow.]

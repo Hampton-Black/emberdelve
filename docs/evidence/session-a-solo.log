@@ -1,0 +1,103 @@
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+
+> Task :run
+[main] INFO dm.ai.VeniceDmClient - DmClient -> https://api.venice.ai/api/v1 model=qwen3-next-80b timeout=20s
+[main] INFO dm.ai.VeniceDmClient - DmClient -> https://api.venice.ai/api/v1 model=venice-uncensored-role-play timeout=90s
+[main] INFO io.javalin.Javalin - Starting Javalin ...
+[main] INFO org.eclipse.jetty.server.Server - jetty-11.0.25; built: 2025-03-13T00:15:57.301Z; git: a2e9fae3ad8320f2a713d4fa29bba356a99d1295; jvm 25.0.2+10-69
+[main] INFO org.eclipse.jetty.server.session.DefaultSessionIdManager - Session workerName=node0
+[main] INFO org.eclipse.jetty.server.handler.ContextHandler - Started o.e.j.s.ServletContextHandler@362045c0{/,null,AVAILABLE}
+[main] INFO org.eclipse.jetty.server.AbstractConnector - Started ServerConnector@106cc338{HTTP/1.1, (http/1.1)}{0.0.0.0:7070}
+[main] INFO org.eclipse.jetty.server.Server - Started Server@66c92293{STARTING}[11.0.25,sto=0] @286ms
+[main] INFO io.javalin.Javalin - 
+       __                  ___           _____
+      / /___ __   ______ _/ (_)___      / ___/
+ __  / / __ `/ | / / __ `/ / / __ \    / __ \
+/ /_/ / /_/ /| |/ / /_/ / / / / / /   / /_/ /
+\____/\__,_/ |___/\__,_/_/_/_/ /_/    \____/
+
+       https://javalin.io/documentation
+
+[main] INFO io.javalin.Javalin - Javalin started in 50ms \o/
+[main] INFO io.javalin.Javalin - Listening on http://localhost:7070/
+[main] INFO io.javalin.Javalin - You are running Javalin 6.7.0 (released June 22, 2025. Your Javalin version is 424 days old. Consider checking for a newer version.).
+[main] INFO dm.App - Emberdelve on :7070 — room 'The Ashen Crypt', 1 entities, dm=qwen3-next-80b + venice-uncensored-role-play
+[warm-check] INFO dm.ai.DmService - tools model 'qwen3-next-80b' healthy: 812ms
+[JettyServerThreadPool-79] INFO dm.WsHandler - client connected: e21024dc-7fd4-4e55-9948-32667b69ea53
+[warm-check] INFO dm.ai.DmService - prose model 'venice-uncensored-role-play' healthy: 655ms
+[JettyServerThreadPool-81] INFO dm.WsHandler - client disconnected: e21024dc-7fd4-4e55-9948-32667b69ea53
+[JettyServerThreadPool-57] INFO dm.WsHandler - client connected: f77cf941-c813-4a89-bdab-a347e545bc1b
+[JettyServerThreadPool-81] INFO dm.ai.TtsClient - TTS      428ms  62737 bytes  narrator  <- 65 chars
+[] INFO dm.ai.DmService - OPENING  first token 813ms  total 1777ms  250 chars
+[JettyServerThreadPool-57] INFO dm.ai.TtsClient - TTS      472ms  82799 bytes  narrator  <- 69 chars
+[JettyServerThreadPool-59] INFO dm.ai.TtsClient - TTS      493ms  106623 bytes  narrator  <- 99 chars
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      263ms  20942 bytes  fighter  <- 17 chars
+[JettyServerThreadPool-56] INFO dm.ai.TtsClient - TTS      302ms  78202 bytes  narrator  <- 75 chars
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK 1094ms | tools 2500ms (1 calls, 0 rejected) | prose 2043ms first-token 797ms | reconcile 724ms (0 applied) | total 5267ms | session: 1/1 turns used dice, 0 reconciled
+[JettyServerThreadPool-59] INFO dm.ai.TtsClient - TTS      308ms  74440 bytes  narrator  <- 73 chars
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      396ms  84471 bytes  narrator  <- 80 chars
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      372ms  39750 bytes  narrator  <- 44 chars
+[JettyServerThreadPool-81] INFO dm.ai.TtsClient - TTS      247ms  6313 bytes  fighter  <- 1 chars
+[JettyServerThreadPool-56] INFO dm.ai.TtsClient - TTS      295ms  69425 bytes  narrator  <- 67 chars
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      484ms  131701 bytes  narrator  <- 115 chars
+[] INFO dm.ai.DmService - reconcile declined to run none({}) — reading it as 'nothing to change'
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK 1184ms | tools 6774ms (2 calls, 0 rejected) | prose 2044ms first-token 823ms | reconcile 2193ms (0 applied) | total 11011ms | session: 2/2 turns used dice, 0 reconciled
+[JettyServerThreadPool-94] INFO dm.ai.TtsClient - TTS      204ms  27211 bytes  narrator  <- 28 chars
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      256ms  45601 bytes  narrator  <- 51 chars
+[JettyServerThreadPool-58] INFO dm.ai.TtsClient - TTS      1495ms  91159 bytes  narrator  <- 95 chars
+[JettyServerThreadPool-58] INFO dm.ai.TtsClient - TTS      162ms  11328 bytes  goblin  <- 5 chars
+[JettyServerThreadPool-58] INFO dm.ai.TtsClient - TTS      1406ms  14254 bytes  goblin  <- 11 chars
+[JettyServerThreadPool-56] INFO dm.ai.TtsClient - TTS      271ms  45601 bytes  fighter  <- 48 chars
+[] INFO dm.ai.DmService - reconcile applied start_combat({}) -> Combat has begun. Initiative order: Vessk (22), Roderick (12). Describe only the instant the fight breaks out — one or two sentences. Do not list the order. Do not narrate anyone's turn, attack, movement or wound: none of that has happened yet.
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK 1524ms | tools 4787ms (1 calls, 0 rejected) | prose 1691ms first-token 816ms | reconcile 763ms (1 applied) | total 7241ms | session: 3/3 turns used dice, 1 reconciled
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      191ms  13000 bytes  goblin  <- 6 chars
+[JettyServerThreadPool-55] INFO dm.ai.TtsClient - TTS      256ms  47273 bytes  narrator  <- 40 chars
+[] INFO dm.ai.DmService - COMBAT   first token 828ms  total 1700ms  220 chars  <- [Vessk closes the distance to Roderick., Vessk hits Roderick for 5 damage., Roderick is now wounded.]
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      216ms  12164 bytes  goblin  <- 7 chars
+[JettyServerThreadPool-61] INFO dm.ai.TtsClient - TTS      178ms  25539 bytes  goblin  <- 26 chars
+[JettyServerThreadPool-60] INFO dm.ai.TtsClient - TTS      333ms  55214 bytes  narrator  <- 53 chars
+[JettyServerThreadPool-61] INFO dm.ai.TtsClient - TTS      314ms  78202 bytes  narrator  <- 84 chars
+[JettyServerThreadPool-61] INFO dm.ai.TtsClient - TTS      177ms  15090 bytes  goblin  <- 11 chars
+[JettyServerThreadPool-61] INFO dm.ai.TtsClient - TTS      264ms  71097 bytes  narrator  <- 61 chars
+[JettyServerThreadPool-58] INFO dm.ai.TtsClient - TTS      337ms  64827 bytes  narrator  <- 64 chars
+[] INFO dm.ai.DmService - COMBAT   first token 846ms  total 1935ms  276 chars  <- [Roderick lands a critical hit on Vessk for 15 damage., Vessk is killed by the blow.]
+[JettyServerThreadPool-98] INFO dm.ai.TtsClient - TTS      350ms  58140 bytes  narrator  <- 61 chars
+[JettyServerThreadPool-61] INFO dm.ai.TtsClient - TTS      355ms  54378 bytes  narrator  <- 51 chars
+[JettyServerThreadPool-79] INFO dm.ai.TtsClient - TTS      323ms  64827 bytes  narrator  <- 64 chars
+[JettyServerThreadPool-79] INFO dm.ai.TtsClient - TTS      313ms  105787 bytes  narrator  <- 100 chars
+[JettyServerThreadPool-79] INFO dm.ai.TtsClient - TTS      388ms  74022 bytes  narrator  <- 68 chars
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK nonems | tools 15503ms (0 calls, 0 rejected) | prose 1844ms first-token 939ms | reconcile 838ms (0 applied) | total 18185ms | session: 3/4 turns used dice, 1 reconciled
+[JettyServerThreadPool-65] INFO dm.ai.TtsClient - TTS      314ms  75276 bytes  narrator  <- 65 chars
+[JettyServerThreadPool-79] INFO dm.ai.TtsClient - TTS      1482ms  90323 bytes  narrator  <- 101 chars
+[JettyServerThreadPool-57] INFO dm.ai.TtsClient - TTS      475ms  119162 bytes  narrator  <- 113 chars
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK nonems | tools 1432ms (0 calls, 0 rejected) | prose 1659ms first-token 783ms | reconcile 660ms (0 applied) | total 3751ms | session: 3/5 turns used dice, 1 reconciled
+[JettyServerThreadPool-79] INFO dm.ai.TtsClient - TTS      340ms  80710 bytes  narrator  <- 73 chars
+[JettyServerThreadPool-65] INFO dm.ai.TtsClient - TTS      1491ms  33898 bytes  narrator  <- 29 chars
+[JettyServerThreadPool-79] INFO dm.ai.TtsClient - TTS      342ms  85725 bytes  narrator  <- 88 chars
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK 1439ms | tools 3577ms (1 calls, 0 rejected) | prose 1549ms first-token 865ms | reconcile 1679ms (0 applied) | total 6805ms | session: 4/6 turns used dice, 1 reconciled
+[JettyServerThreadPool-57] INFO dm.ai.TtsClient - TTS      253ms  36824 bytes  narrator  <- 35 chars
+[JettyServerThreadPool-59] INFO dm.ai.TtsClient - TTS      353ms  101190 bytes  narrator  <- 93 chars
+[JettyServerThreadPool-79] INFO dm.ai.TtsClient - TTS      312ms  94084 bytes  narrator  <- 88 chars
+[] INFO dm.ai.DmService - reconcile declined to run none({}) — reading it as 'nothing to change'
+[] INFO dm.ai.TurnMetrics - turn: FIRST FEEDBACK nonems | tools 1396ms (0 calls, 0 rejected) | prose 2009ms first-token 949ms | reconcile 1251ms (0 applied) | total 4656ms | session: 4/7 turns used dice, 1 reconciled
+[JettyServerThreadPool-128] INFO dm.ai.TtsClient - TTS      449ms  90323 bytes  narrator  <- 90 chars
+[JettyServerThreadPool-57] INFO dm.ai.TtsClient - TTS      469ms  122088 bytes  narrator  <- 108 chars
+
+> Task :run FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':run' (registered by plugin 'org.gradle.application').
+> Process 'command '/Users/hampton/.sdkman/candidates/java/25.0.2-open/bin/java'' finished with non-zero exit value 143 (this value may indicate that the process was terminated with the SIGTERM signal)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 11m 17s
+3 actionable tasks: 1 executed, 2 up-to-date

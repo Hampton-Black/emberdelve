@@ -1,11 +1,14 @@
 # Emberdelve — Agent Rules
 
 AI Dungeon Master. Java backend, React + Three.js frontend.
-**Current milestone: M0** — a two-week vertical slice that exists to answer one question:
-*does this feel like a Dungeon Master running a game?*
+**Current milestone: M0 — gate PASSED 2026-08-20.** A two-week vertical slice that existed to
+answer one question: *does this feel like a Dungeon Master running a game?* It does. The verdict,
+the evidence and the two faults that survived it are in `docs/m0-evaluation.md`.
 
 Read `docs/m0-build-plan.md` before changing anything. `docs/ai-dm-system-design.md` is the
 long-range design; M0 deliberately contradicts parts of it, and where they disagree **M0 wins**.
+`docs/m0-evaluation.md` is the gate itself — what three played sessions measured, the signed
+verdict, and what M0 hands to M1.
 
 ---
 
@@ -50,7 +53,7 @@ Resolved in a design review before implementation. Do not silently revisit these
 |---|---|
 | Assets | Kenney CC0. Architecture from Modular Dungeon Kit, tokens from Graveyard Kit (Mini Characters also installed). Props still procedural. |
 | LLM provider | **Venice.ai**, OpenAI-compatible, `https://api.venice.ai/api/v1`. One key, one endpoint, 100+ models. |
-| LLM model | Build on a strong tool-caller; A/B down at T13. **The model is a config string, never a literal.** |
+| LLM model | Two config strings, never literals: `DM_MODEL_TOOLS` (fast, reliably tool-calling) and `DM_MODEL_PROSE` (best writer). Measured picks and their disqualifications are below. |
 | Narration | **Text channel**, not a tool. Inline `[[speaker]]` markers, validated against live entities. |
 | TTS | ElevenLabs Flash v2.5 behind `TtsClient`. Web Speech API is the working placeholder. |
 | Build | Gradle + Kotlin DSL. |
@@ -139,7 +142,13 @@ despite being the strongest privacy tier.
 | `qwen3-next-80b` | 540 / 771 / 577 / 586ms | 100% valid | **invents props** |
 | `deepseek-v4-flash-0731-fast` | 1195 / 1364 / 1599 / **38478**ms | 100% valid | good, stays in-world |
 
-**Current pick: `DM_MODEL_TOOLS=qwen3-next-80b`, `DM_MODEL_PROSE=` your best writer.**
+**Current pick: `DM_MODEL_TOOLS=qwen3-next-80b`, `DM_MODEL_PROSE=` your best writer** —
+`venice-uncensored-role-play` is what the played sessions ran on and what the tone in
+`m0-evaluation.md` was judged against; `claude-opus-5` is the `.env.example` default.
+
+**`qwen3-next-80b` has a tail too, found in play, not in the benchmark:** 14.3s and 15.5s tool
+phases in two logged sessions, no error, full quota. Rarer than the 480b's and it survives the
+pick, but assume *any* single-provider MoE does this and watch `FIRST FEEDBACK` for it.
 
 `qwen3-coder-480b-a35b-instruct-turbo` looked like the winner on first measurement and is
 **disqualified**. Over one session it went 563ms → 42s → 66s → 621ms → 34s, with full rate-limit
@@ -205,14 +214,19 @@ These are the things most likely to eat week two.
 
 ---
 
-## Latency targets — these are the gate
+## Latency targets — recorded, not the gate
+
+**The gate is multi-turn consistency, not speed** (`m0-evaluation.md` §4.3). Every complaint from
+both played sessions was the DM contradicting a world it had already established; not one was
+about a wait. With a slow, natural voice, a pause reads as the DM thinking. Keep these numbers so
+a regression stays visible, and do not propose latency work on the DM path unprompted.
 
 | Path | Budget | Where it stands |
 |---|---|---|
 | Keypress → the UI acknowledges the input | < 100ms | no model in this path |
-| Keypress → first mechanical feedback (dice in the air) | < 1.2s | **measured 0.8–1.6s**, typically ~1.0s |
-| Keypress → first spoken word, **gap filled** | < 8s | measured 4.4–8.9s end to end |
-| Keypress → first spoken word, **nothing on screen** | < 2.5s | *provisional — unmeasured. T13.* |
+| Keypress → first mechanical feedback (dice in the air) | < 1.2s | **measured in play 1.1–2.5s**, median ~1.3s |
+| Keypress → first spoken word, **gap filled** | < 8s | measured in play 4.0–10.2s end to end |
+| Keypress → first spoken word, **nothing on screen** | < 2.5s | **missed — 2.5–3.6s.** See `m0-evaluation.md` §4.1 |
 | Click-to-move → token starts moving | < 100ms | no model in this path. T10 |
 | Full enemy round resolved and narrated | < 4s | **measured ~3s** — 1.5s to resolve, 1.3–1.6s to narrate |
 
@@ -232,19 +246,28 @@ Two consequences:
   the tray holding until narration starts, a seven-second wait for the first word does not read as
   a wait. With an empty screen, two seconds does. Hence one budget split into two.
 
-### What T13 has to decide
+### What T13 decided — measured over two played sessions
 
-The generous number above is defensible **only** while the gap is filled. Two open questions,
-both to be answered with data and not by argument:
+Both questions are answered in `docs/m0-evaluation.md` §4, against 12 typed turns of real play
+rather than the dice-building sample the question warned about. In short:
 
-1. **How often is a turn tool-free?** `TurnMetrics` logs a running `n/m turns used dice` for
-   exactly this. If most real play turns out to have no dice, the 2.5s row is the one that
-   governs and the design needs to change — a thinking state that is worth looking at, or a
-   faster prose model. Do not judge this from the sample collected while building the dice; it is
-   biased by construction.
-2. **Is ~20 seconds of speech per turn too long?** Narration runs about 20 characters a second,
-   so a 400-character reply is 20 seconds before the player acts again. The tail matters more
-   than the head, and no target above covers it.
+1. **How often is a turn tool-free? 42% of turns — 5 of 12 — showed the player nothing**, and the
+   2.5s row is missed on every one of them. The cause is structural: the mechanics phase runs *in
+   front of* the prose phase, so a turn that requests no tools pays the whole tool latency as dead
+   air and buys nothing with it. A rejected call is the same silence with a round trip behind it.
+   **Judged in play to be a non-problem** — neither player remarked on a wait, and against a
+   spoken narrator a pause reads as the DM thinking. Recorded, not scheduled. If it is ever worth
+   fixing: a speculative prose call started in parallel and discarded if tools fire, or a visible
+   thinking beat. Never a faster prose model; prose was never the problem.
+2. **Is ~20 seconds of speech per turn too long? No, but the ceiling is at the limit.** Mean typed
+   turn measured **315 characters, ~16 seconds**; the two 25-second outliers were the goblin-spawn
+   beat (which earns it) and the since-fixed replay bug. No change for M0. Re-measure after the
+   repeat fix has a real session behind it.
+
+**Read `TurnMetrics`' counter with care.** It logs `n/m turns used dice` but increments on
+`toolCalls() > 0`, so it counts a turn whose only call was rejected and a turn whose call produced
+no dice. `FIRST FEEDBACK` is the honest signal — over the same 12 turns the counter said 8 and the
+feedback line said 7.
 
 ---
 
@@ -394,8 +417,8 @@ streaming prose call.
 
 Still open: attacking during an enemy-turn narration drops the kill's own narration. The fight
 stays correct and goes silent, which reads as the DM losing interest. Rare — the window is about a
-second and a half — but T13 should decide whether the board locks during narration or the beat
-queues.
+second and a half. Carried out of M0 undecided: either the board locks during narration or the
+beat queues. See *Known, unfixed* below.
 
 ### The opening
 
@@ -420,19 +443,42 @@ mechanics model is not consulted and the whole thing is one streaming call. Meas
 - **The instruction stays out of `history`;** only the reply goes in. Replaying stage direction
   every turn has the model treating it as something the player said.
 
+### Since fixed — kept because the reasoning survives the fix
+
+**The player's dialogue was the model's to write, in the end.** It was listed here as a defect —
+the prose model putting words in the player's mouth, which `dm.md` forbade outright. The rule was
+wrong, not the model: a DM voicing a player's shouted taunt is a DM doing its job. `dm.md` now
+says the player's *voice* is the narrator's to use while their **decisions** and **feelings** stay
+untouched, which is the line that actually matters. What remains is the parser problem this
+created — an unmarked quotation has to be guessed at, and the guess is now conditioned on whether
+the player's own sentence says they spoke.
+
+**A dead player character used to be only a dropped token.** Combat ended, the mode pill flipped
+back to EXPLORATION, and nothing said what had happened — with the input box refusing text and the
+board refusing clicks, that reads as a crash rather than a death. `ui/Defeat.tsx` marks the moment
+and offers the way on. It throws the session away and lays the room out again, which is what
+restarting the process did, without the terminal.
+
+**The opening used to be silent on a cold load.** Browsers gate audio behind a user gesture and
+the narration arrived before the player had made one, so the DM described the room to a page that
+could not make a sound. Fixed definitively by the title beat rather than by a patch: `ui/Title.tsx`
+sends `begin` from inside the click that unlocks audio. See *The opening* above — the ordering
+inside that handler is the whole mechanism.
+
 ### Known, unfixed
 
-The prose model sometimes **writes the player's dialogue** ("*You ask: what are you guarding?*"),
-which `dm.md` forbids outright. Invisible in text, obvious once spoken. T13.
+**Attacking during an enemy-turn narration drops the kill's own narration.** The fight stays
+correct and goes silent, which reads as the DM losing interest. The window is about a second and a
+half. Decide whether the board locks during narration or the beat queues.
 
-**A dead player character is only a dropped token.** Combat ends, the mode pill flips back to
-EXPLORATION, and nothing says what happened or offers a way on. M0 has no save and restarting the
-process is fine (§12), but the moment itself is unmarked. T12/T13.
+**The narrator can describe a world change nothing can back.** A player asked for the goblin to
+become "an immense, steaming hotdog" and the narrator obliged; there is no transformation tool, so
+the reconcile pass correctly declined to invent a mechanism and the goblin went on fighting. Same
+class as the goblin that is described but never spawns — harmless only because this instance was
+funny. Not worth a prompt line on a prototype.
 
-**The opening may be silent on a cold load.** Browsers gate audio behind a user gesture, and the
-opening narration arrives before the player has made one. The text always streams; whether the
-voice does depends on the browser. If it turns out to matter, the fix is a "click to begin"
-title beat, which solves the unlock definitively — but that is a design decision, not a patch.
+**`TurnMetrics` mislabels its counter** — see the latency section. One line; left alone so the
+numbers in `m0-evaluation.md` match the logs as they were written.
 
 ---
 
