@@ -153,6 +153,82 @@ export function play(family: Family, options: PlayOptions = {}): void {
   }
 }
 
+/**
+ * White noise, built once. The beater on a drum is a burst of broadband noise a few milliseconds
+ * long; without it a synthesised drum is a pure tone and reads as a boop rather than as a hit.
+ */
+let noise: AudioBuffer | null = null;
+
+function noiseBuffer(context: AudioContext): AudioBuffer {
+  if (!noise) {
+    noise = context.createBuffer(1, Math.floor(context.sampleRate * 0.25), context.sampleRate);
+    const channel = noise.getChannelData(0);
+    for (let i = 0; i < channel.length; i++) channel[i] = Math.random() * 2 - 1;
+  }
+  return noise;
+}
+
+export interface DrumOptions {
+  /** Where the strike starts, in Hz. Higher reads as a smaller drum. */
+  pitch?: number;
+  /** Where it settles. This is the note you actually hear. */
+  floor?: number;
+  gain?: number;
+  /** How long the body rings out. */
+  seconds?: number;
+  delay?: number;
+}
+
+/**
+ * A struck drum, synthesised.
+ *
+ * <p>The whole trick is that the pitch collapses in about fifty milliseconds and then holds: that
+ * fast fall is what the ear reads as a skin being hit rather than as a tone being played. A short
+ * filtered noise burst on top supplies the beater. There is no drum sample in any of the Kenney
+ * packs, and synthesising one means the pitch is a number to tune rather than a file to go
+ * looking for.
+ */
+export function drum(options: DrumOptions = {}): void {
+  if (!ctx || !master) return;
+
+  const start = ctx.currentTime + (options.delay ?? 0);
+  const seconds = options.seconds ?? 0.85;
+  const peak = options.gain ?? 0.9;
+  const floor = options.floor ?? 46;
+
+  const body = ctx.createOscillator();
+  body.type = "sine";
+  body.frequency.setValueAtTime(options.pitch ?? 190, start);
+  body.frequency.exponentialRampToValueAtTime(floor, start + 0.055);
+
+  const bodyGain = ctx.createGain();
+  // Struck, not faded in: four milliseconds of attack, then a long exponential tail.
+  bodyGain.gain.setValueAtTime(0.0001, start);
+  bodyGain.gain.exponentialRampToValueAtTime(peak, start + 0.004);
+  bodyGain.gain.exponentialRampToValueAtTime(0.0001, start + seconds);
+
+  body.connect(bodyGain).connect(master);
+  body.start(start);
+  body.stop(start + seconds + 0.02);
+
+  // The beater: noise through a low-pass, gone in thirty milliseconds. Audible as texture on the
+  // front of the hit, never as a hiss.
+  const hit = ctx.createBufferSource();
+  hit.buffer = noiseBuffer(ctx);
+
+  const tone = ctx.createBiquadFilter();
+  tone.type = "lowpass";
+  tone.frequency.value = 340;
+
+  const hitGain = ctx.createGain();
+  hitGain.gain.setValueAtTime(peak * 0.5, start);
+  hitGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.03);
+
+  hit.connect(tone).connect(hitGain).connect(master);
+  hit.start(start);
+  hit.stop(start + 0.06);
+}
+
 export interface DropOptions {
   /** Starting frequency in Hz. */
   from: number;

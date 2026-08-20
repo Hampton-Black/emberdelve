@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { combatBegins, fell, swing } from "./audio/combat";
 import { isEnabled, setEnabled } from "./audio/narration";
 import { unlock } from "./audio/sfx";
+import { footsteps, lidOpens, revealed } from "./audio/world";
 import { useGame } from "./store";
 import { connect, send } from "./ws";
 import { Canvas } from "./ui/Canvas";
@@ -34,6 +36,15 @@ export function App() {
 
   useEffect(() => {
     connect();
+
+    // Dev-only handle, for the same reason `window.__renderer` exists: these cues are tuned by
+    // ear, and staging a whole fight to hear the combat sting once is a terrible feedback loop.
+    // Needs one real click first — the audio context will not start without a gesture.
+    if (import.meta.env.DEV) {
+      Object.assign(window, {
+        __sfx: { combatBegins, swing, fell, lidOpens, revealed, footsteps, unlock },
+      });
+    }
 
     // Browsers will not start an AudioContext without a gesture, and the first thing the player
     // does is click or type. Cheap to call repeatedly; it only does work once.

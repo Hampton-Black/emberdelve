@@ -1,4 +1,4 @@
-import { drop, play } from "./sfx";
+import { drop, drum, play } from "./sfx";
 
 /**
  * The sounds a fight makes.
@@ -14,19 +14,24 @@ const IMPACT_MS = 220;
 /**
  * Combat opening.
  *
- * <p>A stinger is a transient over a weight. The metal hits are the transient; the sine drop is
- * the weight, and without it this is a loud clang rather than an event. The drawn blade in the
- * middle is what makes it read as *this* kind of fight — the dice on the end are still there,
- * because initiative was still rolled, but they are no longer the whole of it.
+ * <p>Drums, synthesised — see {@link drum}. An earlier version layered a pitched-down metal hit,
+ * a drawn blade and the dice; the metal and the blade were both bright, and bright is the wrong
+ * register for a crypt. Nothing here is above 210Hz at the moment of the strike.
+ *
+ * <p>No dice in it any more. Initiative is in the log where it belongs; this is about the drop in
+ * the floor, and the clatter was fighting it.
  */
 export function combatBegins(): void {
-  drop({ from: 128, to: 38, seconds: 1.2, gain: 0.42 });
-  play("boom", { gain: 0.95, rate: 0.34 });
-  // A second, higher strike just behind the first reads as resonance rather than as two hits.
-  play("boom", { gain: 0.36, rate: 0.52, delay: 0.1 });
-  play("steel", { gain: 0.8, delay: 0.3 });
-  play("grab", { gain: 0.45, delay: 0.66 });
-  play("throw", { gain: 0.55, rate: 0.88, delay: 0.92 });
+  // Two quick strikes and then a heavy one — a war-drum figure rather than three even beats,
+  // because an even three reads as a countdown and this is meant to read as a threat.
+  drum({ pitch: 200, floor: 52, gain: 0.85, seconds: 0.7 });
+  drum({ pitch: 190, floor: 48, gain: 0.8, seconds: 0.7, delay: 0.3 });
+  // The last one is the lowest and the longest: the drum the room is left with.
+  drum({ pitch: 210, floor: 38, gain: 1.0, seconds: 1.5, delay: 0.72 });
+
+  // A sub beneath all three, tuned under the final floor so it thickens rather than beats
+  // against it.
+  drop({ from: 88, to: 30, seconds: 2.1, gain: 0.34 });
 }
 
 /**
