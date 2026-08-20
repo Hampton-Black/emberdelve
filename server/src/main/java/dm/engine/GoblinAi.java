@@ -34,6 +34,11 @@ final class GoblinAi {
             var step = closestStep(combat, self, foe);
             if (step.isPresent()) {
                 self = combat.step(self, step.get(), sink);
+                // From here rather than from moveTo: a move only knows a destination, and what
+                // the narrator needs is why. Only this class knows the goblin was closing.
+                sink.beat(self.isAdjacentTo(foe)
+                        ? self.name() + " closes the distance to " + foe.name() + "."
+                        : self.name() + " advances toward " + foe.name() + ".");
                 beat.run();
             }
         }

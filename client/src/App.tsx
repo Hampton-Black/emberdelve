@@ -17,6 +17,17 @@ export function App() {
   const mode = useGame((s) => s.mode);
   const error = useGame((s) => s.error);
   const setError = useGame((s) => s.setError);
+  const awaitingDm = useGame((s) => s.awaitingDm);
+  const started = useGame((s) => s.started);
+
+  // Dev tools, but they reach straight into a live session: starting a fight halfway through the
+  // narrator's opening sentence is not a state the game can be in any other way, and the server
+  // will simply drop the narration that collides. Locked while the DM has the floor.
+  const debug: React.CSSProperties = {
+    ...styles.button,
+    opacity: awaitingDm || !started ? 0.3 : 1,
+    pointerEvents: awaitingDm || !started ? "none" : "auto",
+  };
 
   // UI preference, not game state (invariant #3) — same reasoning as the input box's draft.
   const [voice, setVoice] = useState(isEnabled());
@@ -84,18 +95,18 @@ export function App() {
           </div>
           <footer style={styles.debug}>
             <span style={styles.debugLabel}>debug</span>
-            <button style={styles.button} onClick={() => send({ type: "debugSpawnGoblin" } as never)}>
+            <button style={debug} onClick={() => send({ type: "debugSpawnGoblin" } as never)}>
               spawn goblin
             </button>
             <button
-              style={styles.button}
+              style={debug}
               onClick={() => send({ type: "debugReveal", propId: "alcove" } as never)}
             >
               reveal alcove
             </button>
             {/* Exercises the walk cycle and facing without waiting for T10's click-to-move. */}
             <button
-              style={styles.button}
+              style={debug}
               onClick={() => {
                 const me = scene?.entities.find((e) => e.isPlayerControlled);
                 if (me) send({ type: "moveTo", actorId: me.id, x: me.x, y: me.y >= 6 ? 1 : 9 });
@@ -106,19 +117,19 @@ export function App() {
             {/* Re-runs the opening past its once-per-session guard. A page reload gets the title
                 screen again but a server that has already narrated, so without this there is no
                 way to hear the opening twice without restarting the process. */}
-            <button style={styles.button} onClick={() => send({ type: "debugOpen" } as never)}>
+            <button style={debug} onClick={() => send({ type: "debugOpen" } as never)}>
               re-open
             </button>
             {/* Combat with no model in the path, for the same reason `roll d20` exists. */}
             <button
-              style={styles.button}
+              style={debug}
               onClick={() => send({ type: "debugStartCombat" } as never)}
             >
               start combat
             </button>
             {/* A real roll down the real path — how the dice get tuned without burning a turn. */}
             <button
-              style={styles.button}
+              style={debug}
               onClick={() =>
                 send({ type: "debugRoll", actorId: "fighter", skill: "PERCEPTION",
                        difficulty: "MEDIUM" } as never)

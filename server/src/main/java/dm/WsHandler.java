@@ -6,6 +6,7 @@ import dm.engine.CombatSink;
 import dm.engine.GameEngine;
 import dm.model.Difficulty;
 import dm.model.Diff;
+import dm.model.Outcome;
 import dm.model.Skill;
 import dm.model.Mode;
 import dm.wire.Json;
@@ -152,18 +153,81 @@ public final class WsHandler {
      * real seconds on pacing and must not hold the socket while it does.
      */
     private void act(WsContext ctx, Consumer<CombatSink> action) {
-        var sink = sink(ctx);
-        action.accept(sink);
+        var mine = new Beats(ctx);
+        action.accept(mine);
+
+        // The player's own swing is narrated only when it is worth stopping for. Every ordinary
+        // hit would put combat on a five-second-per-click clock, and design doc §7's "dramatic
+        // beats only" exists precisely to stop that.
+        if (mine.dramatic) {
+            narrate(ctx, mine.facts);
+        }
 
         if (engine.combat().isActive() && !engine.combat().isPlayerTurn()) {
             turns.submit(() -> {
+                var theirs = new Beats(ctx);
                 try {
-                    engine.combat().runAutomaticTurns(sink, WsHandler::beat);
+                    engine.combat().runAutomaticTurns(theirs, WsHandler::beat);
                 } catch (Exception e) {
                     log.error("enemy turn failed", e);
                     send(ctx, new ServerMessage.Error("The goblin froze: " + e.getMessage()));
+                    return;
                 }
+                // The enemy's whole turn as one call — move and swing together, never one call
+                // each. The client is still animating it, which is the cover the prose model
+                // needs, exactly as the dice cover an exploration turn.
+                narrate(ctx, theirs.facts);
             });
+        }
+    }
+
+    private void narrate(WsContext ctx, List<String> facts) {
+        if (dm == null || facts.isEmpty()) {
+            return;
+        }
+        turns.submit(() -> dm.narrateCombat(facts, turnSink(ctx)));
+    }
+
+    /**
+     * Sends what a combat action produced, in the order it produced it, and keeps the plain-language
+     * facts for the narrator.
+     *
+     * <p>{@code dramatic} is decided structurally rather than by reading the sentences: a natural
+     * 20 or 1, or something reaching zero hit points. Sniffing the prose for the word "critical"
+     * would break the moment anyone reworded a beat.
+     */
+    private final class Beats implements CombatSink {
+
+        private final WsContext ctx;
+        private final List<String> facts = new java.util.ArrayList<>();
+        private boolean dramatic;
+
+        Beats(WsContext ctx) {
+            this.ctx = ctx;
+        }
+
+        @Override
+        public void diffs(List<Diff> diffs) {
+            for (Diff diff : diffs) {
+                if (diff instanceof Diff.StatChanged stat
+                        && "hp".equals(stat.stat()) && stat.to() <= 0) {
+                    dramatic = true;
+                }
+            }
+            sendDiffs(ctx, diffs);
+        }
+
+        @Override
+        public void roll(dm.model.RollResult result) {
+            if (result.outcome() == Outcome.CRIT || result.outcome() == Outcome.CRIT_FAIL) {
+                dramatic = true;
+            }
+            send(ctx, new ServerMessage.Roll(result));
+        }
+
+        @Override
+        public void beat(String fact) {
+            facts.add(fact);
         }
     }
 
@@ -173,21 +237,6 @@ public final class WsHandler {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-    }
-
-    /** Sends what a combat action produced, in the order it produced it. */
-    private CombatSink sink(WsContext ctx) {
-        return new CombatSink() {
-            @Override
-            public void diffs(List<Diff> diffs) {
-                sendDiffs(ctx, diffs);
-            }
-
-            @Override
-            public void roll(dm.model.RollResult result) {
-                send(ctx, new ServerMessage.Roll(result));
-            }
-        };
     }
 
     private void freeText(WsContext ctx, String actorId, String text) {

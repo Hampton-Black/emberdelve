@@ -291,6 +291,94 @@ class CombatEngineTest {
         assertEquals("fighter", fixture.engine.combat().activeId(), "and then ended its turn");
     }
 
+    // ---- What the narrator is handed ----
+
+    @Test
+    @DisplayName("a hit states who, whom and how much — and how hurt they now look")
+    void hitReportsFacts() {
+        var fixture = fight(20, 1, 14, 4);
+        fixture.start();
+        fixture.place("fighter", 6, 5);
+        fixture.repo.put(fixture.get("goblin").withHp(7));
+
+        var sink = new CombatSink.Buffer();
+        fixture.engine.combat().attack("fighter", "goblin", sink);
+
+        assertEquals(
+                List.of("Roderick hits Vessk for 7 damage.", "Vessk is killed by the blow."),
+                sink.collectedBeats());
+    }
+
+    @Test
+    @DisplayName("a wound is described, never counted — the narrator must not read hit points out")
+    void woundIsDescribedNotCounted() {
+        // The goblin swings, because only the fighter has enough hit points to survive a hit and
+        // still be a fraction. 12 less 4+2 is half, which is "wounded" rather than "6/12".
+        var fixture = fight(1, 20, 14, 4);
+        fixture.start();
+        fixture.place("goblin", 6, 5);
+        fixture.place("fighter", 6, 4);
+
+        var sink = new CombatSink.Buffer();
+        fixture.engine.combat().attack("goblin", "fighter", sink);
+
+        var condition = sink.collectedBeats().getLast();
+        assertEquals("Roderick is now wounded.", condition);
+        assertFalse(condition.matches(".*\\d.*"), "a number here invites the model to say it");
+    }
+
+    @Test
+    @DisplayName("a crit says so, so the narrator can spend a sentence on it")
+    void critIsCalledOut() {
+        var fixture = fight(20, 1, 20, 3, 3);
+        fixture.start();
+        fixture.place("fighter", 6, 5);
+        fixture.repo.put(fixture.get("goblin").withHp(20));
+
+        var sink = new CombatSink.Buffer();
+        fixture.engine.combat().attack("fighter", "goblin", sink);
+
+        assertTrue(sink.collectedBeats().getFirst().contains("critical"),
+                sink.collectedBeats().toString());
+    }
+
+    @Test
+    @DisplayName("a miss is a fact too, and a fumble is a different one")
+    void missesAreReported() {
+        var fixture = fight(20, 1, 2, 1);
+        fixture.start();
+        fixture.place("fighter", 6, 5);
+
+        var sink = new CombatSink.Buffer();
+        fixture.engine.combat().attack("fighter", "goblin", sink);
+        assertEquals(List.of("Roderick swings at Vessk and misses."), sink.collectedBeats());
+
+        var fumble = new CombatSink.Buffer();
+        fixture.engine.combat().endTurn("fighter", fumble);
+        fixture.engine.combat().endTurn("goblin", fumble);
+        var second = new CombatSink.Buffer();
+        fixture.engine.combat().attack("fighter", "goblin", second);
+        assertTrue(second.collectedBeats().getFirst().contains("fumbles"),
+                second.collectedBeats().toString());
+    }
+
+    @Test
+    @DisplayName("the goblin's whole turn arrives as one set of facts, movement included")
+    void enemyTurnReportsMovementAndAttack() {
+        var fixture = fight(1, 20, 19, 4);
+        fixture.start();
+        fixture.place("fighter", 6, 1);
+        fixture.place("goblin", 6, 6);
+
+        var sink = new CombatSink.Buffer();
+        fixture.engine.combat().runAutomaticTurns(sink, () -> {});
+
+        var beats = sink.collectedBeats();
+        assertEquals(3, beats.size(), beats.toString());
+        assertTrue(beats.getFirst().contains("closes the distance"), beats.toString());
+        assertTrue(beats.get(1).contains("hits Roderick"), beats.toString());
+    }
+
     @Test
     @DisplayName("a goblin already in reach swings without shuffling")
     void adjacentGoblinDoesNotMove() {

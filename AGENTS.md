@@ -214,7 +214,7 @@ These are the things most likely to eat week two.
 | Keypress → first spoken word, **gap filled** | < 8s | measured 4.4–8.9s end to end |
 | Keypress → first spoken word, **nothing on screen** | < 2.5s | *provisional — unmeasured. T13.* |
 | Click-to-move → token starts moving | < 100ms | no model in this path. T10 |
-| Full enemy round resolved and narrated | < 4s | T11 |
+| Full enemy round resolved and narrated | < 4s | **measured ~3s** — 1.5s to resolve, 1.3–1.6s to narrate |
 
 ### Why these are not the numbers in `docs/m0-build-plan.md`
 
@@ -361,6 +361,41 @@ machine without those voices. On macOS: **Daniel** narrates, **Ralph** is the go
   or digit in it; the example is plain prose.
 - **Narration costs about 20 characters per second of speech.** 400 characters is ~20 seconds the
   player sits through before acting. This is the real ceiling on turn length, not the token budget.
+
+### Combat narration
+
+The DM does not go quiet when a fight starts, which was the loudest thing wrong with T10 — a
+narrator who describes your exploration beautifully and then falls silent the instant a sword comes
+out is the most obvious possible tell that nobody is running this game.
+
+Measured: **708–782ms to first token, 1.3–1.6s total, 150–204 characters.** Far quicker than an
+exploration turn, because there is no tool phase — nothing is left to adjudicate, so it is one
+streaming prose call.
+
+- **The engine states facts; the model writes prose.** `CombatSink.beat` carries plain sentences —
+  "Vessk hits Roderick for 7 damage" — and never a word of description. Neither side does the
+  other's job.
+- **A wound is described, not counted.** The beat says "badly hurt", never "3 of 7". `dm.md`
+  forbids reading hit points aloud, and handing the model a fraction is an invitation to read it.
+- **The enemy's whole turn is one call**, move and swing together. One call per action would put
+  combat on a five-second-per-click clock, which is what design doc §7's "dramatic beats only"
+  exists to prevent. The player's own swings are narrated only on a kill, a crit or a fumble —
+  decided structurally from the roll outcome and the diffs, never by reading the beat text.
+- **The animation is the cover.** The enemy turn is still animating on the client when the prose
+  call starts, exactly as the dice cover an exploration turn, so the narration is free rather than
+  additive.
+- **One narration at a time, and the asymmetry is deliberate.** Narration the *player* asked for
+  (the opening, a typed turn) waits on the lock, because dropping it would silently swallow
+  something they did. Narration the *engine* generated gives up, because a swing narrated ten
+  seconds late is worse than one not narrated at all. Dropped beats are logged.
+- **The debug bar and `end turn` are locked while the DM speaks.** Starting a fight halfway through
+  the opening sentence is a state the game cannot otherwise reach, and it produced exactly the
+  collision the lock now refuses.
+
+Still open: attacking during an enemy-turn narration drops the kill's own narration. The fight
+stays correct and goes silent, which reads as the DM losing interest. Rare — the window is about a
+second and a half — but T13 should decide whether the board locks during narration or the beat
+queues.
 
 ### The opening
 

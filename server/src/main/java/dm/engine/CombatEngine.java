@@ -198,6 +198,9 @@ public final class CombatEngine {
 
         if (attack.outcome() == Outcome.MISS || attack.outcome() == Outcome.CRIT_FAIL) {
             repo.append(Event.action(actor.id(), "missed " + target.name()));
+            sink.beat(attack.outcome() == Outcome.CRIT_FAIL
+                    ? actor.name() + " swings at " + target.name() + " and fumbles badly."
+                    : actor.name() + " swings at " + target.name() + " and misses.");
             return;
         }
 
@@ -212,13 +215,32 @@ public final class CombatEngine {
         repo.append(Event.action(actor.id(),
                 "hit " + target.name() + " for " + damage.total()));
 
+        sink.beat((attack.isCrit()
+                ? "%s lands a critical hit on %s for %d damage."
+                : "%s hits %s for %d damage.")
+                .formatted(actor.name(), target.name(), damage.total()));
+
         var diffs = new ArrayList<Diff>();
         diffs.add(new Diff.StatChanged(target.id(), "hp", target.hp(), hurt.hp()));
         sink.diffs(diffs);
 
         if (!hurt.isAlive()) {
             repo.append(Event.action(target.id(), "died"));
+            sink.beat(target.name() + " is killed by the blow.");
+        } else {
+            // The narrator is told the shape of the wound, not the arithmetic — dm.md forbids
+            // stating hit points aloud, and a fraction invites the model to read it out.
+            sink.beat("%s is now %s.".formatted(target.name(), condition(hurt)));
         }
+    }
+
+    /** How hurt something looks, for prose. Never a number: see the caller. */
+    private static String condition(Entity entity) {
+        double left = (double) entity.hp() / Math.max(entity.maxHp(), 1);
+        if (left > 0.7) return "barely marked";
+        if (left > 0.4) return "wounded";
+        if (left > 0.15) return "badly hurt";
+        return "on the edge of death";
     }
 
     /** {@code 1d8} becomes {@code 2d8}. The modifier is deliberately not doubled, as in 5e. */

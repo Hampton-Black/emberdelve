@@ -18,10 +18,21 @@ public interface CombatSink {
 
     void roll(RollResult result);
 
+    /**
+     * One plain sentence of what just happened, for whoever is going to narrate it.
+     *
+     * <p>Facts, never prose — "Vessk hits Roderick for 5 damage", not "the blade bites deep". The
+     * engine knows what happened and the model knows how to say it, and neither should be doing
+     * the other's job. Default no-op: most callers only want the diffs.
+     */
+    default void beat(String fact) {
+    }
+
     /** Collects instead of sending, for callers that need the consequences as values. */
     final class Buffer implements CombatSink {
         private final List<Diff> diffs = new java.util.ArrayList<>();
         private final List<RollResult> rolls = new java.util.ArrayList<>();
+        private final List<String> beats = new java.util.ArrayList<>();
 
         @Override
         public void diffs(List<Diff> more) {
@@ -37,8 +48,17 @@ public interface CombatSink {
             return List.copyOf(diffs);
         }
 
+        @Override
+        public void beat(String fact) {
+            beats.add(fact);
+        }
+
         public List<RollResult> collectedRolls() {
             return List.copyOf(rolls);
+        }
+
+        public List<String> collectedBeats() {
+            return List.copyOf(beats);
         }
     }
 }

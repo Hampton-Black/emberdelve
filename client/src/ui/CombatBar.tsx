@@ -13,6 +13,7 @@ import { send } from "../ws";
  */
 export function CombatBar() {
   const scene = useGame((s) => s.scene);
+  const awaitingDm = useGame((s) => s.awaitingDm);
   const combat = scene?.combat ?? null;
   if (!combat || !scene) return null;
 
@@ -56,11 +57,15 @@ export function CombatBar() {
           <span style={{ ...styles.budget, opacity: combat.actionAvailable ? 1 : 0.32 }}>
             {combat.actionAvailable ? "attack ready" : "attack spent"}
           </span>
+          {/* Held while the DM is speaking. Handing the turn over mid-sentence would start an
+              enemy turn whose narration the server then drops as a collision — the fight would
+              carry on correctly and silently, which reads as the DM losing interest. */}
           <button
-            style={styles.end}
+            style={{ ...styles.end, opacity: awaitingDm ? 0.35 : 1 }}
+            disabled={awaitingDm}
             onClick={() => send({ type: "endTurn", actorId: combat.activeId })}
           >
-            end turn
+            {awaitingDm ? "…" : "end turn"}
           </button>
         </>
       ) : (

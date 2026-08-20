@@ -44,6 +44,13 @@ public final class DmService {
     private static final String OPENING = "The party has just come through the entrance and is "
             + "standing inside. Open the session: what they walk into.";
 
+    /**
+     * The directive for a combat beat. Shorter than the standing three-sentence rule on purpose:
+     * a fight is a rally, and a narrator who writes a paragraph between swings stops the rally.
+     */
+    private static final String COMBAT_BEAT = "Narrate this moment of the fight. "
+            + "One or two sentences. Do not say whose turn it is.";
+
     /** §7: reject, let it retry once, then take the tools away. */
     private static final int REJECTIONS_BEFORE_DEGRADING = 2;
 
@@ -61,6 +68,18 @@ public final class DmService {
     /** The room is described once per session, not once per reconnect. */
     private final java.util.concurrent.atomic.AtomicBoolean opened =
             new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * One narration at a time, across every path that produces any.
+     *
+     * <p>Two narrations in flight interleave their sentences into nonsense, and the transcript is
+     * a single ordered list with nowhere to put a second voice. Who waits and who gives up is not
+     * symmetric: narration the <em>player</em> asked for waits its turn, because dropping it would
+     * silently swallow something they typed; narration the <em>engine</em> generated gives up,
+     * because a swing narrated ten seconds late is worse than a swing narrated not at all.
+     */
+    private final java.util.concurrent.locks.ReentrantLock narrating =
+            new java.util.concurrent.locks.ReentrantLock();
 
     public DmService(DmClient toolClient, DmClient proseClient, GameEngine engine,
                      String toolPrompt, String prosePrompt) {
@@ -117,19 +136,70 @@ public final class DmService {
 
         var failed = new boolean[]{false};
         long started = System.nanoTime();
-        var prose = runProsePhase(OPENING, List.of(), sink, failed);
-        if (failed[0]) {
-            return;
+
+        narrating.lock();
+        try {
+            var prose = runProsePhase(OPENING, List.of(), sink, failed);
+            if (failed[0]) {
+                return;
+            }
+
+            // The instruction itself stays out of the history: it is stage direction, and replaying
+            // it every turn would have the model treating it as something the player said.
+            history.add(DmClient.ChatMessage.assistant(prose.text()));
+
+            log.info("OPENING  first token {}ms  total {}ms  {} chars",
+                    prose.firstTokenMs(), (System.nanoTime() - started) / 1_000_000,
+                    prose.text().length());
+        } finally {
+            narrating.unlock();
+        }
+        sink.complete();
+    }
+
+    /**
+     * Narrates a moment of combat: the enemy's whole turn as one call, or a kill, or a crit.
+     *
+     * <p>Prose only, like the opening — the engine has already decided everything and there is
+     * nothing to adjudicate. The facts arrive as plain sentences from {@code CombatSink.beat};
+     * this turns them into something worth hearing and never the other way round.
+     *
+     * <p><b>One at a time.</b> A second beat arriving mid-narration is dropped rather than queued.
+     * The player can click faster than the prose model can write, and two overlapping calls would
+     * interleave their sentences into nonsense — while a queue would narrate a swing that landed
+     * ten seconds ago. Silence is the better failure.
+     *
+     * @return whether it ran
+     */
+    public boolean narrateCombat(List<String> facts, TurnSink sink) {
+        if (facts.isEmpty()) {
+            return false;
+        }
+        if (!narrating.tryLock()) {
+            log.info("dropped a combat beat, the DM is already speaking: {}", facts);
+            return false;
         }
 
-        // The instruction itself stays out of the history: it is stage direction, and replaying
-        // it every turn would have the model treating it as something the player said.
-        history.add(DmClient.ChatMessage.assistant(prose.text()));
+        try {
+            var failed = new boolean[]{false};
+            long started = System.nanoTime();
+            var prose = runProsePhase(COMBAT_BEAT, facts, sink, failed);
+            if (failed[0]) {
+                return false;
+            }
 
-        log.info("OPENING  first token {}ms  total {}ms  {} chars",
-                prose.firstTokenMs(), (System.nanoTime() - started) / 1_000_000,
-                prose.text().length());
-        sink.complete();
+            // Only the reply is kept. The directive is stage direction, and replaying it each
+            // turn would have the model treating it as something the player said.
+            history.add(DmClient.ChatMessage.assistant(prose.text()));
+
+            log.info("COMBAT   first token {}ms  total {}ms  {} chars  <- {}",
+                    prose.firstTokenMs(), (System.nanoTime() - started) / 1_000_000,
+                    prose.text().length(), facts);
+            sink.complete();
+            return true;
+        } finally {
+            narrating.unlock();
+        }
     }
 
     /**
@@ -139,6 +209,17 @@ public final class DmService {
     public void handleFreeText(String actorId, String text, TurnSink sink) {
         engine.repo().append(Event.action(actorId, "said: " + text));
 
+        // Waits rather than gives up. The tool phase runs inside the lock too: it puts dice on
+        // the table, and dice landing under someone else's narration is the same collision.
+        narrating.lock();
+        try {
+            handleFreeTextLocked(actorId, text, sink);
+        } finally {
+            narrating.unlock();
+        }
+    }
+
+    private void handleFreeTextLocked(String actorId, String text, TurnSink sink) {
         var failed = new boolean[]{false};
 
         long toolStart = System.nanoTime();
