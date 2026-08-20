@@ -54,18 +54,20 @@ public final class WsHandler {
     private final GameEngine engine;
     private final DmService dm;
     private final boolean demoMode;
+    private final boolean voice;
 
-    public WsHandler(GameEngine engine, DmService dm, boolean demoMode) {
+    public WsHandler(GameEngine engine, DmService dm, boolean demoMode, boolean voice) {
         this.engine = engine;
         this.dm = dm;
         this.demoMode = demoMode;
+        this.voice = voice;
     }
 
     public void register(WsConfig ws) {
         ws.onConnect(ctx -> {
             ctx.enableAutomaticPings();
             log.info("client connected: {}", ctx.sessionId());
-            send(ctx, new ServerMessage.Hello(demoMode));
+            send(ctx, new ServerMessage.Hello(demoMode, voice));
             send(ctx, new ServerMessage.Scene(engine.scene()));
             // Deliberately does NOT open the scene. See the `begin` case below.
         });

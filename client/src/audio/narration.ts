@@ -1,4 +1,4 @@
-import { webSpeech, type SpokenLine, type VoiceBackend } from "./voice";
+import { elevenLabs, webSpeech, type SpokenLine, type VoiceBackend } from "./voice";
 
 /**
  * The ordered audio queue, and the clock the transcript runs on.
@@ -25,6 +25,18 @@ interface Utterance {
 
 let backend: VoiceBackend | null = null;
 let enabled = true;
+
+/**
+ * Choose the voice, once, from what the server says it can do.
+ *
+ * <p>Called from the `hello` message rather than guessed at here: whether a real voice exists is
+ * a fact about the server's configuration, and the browser has no way to know it. The browser's
+ * own synthesiser is always built, because it is also the per-line fallback.
+ */
+export function useServerVoice(available: boolean): void {
+  const browser = webSpeech();
+  backend = available ? elevenLabs(browser) : browser;
+}
 
 const pending: Utterance[] = [];
 let draining = false;
@@ -97,6 +109,13 @@ async function drain(): Promise<void> {
     while (pending.length > 0 && mine === generation) {
       const utterance = pending.shift()!;
       utterance.reveal();
+
+      // Start the next line's synthesis before waiting on this one, so a remote voice spends its
+      // round trip during playback instead of in the gap after it. One ahead only — see
+      // VoiceBackend.prime.
+      const next = pending.find((queued) => queued.line !== null);
+      if (next?.line) backend.prime?.(next.line);
+
       if (utterance.line) await backend.speak(utterance.line);
     }
   } finally {

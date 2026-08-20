@@ -1,6 +1,7 @@
 package dm;
 
 import dm.ai.Config;
+import dm.ai.TtsClient;
 import dm.ai.DmService;
 import dm.ai.VeniceDmClient;
 import dm.content.ContentLoader;
@@ -9,6 +10,7 @@ import dm.engine.GameEngine;
 import dm.engine.RandomDiceRoller;
 import dm.engine.ScriptedDiceRoller;
 import dm.repo.InMemoryGameRepository;
+import dm.wire.Json;
 import io.javalin.Javalin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +73,38 @@ public final class App {
 
         app.get("/health", ctx -> ctx.result("ok"));
 
-        var handler = new WsHandler(engine, dm, demoMode);
+        // Speech is HTTP rather than websocket on purpose. A minute of narration is a few hundred
+        // kilobytes, and pushing that down the same socket the diffs use would put it behind — or
+        // in front of — a click-to-move that has a 100ms budget. It also lets the browser start
+        // playing before the whole clip has arrived.
+        TtsClient tts = null;
+        if (config.has("ELEVENLABS_API_KEY")) {
+            tts = new TtsClient(
+                    config.require("ELEVENLABS_API_KEY"),
+                    config.require("ELEVENLABS_VOICE_NARRATOR"),
+                    config.require("ELEVENLABS_VOICE_GOBLIN"));
+            final TtsClient voice = tts;
+
+            app.post("/tts", ctx -> {
+                var body = Json.MAPPER.readTree(ctx.body());
+                var audio = voice.speak(
+                        body.path("speakerId").asText("narrator"),
+                        body.path("text").asText(""));
+
+                if (audio.isEmpty()) {
+                    // The client falls back to the browser's own voice on anything but a 200,
+                    // so the status is the whole message. Nothing here is worth a body.
+                    ctx.status(502);
+                    return;
+                }
+                ctx.contentType("audio/mpeg").result(audio.get());
+            });
+        } else {
+            log.warn("ELEVENLABS_API_KEY not set — narration falls back to the browser's own "
+                    + "speech synthesis.");
+        }
+
+        var handler = new WsHandler(engine, dm, demoMode, tts != null);
         app.ws("/ws", handler::register);
 
         // Warm-check both endpoints off the startup path. A degraded Venice model looks exactly

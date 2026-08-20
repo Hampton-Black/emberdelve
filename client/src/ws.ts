@@ -1,3 +1,4 @@
+import { useServerVoice } from "./audio/narration";
 import { useGame } from "./store";
 import type { ClientMessage, ServerMessage } from "./types";
 
@@ -48,6 +49,8 @@ function dispatch(message: ServerMessage): void {
   switch (message.type) {
     case "hello":
       game.setDemoMode(message.demoMode);
+      // Before any narration can arrive, which is the only ordering that matters here.
+      useServerVoice(message.voice);
       break;
     case "scene":
       game.setScene(message.scene);
