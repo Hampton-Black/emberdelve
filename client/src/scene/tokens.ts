@@ -16,8 +16,9 @@ export type TokenClip = "idle" | "walk" | "attack-melee-right" | "die";
 /**
  * Which model plays which creature.
  *
- * <p>`mini` is Kenney's contemporary set — the fantasy-appropriate options in the graveyard kit
- * are `graveyard/character-zombie`, `-skeleton`, `-vampire` and `-keeper`, all drop-in.
+ * <p>The graveyard kit carries the fantasy-shaped figures: `-keeper`, `-zombie`, `-skeleton`,
+ * `-vampire`, `-ghost`. Kenney's `mini/` set is contemporary — a police officer, a
+ * businessman, a doctor — and is kept because it is rig-identical and swaps in one line.
  *
  * <p>Native heights differ per model, so `height` is the wanted size in world units (one grid
  * square is 1.0) and the scale is derived from the model's own bounding box. Hard-coding a
@@ -28,8 +29,10 @@ export type TokenClip = "idle" | "walk" | "attack-melee-right" | "die";
  * to its base is what tactical RPGs do, for exactly this reason.
  */
 const MODELS: Record<string, { path: string; height: number; tint?: number }> = {
-  fighter: { path: "mini/character-male-b", height: 1.25 },
-  goblin: { path: "mini/character-male-f", height: 1.05, tint: 0x8fbf63 },
+  fighter: { path: "graveyard/character-keeper", height: 1.25 },
+  // No tint: the zombie is already the right green. Tinting a model that carries its own
+  // colour just muddies the colormap.
+  goblin: { path: "graveyard/character-zombie", height: 1.05 },
 };
 
 /** Used when a model is missing, so a failed asset is a grey figure rather than a blank square. */

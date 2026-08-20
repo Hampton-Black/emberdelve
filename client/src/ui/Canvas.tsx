@@ -28,6 +28,13 @@ export function Canvas() {
     const renderer = new Renderer(canvas);
     rendererRef.current = renderer;
 
+    // Dev-only handle. The renderer is deliberately unreachable from React, which also makes it
+    // unreachable from the console — and "is that token actually there, or just unlit?" is a
+    // question that comes up constantly against a dark room.
+    if (import.meta.env.DEV) {
+      (window as unknown as { __renderer?: Renderer }).__renderer = renderer;
+    }
+
     let unsubscribe = () => {};
     let cancelled = false;
 

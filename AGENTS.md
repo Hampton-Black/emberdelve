@@ -48,7 +48,7 @@ Resolved in a design review before implementation. Do not silently revisit these
 
 | Area | Decision |
 |---|---|
-| Assets | Kenney CC0. Architecture from Modular Dungeon Kit, tokens from Mini Characters, antagonists available from Graveyard Kit. Props still procedural. |
+| Assets | Kenney CC0. Architecture from Modular Dungeon Kit, tokens from Graveyard Kit (Mini Characters also installed). Props still procedural. |
 | LLM provider | **Venice.ai**, OpenAI-compatible, `https://api.venice.ai/api/v1`. One key, one endpoint, 100+ models. |
 | LLM model | Build on a strong tool-caller; A/B down at T13. **The model is a config string, never a literal.** |
 | Narration | **Text channel**, not a tool. Inline `[[speaker]]` markers, validated against live entities. |
@@ -254,8 +254,14 @@ Three things that are not obvious and cost an hour each if forgotten:
   This lifts tokens off the floor without touching scene lighting — do not "fix" it by raising
   the ambient.
 
-`mini` is Kenney's contemporary set (police officer, businessman, doctor); the fantasy-shaped
-options are `graveyard/character-skeleton`, `-zombie`, `-vampire`, `-keeper`.
+Current cast: the **keeper** (a gravedigger in a coat and hat) as the fighter, the **zombie** as
+the goblin. `graveyard/` also holds `-skeleton`, `-vampire` and `-ghost`. Kenney's `mini/` set is
+contemporary — police officer, businessman, doctor — and is kept only because it is rig-identical
+and therefore a one-line swap.
+
+Graveyard models are **node-animated** (`skins: 0`, six part meshes) rather than skinned. Both
+kinds work through the same `AnimationMixer` path and both need `SkeletonUtils.clone` — a plain
+`Object3D.clone()` shares the rig, so two tokens of one model would animate in lockstep.
 
 Origins differ between kits — mini models stand on y=0, graveyard models are centred on the hips
 — so `Token` measures the bounding box rather than keeping a table of offsets.
