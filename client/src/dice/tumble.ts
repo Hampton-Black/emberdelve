@@ -12,12 +12,14 @@
 
 import type { Outcome, RollResult } from "../types";
 
-// ---- Layout, in tray units. The canvas is drawn small and upscaled 3x nearest-neighbour so it
-// matches the pixelation pass on the scene behind it.
+// ---- Layout, in tray units. Every number below is a design-space coordinate: the canvas
+// context is scaled by DISPLAY_SCALE x devicePixelRatio, so the drawing code never has to know
+// what resolution it landed on and the tray stays crisp on a Retina panel.
 
 export const TRAY_WIDTH = 232;
 export const TRAY_HEIGHT = 76;
-export const PIXEL_SCALE = 3;
+/** Tray units to CSS pixels. */
+export const DISPLAY_SCALE = 3;
 
 const DIE_RADIUS = 19;
 const DIE_GAP = 8;

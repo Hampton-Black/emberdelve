@@ -4,7 +4,7 @@ import {
   caption,
   HOLD_MS,
   landAt,
-  PIXEL_SCALE,
+  DISPLAY_SCALE,
   revealAt,
   sample,
   TRAY_HEIGHT,
@@ -20,8 +20,9 @@ import { useGame } from "../store";
 /**
  * The dice, thrown over the scene.
  *
- * Drawn into a 224x76 buffer and upscaled 3x nearest-neighbour, so it wears the same chunky
- * pixels as the render pass behind it rather than sitting on top as crisp modern chrome.
+ * Laid out in a 232x76 design space and drawn at full device resolution. It deliberately does
+ * not wear the scene's pixelation: at this size the readout is mostly text, and upscaled 8px
+ * monospace is unreadable mush.
  *
  * Like {@link Canvas} this never re-renders: it reads the store inside a frame loop and owns no
  * React state (invariant #3). Animation state that React re-rendered would stutter.
@@ -33,12 +34,15 @@ export function DiceTray() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.width = TRAY_WIDTH;
-    canvas.height = TRAY_HEIGHT;
+    // Backing store at full device resolution; the context is then scaled so every draw call
+    // below stays in tray units. Drawing small and upscaling is what made the text mushy.
+    const density = DISPLAY_SCALE * (window.devicePixelRatio || 1);
+    canvas.width = Math.round(TRAY_WIDTH * density);
+    canvas.height = Math.round(TRAY_HEIGHT * density);
 
     const g = canvas.getContext("2d");
     if (!g) return;
-    g.imageSmoothingEnabled = false;
+    g.scale(density, density);
 
     let frame = 0;
     // Which roll we are currently throwing, and which of its sounds have already fired.
@@ -147,8 +151,8 @@ function draw(g: CanvasRenderingContext2D, visual: TrayVisual, text: RollCaption
   g.fillStyle = INK.plate;
   g.fillRect(0, 0, TRAY_WIDTH, TRAY_HEIGHT);
   g.strokeStyle = emphatic && visual.reveal > 0 ? TONE_COLOR[text.tone] : INK.edge;
-  g.lineWidth = 1;
-  g.strokeRect(0.5, 0.5, TRAY_WIDTH - 1, TRAY_HEIGHT - 1);
+  g.lineWidth = 0.6;
+  g.strokeRect(0.3, 0.3, TRAY_WIDTH - 0.6, TRAY_HEIGHT - 0.6);
 
   for (const die of visual.dice) drawDie(g, die);
 
@@ -213,19 +217,23 @@ function drawDie(g: CanvasRenderingContext2D, die: DieVisual): void {
   g.fillStyle = die.discarded ? INK.discardBody : INK.body;
   g.fill();
   g.strokeStyle = INK.bodyEdge;
-  g.lineWidth = 1;
+  // Sub-unit weights are legible now that the tray draws at device resolution.
+  g.lineWidth = 0.8;
   g.stroke();
 
   if (shape.corners === 6) {
     // The facet the number sits on.
-    polygon(g, 3, die.radius * 0.66, -Math.PI / 2);
+    polygon(g, 3, die.radius * 0.72, -Math.PI / 2);
     g.fillStyle = die.discarded ? INK.discardBody : INK.facet;
     g.fill();
+    g.lineWidth = 0.6;
     g.stroke();
   }
 
   g.fillStyle = die.discarded ? INK.discardNumber : INK.number;
-  g.font = `bold ${die.face > 9 ? 15 : 17}px Menlo, Monaco, monospace`;
+  // Two digits need to be narrower than one: the facet is a triangle, so the room
+  // available shrinks the further the text sits from the base.
+  g.font = `bold ${die.face > 9 ? 14 : 17}px Menlo, Monaco, monospace`;
   g.textAlign = "center";
   g.textBaseline = "middle";
   g.fillText(String(die.face), 0, shape.corners === 6 ? 3 : 1);
@@ -251,12 +259,11 @@ const styles: Record<string, React.CSSProperties> = {
     left: "50%",
     bottom: "1.4rem",
     transform: "translateX(-50%)",
-    width: TRAY_WIDTH * PIXEL_SCALE,
+    width: TRAY_WIDTH * DISPLAY_SCALE,
     maxWidth: "94%",
     // Not a fixed height: a narrow window clamps the width, and a fixed height would stretch
     // the dice into ovals rather than shrinking the tray.
     height: "auto",
-    imageRendering: "pixelated",
     pointerEvents: "none",
   },
 };
