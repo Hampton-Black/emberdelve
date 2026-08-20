@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { swing } from "../audio/combat";
 import { Renderer } from "../scene/Renderer";
 import { useGame } from "../store";
 import { send } from "../ws";
@@ -77,6 +78,8 @@ export function Canvas() {
         if (state.strike && state.strike.at !== shownStrike) {
           shownStrike = state.strike.at;
           renderer.strike(state.strike.actorId, state.strike.targetId);
+          // Driven off the same notification as the animation, so the two cannot drift apart.
+          swing(state.strike.connected);
         }
       };
 

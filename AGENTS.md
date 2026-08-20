@@ -420,6 +420,17 @@ taken literally, and it is why M1 can add difficult terrain without touching the
   `die` clip, and the DM's world state marks it `[dead]`. Tokens revive if the server ever reports
   hit points above zero again — dead is what the server says now, never what it once said.
 
+**Health bar colour is allegiance, not health.** Green is yours, red is theirs; the bar's *length*
+carries the hit points. The player's bar used to also warn by going amber then red as it emptied,
+and the moment enemies went red that made one colour mean two things — a short red bar was you in
+trouble, a long red bar was a healthy goblin. One meaning per colour. If the danger signal turns
+out to be too quiet, the fix is a pulse, not a hue.
+
+**The roll log names who rolled.** Names come from `scene.entities` (the server is the authority on
+what a creature is called); the colour comes from the `VOICE` table, so a creature reads the same
+whether it is speaking or rolling. Laid out as a grid rather than wrapping flex, so the log scans
+vertically — every actor in one column, every total in another.
+
 `debug → start combat` runs the whole fight with no model in the path, for the same reason
 `debug → roll d20` exists.
 
@@ -470,6 +481,29 @@ weight happens at ~1s, and the narration lands while the player is still watchin
   canned by the third roll.
 - The stakes are drawn from the first frame — you can read "ATHLETICS CHECK · DC 20" while the
   die is still in the air. That is most of the tension.
+
+### Combat audio
+
+Measured, per attack: **5 sounds on a hit, 4 on a miss.** Rattle 0ms, throw 240ms, die lands
+1060ms, blade 2110ms, steel arriving 2330ms.
+
+- **A hit is two clips and a miss is one.** The blade moves either way; what separates them is
+  whether anything is there when it arrives. An explicit "miss" noise would be the game saying
+  out loud what the silence already said.
+- **The impact clip is scheduled, not played on the swing** — the same 220ms the hit point bar and
+  the death animation wait, so all three land together.
+- **Combat opens with one dice-throw clip**, not one per combatant. Initiative is a batch and
+  never reaches the tray (T12), so without this a fight began in total silence — which was the
+  real content of "the dice sounds aren't happening in combat": the attack rolls were always
+  audible, everything around them was not.
+
+`client/public/assets/audio/rpg` is a 13-clip subset of Kenney's RPG pack. `knifeSlice` and
+`metalClick`/`metalLatch` are now the swing and the impact. **`creak1-3`, `doorOpen`, `doorClose`
+and `metalClick` are still unused** and are the obvious sounds for `reveal_prop` — the sarcophagus
+lid has no sound at all.
+
+Still missing, and needing assets that are not in the repo: a body falling, footsteps on a move,
+and any ambient bed at all (the braziers are silent).
 
 `debug → roll d20` sends a real roll down the real path with no model in it, which is how the
 feel gets tuned without burning a turn or an API key.

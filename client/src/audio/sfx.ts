@@ -9,16 +9,20 @@
  * is still playing cannot be retriggered.
  */
 
-const BASE = "/assets/audio/dice";
+const BASE = "/assets/audio";
 
-/** Kenney's dice pack, grouped by the moment each clip belongs to. */
+/** Kenney's packs, grouped by the moment each clip belongs to rather than by which pack it came from. */
 const FAMILIES = {
   /** The rattle in the hand, before the throw. */
-  shake: ["dice-shake-1", "dice-shake-2", "dice-shake-3"],
+  shake: ["dice/dice-shake-1", "dice/dice-shake-2", "dice/dice-shake-3"],
   /** The toss itself — the whole handful leaving the hand. */
-  throw: ["dice-throw-1", "dice-throw-2", "dice-throw-3"],
+  throw: ["dice/dice-throw-1", "dice/dice-throw-2", "dice/dice-throw-3"],
   /** One die hitting the table. Fires once per die, staggered. */
-  land: ["die-throw-1", "die-throw-2", "die-throw-3", "die-throw-4"],
+  land: ["dice/die-throw-1", "dice/die-throw-2", "dice/die-throw-3", "dice/die-throw-4"],
+  /** A blade moving. Plays on every swing, hit or miss — the sound of the attempt. */
+  swing: ["rpg/knifeSlice", "rpg/knifeSlice2"],
+  /** Steel arriving on something. Plays only when the attack connects. */
+  impact: ["rpg/metalClick", "rpg/metalLatch"],
 } as const;
 
 export type Family = keyof typeof FAMILIES;

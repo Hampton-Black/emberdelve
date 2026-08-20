@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { initiative, silenceCombat } from "./audio/combat";
 import { mark, silence, silenceNow, speak } from "./audio/narration";
 import { IMPACT_BEAT_MS, isDramatic, revealAt } from "./dice/tumble";
 import type {
@@ -36,7 +37,7 @@ interface GameState {
    * plays the swing; it is a notification rather than state, which is why it carries `at` — two
    * identical misses in a row are two separate events and must not collapse into one.
    */
-  strike: { actorId: string; targetId: string; at: number } | null;
+  strike: { actorId: string; targetId: string; connected: boolean; at: number } | null;
 
   setConnected: (connected: boolean) => void;
   setDemoMode: (demoMode: boolean) => void;
@@ -123,6 +124,9 @@ export const useGame = create<GameState>((set) => ({
               break;
 
             case "ModeChanged":
+              // Combat opens on initiative, which is rolled as a batch and never reaches the
+              // tray (T12 owns that). Without this the fight begins in complete silence.
+              if (mode !== diff.mode && diff.mode === "COMBAT") initiative();
               mode = diff.mode;
               break;
 
@@ -232,6 +236,7 @@ export const useGame = create<GameState>((set) => ({
               strike: {
                 actorId: result.request.actorId,
                 targetId: result.request.targetId,
+                connected: result.outcome === "HIT" || result.outcome === "CRIT",
                 at: performance.now(),
               },
               // The blow is the tray's cue to leave, exactly as narration is out of combat. The
@@ -249,6 +254,7 @@ export const useGame = create<GameState>((set) => ({
   setError: (error) => {
     // An error is the one case worth cutting mid-word for.
     silenceNow();
+    silenceCombat();
     set({ error, awaitingDm: false });
   },
 }));

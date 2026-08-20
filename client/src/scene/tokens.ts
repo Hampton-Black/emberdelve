@@ -96,6 +96,7 @@ export class Token {
   /** Counts down to the moment the body drops. Zero when nothing is falling. */
   private dying = 0;
   private barWanted = false;
+  private readonly hostile: boolean;
   private striking = 0;
   private dead = false;
 
@@ -107,6 +108,11 @@ export class Token {
     this.hp = entity.hp;
     this.maxHp = entity.maxHp;
     this.shownHp = entity.hp;
+    this.hostile = !entity.isPlayerControlled;
+    // A token can be born dead — a reconnect during a fight, or after one. setHp cannot catch
+    // this, because the hit points it is handed already match what the constructor recorded, so
+    // without it the corpse stands back up on every page load.
+    this.dead = entity.hp <= 0;
 
     const config = MODELS[entity.kind];
     const model = config ? instanceCharacter(config.path) : null;
@@ -118,6 +124,9 @@ export class Token {
     this.group.add(this.bar);
     this.barFill = this.bar.children[1] as THREE.Mesh;
     this.barFillMaterial = this.barFill.material as THREE.MeshBasicMaterial;
+    // Drawn once up front: drawBar() otherwise only runs during a drain, so an undamaged enemy
+    // would wear the mesh's default green until something hit it.
+    this.drawBar();
 
     if (!model || !config) {
       this.pivot.add(buildPlaceholder());
@@ -163,6 +172,8 @@ export class Token {
       this.actions.set(clip.name, this.mixer.clipAction(clip));
     }
     this.play("idle");
+    // Straight to the last frame of `die` — there was no blow to wait for, only a page load.
+    if (this.dead) this.drop();
   }
 
   /** Crossfades to a clip. `die` holds its last frame; everything else loops. */
@@ -308,9 +319,15 @@ export class Token {
     // Scaled from the left edge, so a draining bar shortens rather than shrinking to its middle.
     this.barFill.scale.x = fraction;
     this.barFill.position.x = -(BAR_WIDTH / 2) * (1 - fraction);
-    this.barFillMaterial.color.setHex(
-      fraction > 0.55 ? 0x7fae56 : fraction > 0.25 ? 0xd0a13c : 0xc0453c,
-    );
+    // Colour is allegiance and length is health — the tactical-RPG convention, and the reason a
+    // glance at the board tells you who is who before you have read a single number.
+    //
+    // The player's bar deliberately does not also warn by turning red as it empties. It used to,
+    // and the moment enemies went red the same colour meant two different things: a short red bar
+    // was you in trouble, a long red bar was a healthy goblin. One meaning per colour. The danger
+    // signal lives in the bar's length and in the hit points in the header, and if that turns out
+    // to be too quiet the fix is a pulse, not a hue.
+    this.barFillMaterial.color.setHex(this.hostile ? 0xb83a30 : 0x7fae56);
   }
 
   dispose(): void {
