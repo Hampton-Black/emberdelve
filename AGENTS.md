@@ -448,10 +448,23 @@ weight happens at ~1s, and the narration lands while the player is still watchin
   player's rolls" would gate out exactly the wrong ones. Damage animating after to-hit makes one
   swing read as two; initiative is every combatant at once and the tray throws one roll at a time
   (T12 owns that beat).
-- **The tray leaves faster in combat** (`COMBAT_HOLD_MS`, 2.2s vs 9s). Out of combat a roll is a
-  question the DM is about to answer, so the tray waits for the answer. In a fight nothing is
-  coming but the next roll, and a tray covering a third of the board between swings is how combat
-  stops feeling like combat.
+- **The tray leaves faster in combat.** Out of combat a roll is a question the DM is about to
+  answer, so the tray waits for the answer. In a fight the blow is the answer, so the swing
+  dismisses the tray exactly as narration does — the readout dissolves as the sword comes down,
+  which is what moves the eye from the tray back to the board. `COMBAT_HOLD_MS` (3s) is only the
+  backstop for rolls with no swing behind them.
+- **The blow waits for the result to be read** (`IMPACT_BEAT_MS`, 650ms after `revealAt`). The
+  swing used to start on the same frame the readout began wiping in — and the wipe itself takes
+  260ms — so the player was asked to read "HIT" and watch the hit at once, and got neither. The
+  beat is applied to the **gate**, not to the swing alone: the hit point bar, the damage line and
+  the blow are all consequences of one roll, and delaying only the animation would have the bar
+  emptying before the sword moved.
+
+  Measured, click to swing: dice land 1060ms, total legible 1460ms, readout finished 1720ms,
+  swing 2120ms, impact 2340ms. The result stands alone for about 400ms.
+- **Everything a blow causes waits for the blow** (`IMPACT_SECONDS`, 220ms — a little past halfway
+  through the 417ms swing clip). That gates the hit point drain *and* the drop: a creature that
+  falls as the sword starts moving has died of something the player never saw land.
 - **Audio carries most of the satisfaction.** Rattle at 0ms, throw at 240ms, one clack per die
   staggered 130ms apart. Every clip gets random pitch jitter; without it the clatter sounds
   canned by the third roll.

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { mark, silence, silenceNow, speak } from "./audio/narration";
-import { isDramatic, revealAt } from "./dice/tumble";
+import { IMPACT_BEAT_MS, isDramatic, revealAt } from "./dice/tumble";
 import type {
   Diff,
   Mode,
@@ -209,7 +209,11 @@ export const useGame = create<GameState>((set) => ({
     const dramatic = isDramatic(result);
     const startedAt = performance.now();
 
-    if (dramatic) closeGateUntil(startedAt + revealAt(result.faces.length));
+    // Delaying the gate rather than the swing alone is what keeps the order true: the hit point
+    // bar, the damage line and the blow are all consequences of this roll, and none of them may
+    // arrive before the player has read what the roll said.
+    const beat = result.request.purpose === "ATTACK" ? IMPACT_BEAT_MS : 0;
+    if (dramatic) closeGateUntil(startedAt + revealAt(result.faces.length) + beat);
 
     set((state) => ({
       rolls: [...state.rolls, result],
@@ -230,6 +234,11 @@ export const useGame = create<GameState>((set) => ({
                 targetId: result.request.targetId,
                 at: performance.now(),
               },
+              // The blow is the tray's cue to leave, exactly as narration is out of combat. The
+              // readout dissolves as the sword comes down, which is what moves the eye from the
+              // tray back to the board. COMBAT_HOLD_MS is only the backstop for rolls with no
+              // swing behind them.
+              ...(state.diceDismissAt === null ? { diceDismissAt: performance.now() } : {}),
             }
           : {}),
       })),

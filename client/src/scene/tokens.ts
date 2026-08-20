@@ -13,9 +13,19 @@ import { instanceCharacter } from "./assets";
 /** The clips this game actually asks for. The kits ship 32; the rest are for wheelchairs. */
 export type TokenClip = "idle" | "walk" | "attack-melee-right" | "die";
 
-/** How long a hit point bar takes to catch up, and how long it waits before starting. */
-const DRAIN_DELAY_SECONDS = 0.22;
-const DRAIN_RATE = 5;
+/**
+ * How far into a swing the blow actually connects. The attack clip runs 417ms, so this is a
+ * little past halfway — and it gates both the hit point bar and the drop, because everything a
+ * blow causes has to wait for the blow.
+ */
+const IMPACT_SECONDS = 0.22;
+/**
+ * How long the bar takes to empty once it starts.
+ *
+ * A fixed span rather than an exponential chase: a chase never actually arrives, so the bar was
+ * still creeping a full second after the body had hit the floor.
+ */
+const DRAIN_SECONDS = 0.34;
 
 const BAR_WIDTH = 0.72;
 const BAR_HEIGHT = 0.085;
@@ -78,9 +88,13 @@ export class Token {
   private readonly barFillMaterial: THREE.MeshBasicMaterial;
   private hp: number;
   private maxHp: number;
-  /** What the bar is showing, chasing `hp`. The gap is the drain. */
+  /** What the bar is showing, on its way to `hp`. The gap is the drain. */
   private shownHp: number;
+  private drainFrom = 0;
+  private drainT = 1;
   private drainDelay = 0;
+  /** Counts down to the moment the body drops. Zero when nothing is falling. */
+  private dying = 0;
   private barWanted = false;
   private striking = 0;
   private dead = false;
@@ -201,19 +215,28 @@ export class Token {
    */
   setHp(hp: number, maxHp: number): void {
     if (hp === this.hp && maxHp === this.maxHp) return;
-    if (hp < this.hp) this.drainDelay = DRAIN_DELAY_SECONDS;
+    const hurt = hp < this.hp;
+    this.drainFrom = this.shownHp;
+    this.drainT = 0;
+    this.drainDelay = hurt ? IMPACT_SECONDS : 0;
     this.hp = hp;
     this.maxHp = maxHp;
 
     if (hp <= 0 && !this.dead) {
       this.dead = true;
-      this.play("die");
+      // Dead immediately, down a moment later. A creature that falls as the sword starts moving
+      // has died of something the player never saw land. Set to zero when the hit points did not
+      // drop — a corpse restored from a reconnect has no blow to wait for.
+      this.dying = hurt ? IMPACT_SECONDS : 0;
+      if (this.dying <= 0) this.drop();
     } else if (hp > 0 && this.dead) {
       // A creature is dead exactly when the server says its hit points are zero — never because
       // it once was. M0's goblin has a fixed id, so spawning a second one replaces the first,
       // and a token that remembered the corpse would leave the new one face down on the floor.
       this.dead = false;
+      this.dying = 0;
       this.shownHp = hp;
+      this.drainT = 1;
       this.current = null;
       this.play("idle");
     }
@@ -229,8 +252,18 @@ export class Token {
     this.refreshBar();
   }
 
+  /** The body going down, once the blow that caused it has landed. */
+  private drop(): void {
+    this.dying = 0;
+    this.current = null;
+    this.play("die");
+    this.refreshBar();
+  }
+
   private refreshBar(): void {
-    this.bar.visible = !this.dead && this.maxHp > 0 && (this.barWanted || this.hp < this.maxHp);
+    // Still shown while the creature is falling: the bar has to be visible to be seen emptying.
+    const down = this.dead && this.dying <= 0;
+    this.bar.visible = !down && this.maxHp > 0 && (this.barWanted || this.hp < this.maxHp);
   }
 
   get isDead(): boolean {
@@ -241,11 +274,20 @@ export class Token {
   update(delta: number, faceTo?: THREE.Quaternion): void {
     this.mixer?.update(delta);
 
+    if (this.dying > 0) {
+      this.dying -= delta;
+      if (this.dying <= 0) this.drop();
+    }
+
     if (this.striking > 0) {
       this.striking -= delta;
       if (this.striking <= 0) {
-        this.current = null;
-        this.play("idle");
+        this.striking = 0;
+        // Never back to idle over a corpse — a creature killed mid-swing stays down.
+        if (!this.dead) {
+          this.current = null;
+          this.play("idle");
+        }
       }
     }
 
@@ -253,11 +295,10 @@ export class Token {
 
     if (this.drainDelay > 0) {
       this.drainDelay -= delta;
-    } else if (Math.abs(this.shownHp - this.hp) > 0.01) {
-      this.shownHp += (this.hp - this.shownHp) * Math.min(1, delta * DRAIN_RATE);
-      this.drawBar();
-    } else if (this.shownHp !== this.hp) {
-      this.shownHp = this.hp;
+    } else if (this.drainT < 1) {
+      this.drainT = Math.min(this.drainT + delta / DRAIN_SECONDS, 1);
+      const eased = 1 - Math.pow(1 - this.drainT, 3);
+      this.shownHp = this.drainFrom + (this.hp - this.drainFrom) * eased;
       this.drawBar();
     }
   }

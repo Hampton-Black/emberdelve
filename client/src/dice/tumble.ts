@@ -48,7 +48,19 @@ export const HOLD_MS = 9000;
  * the next roll — and nine seconds of a tray covering a third of the board between swings is
  * how a fight stops feeling like a fight. Long enough to read, and then gone.
  */
-export const COMBAT_HOLD_MS = 2200;
+export const COMBAT_HOLD_MS = 3000;
+
+/**
+ * The pause between a result becoming readable and the blow that follows it.
+ *
+ * Measured against {@link revealAt}, which is when the total first becomes legible — the readout
+ * then takes another 260ms to wipe in. Without this the swing started on that same frame, so the
+ * player was asked to read "HIT" and watch the hit at once, and got neither.
+ *
+ * Attacks only. A skill check has no animation waiting behind its result; its consequence is
+ * narration, which takes seconds to arrive on its own.
+ */
+export const IMPACT_BEAT_MS = 650;
 
 const LOB = 10;
 const BOUNCE_HEIGHT = 12;
