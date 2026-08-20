@@ -3,7 +3,7 @@ import { swing } from "../audio/combat";
 import { Renderer } from "../scene/Renderer";
 import { useGame } from "../store";
 import { send } from "../ws";
-import type { CombatView, SceneState, Square } from "../types";
+import type { CombatView, Mode, SceneState, Square } from "../types";
 
 /**
  * The Three.js boundary.
@@ -63,10 +63,20 @@ export function Canvas() {
       // function of the store — never of a second stream of events arriving on its own path.
       let shownCombat: CombatView | null | undefined;
       let shownStrike = 0;
+      let shownMode: Mode | undefined;
 
       const sync = () => {
         const state = useGame.getState();
         apply(state.scene);
+
+        // The camera's half of the mode transition. Driven off the store's mode rather than off
+        // the diff, so it cannot fire twice for one flip and cannot miss one that arrived in a
+        // whole scene. The pull-back starts on the same frame the drums do — everything else
+        // about the fight is held behind the ceremony, but this is the ceremony.
+        if (state.mode !== shownMode) {
+          renderer.setFraming(state.mode);
+          shownMode = state.mode;
+        }
 
         const combat = state.scene?.combat ?? null;
         if (combat !== shownCombat) {

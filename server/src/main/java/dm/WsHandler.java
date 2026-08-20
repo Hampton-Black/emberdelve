@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -40,6 +41,15 @@ public final class WsHandler {
      * the longest a slide can take.
      */
     private static final long BEAT_MS = 750;
+
+    /**
+     * Whether an enemy turn is already running.
+     *
+     * <p>Two paths hand the fight over now — a player action, and a DM turn that called
+     * {@code start_combat} — and on a quick turn both can be true at the same moment. Whoever
+     * claims this owns the turn; the other returns.
+     */
+    private final AtomicBoolean automatic = new AtomicBoolean();
 
     private final GameEngine engine;
     private final DmService dm;
@@ -149,8 +159,7 @@ public final class WsHandler {
      * Runs one player action and then hands the fight to whoever is next.
      *
      * <p>The player's own consequences are sent synchronously — the click-to-move budget has no
-     * room for a thread hop — and the goblin's turn goes to a virtual thread, because it spends
-     * real seconds on pacing and must not hold the socket while it does.
+     * room for a thread hop. What happens after them is {@link #handOff}'s problem.
      */
     private void act(WsContext ctx, Consumer<CombatSink> action) {
         var mine = new Beats(ctx);
@@ -163,22 +172,45 @@ public final class WsHandler {
             narrate(ctx, mine.facts);
         }
 
-        if (engine.combat().isActive() && !engine.combat().isPlayerTurn()) {
-            turns.submit(() -> {
-                var theirs = new Beats(ctx);
-                try {
-                    engine.combat().runAutomaticTurns(theirs, WsHandler::beat);
-                } catch (Exception e) {
-                    log.error("enemy turn failed", e);
-                    send(ctx, new ServerMessage.Error("The goblin froze: " + e.getMessage()));
-                    return;
-                }
-                // The enemy's whole turn as one call — move and swing together, never one call
-                // each. The client is still animating it, which is the cover the prose model
-                // needs, exactly as the dice cover an exploration turn.
-                narrate(ctx, theirs.facts);
-            });
+        handOff(ctx);
+    }
+
+    /**
+     * Gives the fight to whoever is next, when that is not the player.
+     *
+     * <p>Called from both the player-action path and the end of a DM turn. It used to live only
+     * on the first of those, which meant a fight the DM started — rather than one the player
+     * walked into — simply stopped if the creature won initiative: nothing on the server would
+     * ever run its turn, and the player was left looking at a HUD waiting on a goblin that had
+     * no reason to move.
+     *
+     * <p>The turn goes to a virtual thread because it spends real seconds on pacing and must not
+     * hold the socket while it does.
+     */
+    private void handOff(WsContext ctx) {
+        if (!engine.combat().isActive() || engine.combat().isPlayerTurn()) {
+            return;
         }
+        if (!automatic.compareAndSet(false, true)) {
+            return;
+        }
+
+        turns.submit(() -> {
+            var theirs = new Beats(ctx);
+            try {
+                engine.combat().runAutomaticTurns(theirs, WsHandler::beat);
+            } catch (Exception e) {
+                log.error("enemy turn failed", e);
+                send(ctx, new ServerMessage.Error("The goblin froze: " + e.getMessage()));
+                return;
+            } finally {
+                automatic.set(false);
+            }
+            // The enemy's whole turn as one call — move and swing together, never one call
+            // each. The client is still animating it, which is the cover the prose model
+            // needs, exactly as the dice cover an exploration turn.
+            narrate(ctx, theirs.facts);
+        });
     }
 
     private void narrate(WsContext ctx, List<String> facts) {
@@ -274,6 +306,9 @@ public final class WsHandler {
             @Override
             public void complete() {
                 send(ctx, new ServerMessage.NarrationEnd());
+                // A DM turn can start a fight, and whatever it started the fight against may go
+                // first. This is the only place that would ever notice.
+                handOff(ctx);
             }
 
             @Override

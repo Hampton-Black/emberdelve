@@ -1,0 +1,64 @@
+/*
+ * The only stylesheet in the project.
+ *
+ * Everything else is inline styles, deliberately — components carry their own appearance and
+ * there is no cascade to reason about. Keyframes are the one thing that cannot be expressed
+ * that way, so they live here rather than being injected from a component at runtime.
+ *
+ * These are entrances only. Exits are plain transitions on the elements themselves, because an
+ * exit always has a previous value to move away from and an entrance does not.
+ */
+
+/*
+ * The one rule in here that is not a keyframe.
+ *
+ * The default body margin against a 100vh page puts scrollbars on a game viewport, and the
+ * horizontal one narrows the canvas — which the camera then measures and frames against. Left
+ * alone it is a cosmetic annoyance; now that the framing is computed from the canvas aspect it
+ * is also a wrong number.
+ */
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+/* The combat HUD arriving, just behind the drums. */
+@keyframes combatBarIn {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * One combatant taking its place in the initiative order. The overshoot in the easing is what
+ * makes it read as set down rather than faded in — it is carrying a die result, and a die result
+ * should arrive with some weight behind it.
+ *
+ * Opacity here is the arrival only. Each chip's resting opacity lives on the element inside this
+ * one, so the two multiply and a chip can arrive and be dimmed without the two fighting.
+ */
+@keyframes chipIn {
+  from {
+    opacity: 0;
+    transform: translateY(-9px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* The chrome around the order, once the order itself has settled. */
+@keyframes combatSettle {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

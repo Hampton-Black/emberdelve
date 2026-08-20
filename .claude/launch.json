@@ -2,9 +2,22 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "server",
+      "runtimeExecutable": "./gradlew",
+      "runtimeArgs": [
+        "run",
+        "--quiet"
+      ],
+      "cwd": "server",
+      "port": 7070
+    },
+    {
       "name": "client",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "cwd": "client",
       "port": 5173
     }

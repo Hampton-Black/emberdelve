@@ -1,5 +1,13 @@
 import * as THREE from "three";
-import type { CombatView, EntityView, LightingPreset, Prop, SceneState, Square } from "../types";
+import type {
+  CombatView,
+  EntityView,
+  LightingPreset,
+  Mode,
+  Prop,
+  SceneState,
+  Square,
+} from "../types";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPixelatedPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
@@ -22,7 +30,38 @@ const TARGET_WIDTH = 480;
  * problem — props occluding tokens behind them.
  */
 const ROTATION_STEP = Math.PI / 2;
-const ROTATION_SECONDS = 0.42;
+/**
+ * Deliberately slower than it was when the camera framed the whole room. A ninety-degree swing
+ * throws the scene much further across a tight frame than a wide one, and the old 0.42s read as
+ * a snap rather than as a turn once exploration moved in close.
+ */
+const ROTATION_SECONDS = 0.55;
+
+/**
+ * The two framings, as orthographic half-heights in world units.
+ *
+ * <p>Exploration sits close enough that the room is somewhere you are standing rather than a
+ * board you are reading — roughly seven squares. Combat is the whole floor, because a tactical
+ * decision you cannot see the inputs to is not a decision. The move between them is the point
+ * of the mode transition: the pull-back *is* the announcement.
+ */
+const EXPLORATION_HALF_HEIGHT = 4.5;
+const FRAMING_SECONDS = 1.1;
+
+/**
+ * How quickly the exploration camera catches up to the party — the time to close about 63% of
+ * the remaining gap, applied per frame, so the follow is framerate-independent and never
+ * overshoots. Loose enough that a single step does not yank the room.
+ */
+const FOLLOW_SECONDS = 0.34;
+
+/** The world origin is the middle of the room; see the halving in {@link buildWalls}. */
+const ROOM_CENTRE = new THREE.Vector3(0, 0, 0);
+
+/** How tall the walls stand, so the combat framing does not crop them. */
+const WALL_HEIGHT = 2;
+/** Breathing room around the room in the combat framing. */
+const ROOM_MARGIN = 0.7;
 
 /** Overlay colours. Where you may go, who you may hit, and what is under the cursor. */
 const MOVE_TINT = 0x5c86c4;
@@ -74,6 +113,19 @@ export class Renderer {
   private azimuthFrom = Math.PI / 4;
   private azimuthTo = Math.PI / 4;
   private rotationT = 1;
+
+  /** Which framing the camera is heading for, and how far through the move it is. */
+  private framing: Mode = "EXPLORATION";
+  private framingT = 1;
+  private framingFrom = EXPLORATION_HALF_HEIGHT;
+  /** Half-height right now — interpolated during a framing change, pinned either side of one. */
+  private halfHeight = EXPLORATION_HALF_HEIGHT;
+
+  /** Where the camera is looking, and where it was looking when the current move began. */
+  private readonly focus = new THREE.Vector3();
+  private readonly focusFrom = new THREE.Vector3();
+  /** Whatever {@link resize} last handed the pixelation pass. Needed to snap the camera to it. */
+  private pixelSize = 3;
   private kit: { floor: KitPiece; wall: KitPiece } | null = null;
   private dims = { width: 12, height: 12 };
   private frameHandle = 0;
@@ -88,7 +140,6 @@ export class Renderer {
     this.renderer.toneMappingExposure = 1.0;
 
     this.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
-    this.positionCamera();
 
     this.scene.add(this.room);
 
@@ -115,18 +166,245 @@ export class Renderer {
     this.resize();
   }
 
-  /** True isometric: atan(1/sqrt(2)) down, at whatever corner the player has rotated to. */
-  private positionCamera(): void {
+  /**
+   * Puts the camera where the current azimuth, framing and focus say it belongs.
+   *
+   * <p>True isometric: atan(1/sqrt(2)) down, at whatever corner the player has rotated to. The
+   * elevation never changes — it is what makes the projection isometric, and the four corners
+   * exist so the pixelation pass always resolves tile edges onto the same screen-space slopes.
+   *
+   * <p>Runs every frame rather than on demand, because the focus point moves continuously.
+   */
+  private applyCamera(): void {
     // Orthographic, so distance only sets the clip range — not apparent size.
     const distance = 30;
     const elevation = Math.atan(1 / Math.SQRT2);
 
-    this.camera.position.set(
+    const offset = new THREE.Vector3(
       distance * Math.cos(elevation) * Math.sin(this.azimuth),
       distance * Math.sin(elevation),
       distance * Math.cos(elevation) * Math.cos(this.azimuth),
     );
-    this.camera.lookAt(0, 0, 0);
+
+    // Aim once at the raw focus so the camera's own basis is available to snap against.
+    this.camera.position.copy(this.focus).add(offset);
+    this.camera.lookAt(this.focus);
+    this.camera.updateMatrixWorld(true);
+
+    const aimed = this.snapToPixelGrid(this.focus);
+    this.camera.position.copy(aimed).add(offset);
+    this.camera.lookAt(aimed);
+
+    const aspect = this.viewport().width / this.viewport().height;
+    this.camera.top = this.halfHeight;
+    this.camera.bottom = -this.halfHeight;
+    this.camera.right = this.halfHeight * aspect;
+    this.camera.left = -this.halfHeight * aspect;
+    this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * Quantises the focus point to whole low-resolution pixels.
+   *
+   * <p>Until the camera started following the party it only ever orbited, and a scene that never
+   * translates never shows this: at 480px with nearest-neighbour upscaling, a camera that moves
+   * by a fraction of a low-res pixel resamples the entire frame, and every edge in the room
+   * crawls while you walk. Snapping the focus to the render target's own grid means the scene
+   * can only ever move in exact pixel steps, which is what keeps the art still underneath it.
+   *
+   * <p>Both screen axes share one unit: the projection is orthographic and the half-width is the
+   * half-height times the aspect, so world units per pixel come out the same either way.
+   */
+  private snapToPixelGrid(focus: THREE.Vector3): THREE.Vector3 {
+    const rows = Math.max(1, Math.round(this.viewport().height / this.pixelSize));
+    const unit = (this.halfHeight * 2) / rows;
+
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+
+    const alongRight = focus.dot(right) / unit;
+    const alongUp = focus.dot(up) / unit;
+
+    return focus
+      .clone()
+      .addScaledVector(right, (Math.round(alongRight) - alongRight) * unit)
+      .addScaledVector(up, (Math.round(alongUp) - alongUp) * unit);
+  }
+
+  private viewport(): { width: number; height: number } {
+    return {
+      width: this.canvas.clientWidth || 1280,
+      height: this.canvas.clientHeight || 720,
+    };
+  }
+
+  /**
+   * Where the exploration camera wants to look: the middle of the party.
+   *
+   * <p>A centroid over every player-controlled token rather than "the fighter" — M0 has one
+   * member but the party is a list (invariant #2), and a camera written against a sample size of
+   * one is exactly the kind of thing §12 warns about.
+   */
+  private partyCentre(): THREE.Vector3 {
+    const centre = new THREE.Vector3();
+    let count = 0;
+
+    for (const id of this.playerControlled) {
+      const token = this.tokens.get(id);
+      if (!token) continue;
+      centre.add(token.group.position);
+      count++;
+    }
+
+    // Nothing to follow — hold the room rather than snapping to the origin mid-session.
+    if (count === 0) return this.focus.clone();
+
+    // The hop in advanceMovement rides on the token's y, and a camera that inherits it bounces
+    // with every step.
+    return centre.divideScalar(count).setY(0);
+  }
+
+  /**
+   * Cross to the other framing. The move itself is the mode transition the player sees (T12);
+   * nothing else about combat is announced by the camera.
+   */
+  setFraming(mode: Mode): void {
+    if (this.framing === mode) return;
+    this.framing = mode;
+    this.framingFrom = this.halfHeight;
+    this.focusFrom.copy(this.focus);
+    this.framingT = 0;
+  }
+
+  /** What the current framing is aiming at, before any easing. */
+  private framingTarget(): { halfHeight: number; focus: THREE.Vector3 } {
+    const halfHeight =
+      this.framing === "COMBAT" ? this.combatHalfHeight() : EXPLORATION_HALF_HEIGHT;
+    const wanted = this.framing === "COMBAT" ? ROOM_CENTRE.clone() : this.partyCentre();
+    return { halfHeight, focus: this.clampToRoom(wanted, halfHeight) };
+  }
+
+  /**
+   * The tightest framing that still contains the whole room.
+   *
+   * <p>Measured rather than derived from the grid size. The obvious formula — half the floor's
+   * diagonal, plus headroom — sizes the *vertical* window to hold the room's *horizontal* extent,
+   * and an isometric floor is about twice as wide on screen as it is tall. That put the combat
+   * camera roughly twice as far out as it needed to be, which was invisible while it was the only
+   * framing there was and became very visible the moment exploration moved in close: the
+   * pull-back read as a retreat into empty space rather than as a step back to see the board.
+   *
+   * <p>So: project the room's eight corners onto the camera's own axes and take whichever of the
+   * two constraints binds. Rotation is handled for free, and a room that is not square will be
+   * framed correctly on every corner rather than only on the worst one.
+   */
+  private combatHalfHeight(): number {
+    const { width, height } = this.viewport();
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+
+    const x = this.dims.width / 2;
+    const z = this.dims.height / 2;
+
+    let halfSpanRight = 0;
+    let halfSpanUp = 0;
+    for (const cx of [-x, x]) {
+      for (const cz of [-z, z]) {
+        for (const cy of [0, WALL_HEIGHT]) {
+          const corner = new THREE.Vector3(cx, cy, cz);
+          halfSpanRight = Math.max(halfSpanRight, Math.abs(corner.dot(right)));
+          halfSpanUp = Math.max(halfSpanUp, Math.abs(corner.dot(up)));
+        }
+      }
+    }
+
+    // Whichever axis runs out first decides the zoom.
+    return Math.max(halfSpanUp, (halfSpanRight * height) / width) + ROOM_MARGIN;
+  }
+
+  /**
+   * Keeps the frame full of room.
+   *
+   * <p>A follow camera pointed straight at the party walks the room off the edge of the screen
+   * the moment the party stands near a wall — which in this room is where they start. Half the
+   * frame becomes the void outside the floor, and the crypt reads as a model on a table rather
+   * than as somewhere with more of itself behind you.
+   *
+   * <p>Works on the two screen axes rather than on x and z, because the floor is a diamond once
+   * projected and a world-space box would clamp the wrong corners. Projecting the footprint onto
+   * the camera's own basis makes the rotation fall out for free: each of the four corners gets a
+   * different limit, and none of them needs to be written down.
+   *
+   * <p>When the room is smaller than the window along an axis — which is every axis in combat —
+   * there is nothing to clamp, and it centres instead.
+   */
+  private clampToRoom(focus: THREE.Vector3, halfHeight: number): THREE.Vector3 {
+    const halfWidth = (halfHeight * this.viewport().width) / this.viewport().height;
+
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+
+    const x = this.dims.width / 2;
+    const z = this.dims.height / 2;
+    const corners = [
+      new THREE.Vector3(-x, 0, -z),
+      new THREE.Vector3(x, 0, -z),
+      new THREE.Vector3(x, 0, z),
+      new THREE.Vector3(-x, 0, z),
+    ];
+
+    const clamped = focus.clone();
+    for (const [axis, half] of [
+      [right, halfWidth],
+      [up, halfHeight],
+    ] as const) {
+      const spans = corners.map((corner) => corner.dot(axis));
+      const low = Math.min(...spans);
+      const high = Math.max(...spans);
+      const at = focus.dot(axis);
+
+      const want =
+        high - low <= half * 2
+          ? (low + high) / 2
+          : Math.min(Math.max(at, low + half), high - half);
+      clamped.addScaledVector(axis, want - at);
+    }
+    return clamped;
+  }
+
+  /**
+   * Advance the framing and the follow.
+   *
+   * <p>While a framing change is running, both zoom and focus ride the same eased curve, so the
+   * pull-back arrives as one gesture. At rest the focus instead chases the party exponentially,
+   * which handles a step, a long walk and a spawn without any of them needing to agree on a
+   * duration.
+   */
+  private advanceCamera(delta: number): void {
+    const target = this.framingTarget();
+
+    if (this.framingT < 1) {
+      this.framingT = Math.min(this.framingT + delta / FRAMING_SECONDS, 1);
+      const eased = easeInOutCubic(this.framingT);
+      this.halfHeight = this.framingFrom + (target.halfHeight - this.framingFrom) * eased;
+      this.focus.lerpVectors(this.focusFrom, target.focus, eased);
+    } else {
+      this.halfHeight = target.halfHeight;
+      this.focus.lerp(target.focus, 1 - Math.exp(-delta / FOLLOW_SECONDS));
+    }
+
+    this.applyCamera();
+  }
+
+  /** Drop the camera straight onto the current framing, with no move. For scene construction. */
+  private settleCamera(): void {
+    const target = this.framingTarget();
+    this.halfHeight = target.halfHeight;
+    this.framingFrom = target.halfHeight;
+    this.focus.copy(target.focus);
+    this.focusFrom.copy(target.focus);
+    this.framingT = 1;
+    this.applyCamera();
   }
 
   /** Snap to the next corner. `direction` is -1 (counter-clockwise) or +1 (clockwise). */
@@ -148,7 +426,6 @@ export class Renderer {
     this.rotationT = Math.min(this.rotationT + delta / ROTATION_SECONDS, 1);
     const eased = easeInOutCubic(this.rotationT);
     this.azimuth = this.azimuthFrom + (this.azimuthTo - this.azimuthFrom) * eased;
-    this.positionCamera();
   }
 
   async init(): Promise<void> {
@@ -189,7 +466,11 @@ export class Renderer {
     for (const entity of state.entities) this.setHp(entity.id, entity.hp, entity.maxHp);
 
     this.setCombat(state.combat);
-    this.fitCamera();
+
+    // Framing follows the scene's own mode, so a reconnect that lands mid-fight opens on the
+    // tactical view instead of easing out to it a second time.
+    this.framing = state.mode;
+    this.settleCamera();
   }
 
   private buildLighting(preset: LightingPreset): void {
@@ -503,6 +784,8 @@ export class Renderer {
 
       this.advanceMovement(delta);
       this.advanceRotation(delta);
+      // After movement, so the follow sees where the tokens actually got to this frame.
+      this.advanceCamera(delta);
       // The camera's orientation, so health bars billboard to it through the 90-degree snaps.
       for (const token of this.tokens.values()) token.update(delta, this.camera.quaternion);
 
@@ -530,26 +813,11 @@ export class Renderer {
     this.composer.setSize(width, height);
 
     // Pick the pixel size that lands closest to TARGET_WIDTH for this canvas.
-    this.pixelPass.setPixelSize(Math.max(1, Math.round(width / TARGET_WIDTH)));
+    this.pixelSize = Math.max(1, Math.round(width / TARGET_WIDTH));
+    this.pixelPass.setPixelSize(this.pixelSize);
 
-    this.fitCamera();
-  }
-
-  /** Frame the whole room with a little headroom for wall height. */
-  private fitCamera(): void {
-    const width = this.canvas.clientWidth || 1280;
-    const height = this.canvas.clientHeight || 720;
-    const aspect = width / height;
-
-    const span = Math.max(this.dims.width, this.dims.height) * Math.SQRT2;
-    const halfHeight = span / 2 + 1.5;
-    const halfWidth = halfHeight * aspect;
-
-    this.camera.left = -halfWidth;
-    this.camera.right = halfWidth;
-    this.camera.top = halfHeight;
-    this.camera.bottom = -halfHeight;
-    this.camera.updateProjectionMatrix();
+    // Deliberately not settleCamera(): a resize mid-transition must not cancel the pull-back.
+    this.applyCamera();
   }
 
   dispose(): void {

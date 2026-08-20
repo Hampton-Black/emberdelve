@@ -1,9 +1,11 @@
 import { create } from "zustand";
-import { combatBegins, fell } from "./audio/combat";
+import { combatBegins, fell, initiativeSet } from "./audio/combat";
 import { mark, silence, silenceNow, speak } from "./audio/narration";
 import { footsteps, lidOpens, revealed } from "./audio/world";
+import { CEREMONY_MS } from "./combat/opening";
 import { IMPACT_BEAT_MS, isDramatic, revealAt } from "./dice/tumble";
 import type {
+  CombatView,
   Diff,
   Mode,
   NarrationSegment,
@@ -11,6 +13,22 @@ import type {
   SceneState,
   TranscriptEntry,
 } from "./types";
+
+/**
+ * The combat HUD and where it is in its arrival.
+ *
+ * <p>Separate from `scene.combat` because the chrome outlives the fight by design: the bar has to
+ * still have names and initiative totals to draw while it is dissolving, and by then the server
+ * has already told us the fight is over. `openedAt` is what the animation times against, and it
+ * doubles as the identity of the fight — a second one must replay the ceremony rather than
+ * inherit the first one's finished state.
+ */
+export interface CombatBeat {
+  view: CombatView;
+  openedAt: number;
+  /** When the fight ended, or null while it is still running. */
+  closingAt: number | null;
+}
 
 /**
  * ALL game state lives here (invariant #3). React and Three.js both subscribe.
@@ -41,6 +59,11 @@ interface GameState {
   activeRoll: { result: RollResult; startedAt: number } | null;
   /** When the tray began fading, in `performance.now()` terms. Null while it is still held. */
   diceDismissAt: number | null;
+
+  /**
+   * The fight's chrome, or the last fight's while it fades. Null until the first one starts.
+   */
+  combatBeat: CombatBeat | null;
 
   /**
    * The most recent attack, published once its dice have landed. The renderer watches this and
@@ -74,6 +97,7 @@ export const useGame = create<GameState>((set) => ({
   activeRoll: null,
   diceDismissAt: null,
   strike: null,
+  combatBeat: null,
 
   setConnected: (connected) => set({ connected }),
   // One way. A dropped socket reconnects to a session already under way; it does not put the
@@ -82,7 +106,17 @@ export const useGame = create<GameState>((set) => ({
   setDemoMode: (demoMode) => set({ demoMode }),
   // Mode rides with the scene rather than being left to the diff that changed it: a client
   // that connects mid-fight gets one message, and it has to be the whole truth.
-  setScene: (scene) => set({ scene, mode: scene.mode }),
+  setScene: (scene) =>
+    set({
+      scene,
+      mode: scene.mode,
+      // Backdated past the ceremony on purpose: a socket that drops and reconnects during a
+      // fight rejoins one already in progress, and replaying the drums and the initiative
+      // ceremony for it would announce something that happened minutes ago.
+      combatBeat: scene.combat
+        ? { view: scene.combat, openedAt: performance.now() - CEREMONY_MS, closingAt: null }
+        : null,
+    }),
 
   /**
    * Held behind the dice for the same reason narration is: a hit point bar that empties while
@@ -97,6 +131,11 @@ export const useGame = create<GameState>((set) => ({
 
         let scene = state.scene;
         let mode = state.mode;
+        // Which side of a mode flip this batch crossed, decided in the loop and acted on after
+        // it: the ceremony needs the CombatView, and that arrives in the CombatChanged diff
+        // sitting behind the ModeChanged one.
+        let opened = false;
+        let closed = false;
 
         for (const diff of diffs) {
           switch (diff.kind) {
@@ -148,9 +187,13 @@ export const useGame = create<GameState>((set) => ({
               break;
 
             case "ModeChanged":
-              // Combat opens on initiative, which is rolled as a batch and never reaches the
-              // tray (T12 owns that). Without this the fight begins in complete silence.
-              if (mode !== diff.mode && diff.mode === "COMBAT") combatBegins();
+              if (mode !== diff.mode) {
+                // Initiative is rolled as a batch and never reaches the tray, so the sting is
+                // the only thing announcing the fight until the bar arrives behind it.
+                if (diff.mode === "COMBAT") combatBegins();
+                opened = diff.mode === "COMBAT";
+                closed = diff.mode === "EXPLORATION";
+              }
               mode = diff.mode;
               break;
 
@@ -172,7 +215,7 @@ export const useGame = create<GameState>((set) => ({
           }
         }
 
-        return { scene, mode };
+        return { scene, mode, combatBeat: beatFor(state.combatBeat, scene.combat, opened, closed) };
       }),
     ),
 
@@ -283,6 +326,46 @@ export const useGame = create<GameState>((set) => ({
   },
 }));
 
+/**
+ * The combat chrome after a batch of diffs.
+ *
+ * <p>Not pure, and deliberately so — this is where the fight's opening beat is scheduled, and it
+ * is the first point at which both facts it needs are known: that the mode flipped, and who is
+ * in the initiative order. Splitting the schedule away from the state it times against is how
+ * the two drift apart.
+ */
+function beatFor(
+  current: CombatBeat | null,
+  combat: CombatView | null,
+  opened: boolean,
+  closed: boolean,
+): CombatBeat | null {
+  const now = performance.now();
+
+  if (opened && combat) {
+    // Everything downstream waits behind the ceremony: the DM's first line about the fight, the
+    // goblin's opening move, and every consequence of it. The same gate the dice use, for the
+    // same reason — a beat the narrator talks over is not a beat.
+    closeGateUntil(now + CEREMONY_MS);
+    initiativeSet(combat.order.length);
+    return { view: combat, openedAt: now, closingAt: null };
+  }
+
+  if (closed) {
+    // The retained view is the last live one. `combat` is already null by the time this runs,
+    // and the bar has to keep drawing names and totals all the way through its dissolve.
+    return current && current.closingAt === null ? { ...current, closingAt: now } : current;
+  }
+
+  if (!combat) return current;
+  // An ordinary update — the turn passing, movement spent, someone going down. The backdated
+  // fallback covers a CombatChanged arriving without an opening, which is what a mid-fight
+  // reconnect looks like if the scene has not landed yet.
+  return current
+    ? { ...current, view: combat }
+    : { view: combat, openedAt: now - CEREMONY_MS, closingAt: null };
+}
+
 /** Segments arrive pre-trimmed of nothing, so join with exactly one space. */
 function joinProse(existing: string, addition: string): string {
   const left = existing.trimEnd();
@@ -326,7 +409,21 @@ function openGate(): void {
   const queued = held;
   held = [];
   gateOpensAt = 0;
-  for (const action of queued) action();
+
+  for (let i = 0; i < queued.length; i++) {
+    queued[i]();
+
+    // An action may have closed the gate behind itself — the mode flipping to COMBAT does
+    // exactly that, to buy the initiative ceremony its stage. Anything still queued belongs
+    // behind the new hold rather than in front of it, and running it here would let the
+    // goblin's first move land during the drums.
+    const reclosed = gateOpensAt - performance.now();
+    if (reclosed > 0) {
+      held = queued.slice(i + 1).concat(held);
+      timer = setTimeout(openGate, reclosed);
+      return;
+    }
+  }
 }
 
 function closeGateUntil(at: number): void {

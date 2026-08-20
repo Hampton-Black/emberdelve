@@ -172,7 +172,8 @@ export function sample(result: RollResult, elapsed: number, dismissAt: number): 
 export function isDramatic(result: RollResult): boolean {
   switch (result.request.purpose) {
     // A batch, not a moment: initiative is every combatant at once and the tray throws one roll
-    // at a time. The second throw would replace the first mid-flight. T12 owns that beat.
+    // at a time, so the second throw would replace the first mid-flight. The order is shown as
+    // the combat bar assembling instead — see `combat/opening.ts`.
     case "INITIATIVE":
       return false;
     // The consequence, not the question. Animating to-hit and then damage makes one swing read

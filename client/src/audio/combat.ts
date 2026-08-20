@@ -1,3 +1,4 @@
+import { chipDelay } from "../combat/opening";
 import { drop, drum, play } from "./sfx";
 
 /**
@@ -32,6 +33,26 @@ export function combatBegins(): void {
   // A sub beneath all three, tuned under the final floor so it thickens rather than beats
   // against it.
   drop({ from: 88, to: 30, seconds: 2.1, gain: 0.34 });
+}
+
+/**
+ * The initiative order being set: one small, dull knock per combatant as its chip lands.
+ *
+ * <p>Scheduled against {@link chipDelay} rather than fired from the bar's own render, so the
+ * sound sits on the audio clock with the drums instead of on React's frame budget.
+ *
+ * <p>Pitched down and quiet on purpose. The obvious choice is a bright click, and a bright click
+ * is exactly what came out of the sting when it was rebuilt as drums — nothing in this cue is
+ * allowed to be brighter than the room.
+ */
+export function initiativeSet(count: number): void {
+  for (let i = 0; i < count; i++) {
+    const at = chipDelay(i) / 1000;
+    play("thud", { gain: 0.3, rate: 0.85, delay: at });
+    // The body under the knock, barely audible on its own — a figure set down rather than a
+    // counter dropped on glass.
+    play("cloth", { gain: 0.18, rate: 0.75, delay: at + 0.015 });
+  }
 }
 
 /**
