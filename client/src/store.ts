@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { initiative, silenceCombat } from "./audio/combat";
+import { combatBegins, fell } from "./audio/combat";
 import { mark, silence, silenceNow, speak } from "./audio/narration";
+import { footsteps, lidOpens, revealed } from "./audio/world";
 import { IMPACT_BEAT_MS, isDramatic, revealAt } from "./dice/tumble";
 import type {
   Diff,
@@ -85,16 +86,22 @@ export const useGame = create<GameState>((set) => ({
 
         for (const diff of diffs) {
           switch (diff.kind) {
-            case "EntityAdded":
+            case "EntityAdded": {
+              // Only when it is genuinely new. This diff is idempotent by id, and a replaced
+              // goblin is a debug respawn rather than a lid coming off a second time.
+              const already = scene.entities.some((e) => e.id === diff.entity.id);
+              if (!already && !diff.entity.isPlayerControlled) lidOpens();
+
               // Idempotent by id. M0's goblin has a hardcoded id, so spawning a second one
               // replaces the first server-side — appending here would leave a phantom behind.
               scene = {
                 ...scene,
-                entities: scene.entities.some((e) => e.id === diff.entity.id)
+                entities: already
                   ? scene.entities.map((e) => (e.id === diff.entity.id ? diff.entity : e))
                   : [...scene.entities, diff.entity],
               };
               break;
+            }
 
             case "EntityRemoved":
               scene = {
@@ -104,6 +111,7 @@ export const useGame = create<GameState>((set) => ({
               break;
 
             case "EntityMoved":
+              footsteps(Math.max(Math.abs(diff.x - diff.fromX), Math.abs(diff.y - diff.fromY)));
               scene = {
                 ...scene,
                 entities: scene.entities.map((e) =>
@@ -113,6 +121,8 @@ export const useGame = create<GameState>((set) => ({
               break;
 
             case "StatChanged":
+              // The blow that caused this is still mid-swing; `fell` waits for it to land.
+              if (diff.stat === "hp" && diff.to <= 0 && diff.from > 0) fell();
               scene = {
                 ...scene,
                 entities: scene.entities.map((e) =>
@@ -126,11 +136,12 @@ export const useGame = create<GameState>((set) => ({
             case "ModeChanged":
               // Combat opens on initiative, which is rolled as a batch and never reaches the
               // tray (T12 owns that). Without this the fight begins in complete silence.
-              if (mode !== diff.mode && diff.mode === "COMBAT") initiative();
+              if (mode !== diff.mode && diff.mode === "COMBAT") combatBegins();
               mode = diff.mode;
               break;
 
             case "PropRevealed":
+              if (!scene.props.some((p) => p.id === diff.prop.id)) revealed();
               scene = {
                 ...scene,
                 props: scene.props.some((p) => p.id === diff.prop.id)
@@ -254,7 +265,6 @@ export const useGame = create<GameState>((set) => ({
   setError: (error) => {
     // An error is the one case worth cutting mid-word for.
     silenceNow();
-    silenceCombat();
     set({ error, awaitingDm: false });
   },
 }));

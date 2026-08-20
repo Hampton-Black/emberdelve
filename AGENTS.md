@@ -482,28 +482,44 @@ weight happens at ~1s, and the narration lands while the player is still watchin
 - The stakes are drawn from the first frame — you can read "ATHLETICS CHECK · DC 20" while the
   die is still in the air. That is most of the tension.
 
-### Combat audio
+### Sound
 
-Measured, per attack: **5 sounds on a hit, 4 on a miss.** Rattle 0ms, throw 240ms, die lands
-1060ms, blade 2110ms, steel arriving 2330ms.
+Layer counts, measured. Every layer is scheduled on the **audio clock**, not with `setTimeout` —
+a sting is layers a tenth of a second apart and timers smear them together.
 
-- **A hit is two clips and a miss is one.** The blade moves either way; what separates them is
-  whether anything is there when it arrives. An explicit "miss" noise would be the game saying
-  out loud what the silence already said.
-- **The impact clip is scheduled, not played on the swing** — the same 220ms the hit point bar and
-  the death animation wait, so all three land together.
-- **Combat opens with one dice-throw clip**, not one per combatant. Initiative is a batch and
-  never reaches the tray (T12), so without this a fight began in total silence — which was the
-  real content of "the dice sounds aren't happening in combat": the attack rolls were always
-  audible, everything around them was not.
+| Moment | Layers | What it is |
+|---|---|---|
+| Move | 4 | footfalls spread across the slide, capped at four |
+| Prop revealed | 2 | a catch, then a short scrape |
+| Sarcophagus opens | 5 | stone grinding, the catch letting go, the slab landing, a sub under it |
+| **Combat begins** | 6 | two struck booms, a drawn blade, then the dice |
+| Attack, miss | 4 | three dice, then the blade through air |
+| Attack, hit | 6 | + chop and a metal ring, 220ms later |
+| Killing blow | 9 | + body, cloth and a sub, 430ms later |
 
-`client/public/assets/audio/rpg` is a 13-clip subset of Kenney's RPG pack. `knifeSlice` and
-`metalClick`/`metalLatch` are now the swing and the impact. **`creak1-3`, `doorOpen`, `doorClose`
-and `metalClick` are still unused** and are the obvious sounds for `reveal_prop` — the sarcophagus
-lid has no sound at all.
+- **A stinger is a transient over a weight.** The metal hits are the transient; `drop()` in
+  `sfx.ts` synthesises the weight as a falling sine, because nothing in these packs is low or long
+  enough to sit under an impact and it is a dozen lines of Web Audio rather than a hunt for a
+  sample. Without it the combat sting is a loud clang rather than an event.
+- **`rate` is doing real work.** `boom` and `thud` are only ever played far below speed — a heavy
+  metal hit at a third speed is a struck bell, and the creak at half speed stops being timber and
+  becomes stone under its own weight. Several "families" are the same clips at different speeds.
+- **A hit is three clips and a miss is one.** The blade moves either way; what separates them is
+  whether anything is there when it arrives. An explicit "miss" noise would say out loud what the
+  silence already says.
+- **Consequences wait for the blow** — 220ms, the same delay the hit point bar and the death
+  animation use, so the chop, the bar and the drop all land together instead of on the wind-up.
+- **The lid is hung off a hostile arriving**, which in M0 is the only way anything ever appears.
+  If a second spawn point is ever added, this has to become a property of the prop instead.
+- **`moveSeconds()` is shared** between the renderer's slide and the footstep spacing. Two copies
+  of that number would drift apart the first time anyone retuned movement.
 
-Still missing, and needing assets that are not in the repo: a body falling, footsteps on a move,
-and any ambient bed at all (the braziers are silent).
+**Kenney's fighter voiceover pack was deliberately not used.** It is an arcade announcer — "FIGHT",
+"ROUND 1", "FLAWLESS VICTORY" — which is the wrong genre for a crypt, and it would put a second
+speaking voice against the narrator. If that flavour is ever wanted it is a whole-game tone
+decision, not a sound effect.
+
+Still silent: there is no ambient bed at all. The braziers burn without a sound.
 
 `debug → roll d20` sends a real roll down the real path with no model in it, which is how the
 feel gets tuned without burning a turn or an API key.

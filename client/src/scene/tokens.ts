@@ -408,6 +408,15 @@ function buildBar(): THREE.Group {
   return group;
 }
 
+/**
+ * How long a token takes to slide `squares`. Exported because the footstep audio has to run for
+ * exactly as long as the walk does — two copies of this number would drift apart on the first
+ * time anyone retuned the movement.
+ */
+export function moveSeconds(squares: number): number {
+  return Math.min(0.18 + squares * 0.07, 0.75);
+}
+
 /** Every model the scene needs loaded before the first token is built. */
 export function characterPaths(): string[] {
   return [...new Set(Object.values(MODELS).map((m) => m.path))];

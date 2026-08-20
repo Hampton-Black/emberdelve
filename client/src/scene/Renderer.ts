@@ -5,7 +5,7 @@ import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPix
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { loadCharacter, loadKitPiece, toWorld, type KitPiece } from "./assets";
 import { buildProp, FLAME_INTENSITY } from "./props";
-import { characterPaths, Token } from "./tokens";
+import { characterPaths, moveSeconds, Token } from "./tokens";
 
 /**
  * Horizontal resolution of the low-res render target. Everything is rendered at this width and
@@ -470,7 +470,7 @@ export class Renderer {
       }
 
       const squares = move.from.distanceTo(move.to);
-      const duration = Math.min(0.18 + squares * 0.07, 0.75);
+      const duration = moveSeconds(squares);
       move.t = Math.min(move.t + delta / duration, 1);
 
       const eased = easeOutCubic(move.t);

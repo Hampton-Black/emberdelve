@@ -11,18 +11,61 @@
 
 const BASE = "/assets/audio";
 
-/** Kenney's packs, grouped by the moment each clip belongs to rather than by which pack it came from. */
+/**
+ * Kenney's packs, grouped by the moment each clip belongs to rather than by which pack it came
+ * from. Several families are the same samples at different speeds: `rate` is doing real work
+ * here, and a metal hit dragged down to a third speed is a gong, not a clang.
+ */
 const FAMILIES = {
   /** The rattle in the hand, before the throw. */
   shake: ["dice/dice-shake-1", "dice/dice-shake-2", "dice/dice-shake-3"],
+  /** Dice being picked up. */
+  grab: ["dice/dice-grab-1", "dice/dice-grab-2"],
   /** The toss itself — the whole handful leaving the hand. */
   throw: ["dice/dice-throw-1", "dice/dice-throw-2", "dice/dice-throw-3"],
   /** One die hitting the table. Fires once per die, staggered. */
   land: ["dice/die-throw-1", "dice/die-throw-2", "dice/die-throw-3", "dice/die-throw-4"],
   /** A blade moving. Plays on every swing, hit or miss — the sound of the attempt. */
   swing: ["rpg/knifeSlice", "rpg/knifeSlice2"],
-  /** Steel arriving on something. Plays only when the attack connects. */
-  impact: ["rpg/metalClick", "rpg/metalLatch"],
+  /** Steel arriving on armour. Plays only when the attack connects. */
+  impact: [
+    "impact/impactMetal_medium_000",
+    "impact/impactMetal_medium_001",
+    "impact/impactMetal_medium_002",
+    "impact/impactMetal_medium_003",
+    "impact/impactMetal_medium_004",
+  ],
+  /** Only ever played far below speed, where it stops being metal and becomes a struck bell. */
+  boom: [
+    "impact/impactMetal_heavy_000",
+    "impact/impactMetal_heavy_001",
+    "impact/impactMetal_heavy_002",
+    "impact/impactMetal_heavy_003",
+    "impact/impactMetal_heavy_004",
+  ],
+  /** Something reaching the floor. Pitched down — the pack's generic hits are all light. */
+  thud: [
+    "impact/impactGeneric_light_000",
+    "impact/impactGeneric_light_001",
+    "impact/impactGeneric_light_002",
+    "impact/impactGeneric_light_003",
+    "impact/impactGeneric_light_004",
+  ],
+  /** A blade leaving its scabbard. The gesture that means a fight is starting. */
+  steel: ["rpg/drawKnife1", "rpg/drawKnife2", "rpg/drawKnife3"],
+  /** The blade arriving on something that is not armour. Layered under {@link FAMILIES.impact}. */
+  chop: ["rpg/chop"],
+  /** Ten of them, so a walk across the room never repeats a foot. */
+  step: [
+    "rpg/footstep00", "rpg/footstep01", "rpg/footstep02", "rpg/footstep03", "rpg/footstep04",
+    "rpg/footstep05", "rpg/footstep06", "rpg/footstep07", "rpg/footstep08", "rpg/footstep09",
+  ],
+  /** Armour and clothing shifting. Never plays alone — it is the body under another sound. */
+  cloth: ["rpg/cloth1", "rpg/cloth2", "rpg/cloth3", "rpg/cloth4"],
+  /** Stone and old timber under load. */
+  grind: ["rpg/creak1", "rpg/creak2", "rpg/creak3"],
+  /** A catch giving way. */
+  latch: ["rpg/metalLatch", "rpg/metalClick"],
 } as const;
 
 export type Family = keyof typeof FAMILIES;
@@ -73,6 +116,11 @@ export interface PlayOptions {
    * going while the dice land — a die is shaken, then thrown, and the two must not overlap.
    */
   duration?: number;
+  /**
+   * Seconds to wait before starting. Scheduled on the audio clock rather than with a timer,
+   * because the layers of a sting have to be tight and `setTimeout` is not.
+   */
+  delay?: number;
 }
 
 /** Plays one clip from the family. A no-op until {@link unlock} has run and decoding is done. */
@@ -93,13 +141,54 @@ export function play(family: Family, options: PlayOptions = {}): void {
   gain.gain.value = options.gain ?? 1;
 
   source.connect(gain).connect(master);
-  source.start();
+  const at = ctx.currentTime + (options.delay ?? 0);
+  source.start(at);
 
   if (options.duration !== undefined) {
     // Ramped, not cut: stopping a sample mid-waveform is an audible click.
-    const end = ctx.currentTime + options.duration;
+    const end = at + options.duration;
     gain.gain.setValueAtTime(gain.gain.value, Math.max(end - 0.06, ctx.currentTime));
     gain.gain.linearRampToValueAtTime(0.0001, end);
     source.stop(end);
   }
+}
+
+export interface DropOptions {
+  /** Starting frequency in Hz. */
+  from: number;
+  to: number;
+  seconds: number;
+  gain?: number;
+  delay?: number;
+}
+
+/**
+ * A synthesised sine falling in pitch: the weight underneath a sting.
+ *
+ * <p>Nothing in these packs is low enough or long enough to sit under an impact, and this is a
+ * dozen lines of Web Audio rather than a hunt for a sample. It is also the part that actually
+ * makes a stinger feel large — the metal on top is only the transient, and a transient with
+ * nothing under it is a loud clang.
+ */
+export function drop(options: DropOptions): void {
+  if (!ctx || !master) return;
+
+  const start = ctx.currentTime + (options.delay ?? 0);
+  const end = start + options.seconds;
+
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(options.from, start);
+  osc.frequency.exponentialRampToValueAtTime(options.to, end);
+
+  // Exponential ramps cannot reach zero, hence the near-silence at both ends. Fast in and slow
+  // out: an envelope that fades in reads as a hum arriving rather than as something being hit.
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(options.gain ?? 0.4, start + 0.04);
+  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+  osc.connect(gain).connect(master);
+  osc.start(start);
+  osc.stop(end + 0.02);
 }
