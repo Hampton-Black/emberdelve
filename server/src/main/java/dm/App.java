@@ -60,7 +60,8 @@ public final class App {
                     new VeniceDmClient(config, proseModel, java.time.Duration.ofSeconds(90)),
                     engine,
                     content.prompt("dm-tools"),
-                    content.prompt("dm"));
+                    content.prompt("dm"),
+                    content.prompt("dm-reconcile"));
         } else {
             log.warn("VENICE_API_KEY not set — narration disabled. "
                     + "Copy .env.example to .env to enable the DM.");

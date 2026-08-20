@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Runs one DM turn as two phases against two different models.
+ * Runs one DM turn as three phases against two different models.
  *
  * <p><b>Phase 1 — mechanics, fast model.</b> Decides tool calls and nothing else; any prose it
  * emits is discarded. Loops until it stops asking for tools, seeing each engine result before
@@ -23,6 +23,12 @@ import java.util.stream.Collectors;
  * <p><b>Phase 2 — narration, strong model.</b> Writes the prose, with the engine's actual results
  * as context. It runs <em>while the dice are still animating</em>, which is what buys it the time
  * to be good rather than merely fast.
+ *
+ * <p><b>Phase 3 — reconcile, fast model.</b> Hands the finished narration back to the mechanics
+ * model and asks what has to become true for it to have been true. This is what stops the writer
+ * describing a creature nobody spawned, and equally what lets it decide the fight starts: the
+ * strong model has the dramatic judgement and the fast one has the verbs, and this is the wire
+ * between them. It runs behind speech the client has already queued, so it is close to free.
  *
  * <p>Narration stays with exactly one model, so the tone cannot drift between turns — the failure
  * {@code ai-dm-system-design.md} §10 warns is audible immediately.
@@ -62,6 +68,7 @@ public final class DmService {
     private final ToolDispatcher dispatcher;
     private final String toolPrompt;
     private final String prosePrompt;
+    private final String reconcilePrompt;
     private final TurnMetrics metrics = new TurnMetrics();
 
     /** The durable conversation: what the player said, and what the narrator said back. */
@@ -84,13 +91,14 @@ public final class DmService {
             new java.util.concurrent.locks.ReentrantLock();
 
     public DmService(DmClient toolClient, DmClient proseClient, GameEngine engine,
-                     String toolPrompt, String prosePrompt) {
+                     String toolPrompt, String prosePrompt, String reconcilePrompt) {
         this.toolClient = toolClient;
         this.proseClient = proseClient;
         this.engine = engine;
         this.dispatcher = new ToolDispatcher(engine);
         this.toolPrompt = toolPrompt;
         this.prosePrompt = prosePrompt;
+        this.reconcilePrompt = reconcilePrompt;
     }
 
     public String modelId() {
@@ -251,10 +259,18 @@ public final class DmService {
         history.add(DmClient.ChatMessage.user(text));
         history.add(DmClient.ChatMessage.assistant(prose.text()));
 
+        // Phase 3, and the reason it is worth a third call: see runReconcilePhase.
+        long reconcileStart = System.nanoTime();
+        int reconciled = runReconcilePhase(prose.text(), mechanics.results(), sink);
+        long reconcileMs = (System.nanoTime() - reconcileStart) / 1_000_000;
+
         metrics.record(new TurnMetrics.TurnShape(
                 mechanics.calls(), mechanics.applied(), mechanics.rejected(),
-                mechanics.firstFeedbackMs(), toolPhaseMs, proseMs, prose.firstTokenMs()));
+                mechanics.firstFeedbackMs(), toolPhaseMs, proseMs, prose.firstTokenMs(),
+                reconcileMs, reconciled));
 
+        // Last, and after the reconcile on purpose: closing the turn is what hands the fight to
+        // whoever won initiative, and a fight the reconcile has just started has to exist by then.
         sink.complete();
     }
 
@@ -419,6 +435,141 @@ public final class DmService {
         return new Prose(narrated.toString(), firstTokenMs);
     }
 
+    // ---- Phase 3: reconcile ----
+
+    /**
+     * Catches the board up to what the narrator just said.
+     *
+     * <p>Phases 1 and 2 run in that order for a latency reason — mechanics first so the dice are
+     * already tumbling while the writer works. The cost is that the writer is the last to speak
+     * and the first to be believed. Told the sarcophagus holds a goblin that "will come out
+     * fighting", it wrote the lid grinding open and claws at the player's throat on a turn where
+     * phase 1 had spawned nothing; the room stayed empty and the player walked around a creature
+     * that had just attacked them. Stopping the narrator writing that is one fix, and it is the
+     * one that keeps the DM honest and timid: a hostile that menaces for turn after turn while
+     * nothing on the board moves is scenery, and the player learns they are safe.
+     *
+     * <p>So the other half. Dramatic judgement lives in the strong model and the verbs live in
+     * the fast one, and this is the wire between them: the narration goes back to the mechanics
+     * model, which is asked one question — <em>what has to become true for that to have been
+     * true?</em> The narrator leads and the engine follows, which is the order a human DM works
+     * in. They say it, then they move the miniature.
+     *
+     * <p>It still never adjudicates. There are no dice in this phase ({@link
+     * ToolSchema#forReconcile}), every call is validated by the same dispatcher as any other, and
+     * the engine can refuse — so the narrator gained the power to <em>propose</em> a spawn or a
+     * fight, not the power to make one happen. Invariant #1 is untouched.
+     *
+     * <p>The latency is close to free. It starts once the prose has finished streaming, which is
+     * the moment the client has fifteen seconds of speech queued and nothing to do but play it;
+     * the diffs land in that same ordered queue and arrive as the sentence describing them
+     * finishes. The player sees the goblin appear on the word "goblin".
+     *
+     * @return how many calls were applied
+     */
+    private int runReconcilePhase(String narration, List<String> alreadyDone, TurnSink sink) {
+        // Combat is the engine's to run beat by beat, and a beat is narrated from facts it has
+        // already decided. There is nothing to catch up to, and everything to get wrong.
+        if (narration.isBlank() || engine.combat().isActive()) {
+            return 0;
+        }
+
+        var tools = ToolSchema.forReconcile(engine);
+        var conversation = new ArrayList<DmClient.ChatMessage>();
+        conversation.add(DmClient.ChatMessage.system(reconcilePrompt + "\n\n" + worldState(false)));
+        conversation.add(DmClient.ChatMessage.user(prompt(narration, alreadyDone)));
+
+        var failed = new boolean[]{false};
+        var discard = new DmClient.DmListener() {
+            @Override
+            public void onTextDelta(String delta) {
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                // Deliberately not surfaced to the player. The turn has already been narrated and
+                // is already being spoken; a red toast now would report a failure they cannot see
+                // over something they can already hear working.
+                failed[0] = true;
+                log.warn("reconcile pass failed, the board keeps what phase 1 gave it", error);
+            }
+        };
+
+        int applied = 0;
+
+        // Two rounds at most, and the second only to fix a rejection. Picking a square is the
+        // one argument here that can be wrong for a reason the model could not see — the
+        // narrator says the goblin is out of the sarcophagus, and the square next to it happens
+        // to be where the player is standing. Without the retry that turn narrates a creature
+        // into the room and then does not put one there, which is the exact bug this phase
+        // exists to close.
+        for (int round = 0; round < 2 && !failed[0]; round++) {
+            var result = toolClient.streamTurn(conversation, tools, discard);
+            if (failed[0] || !result.wantsTools()) {
+                break;
+            }
+
+            conversation.add(
+                    DmClient.ChatMessage.assistantToolCalls(result.text(), result.toolCalls()));
+
+            boolean rejected = false;
+            for (var call : result.toolCalls()) {
+                // "Nothing needs to change" is the most common right answer here, and the model
+                // keeps expressing it by calling a tool named `none`. Dispatched, that is a
+                // rejection, and a rejection buys a retry round — so the cheapest turn in the
+                // game was costing two round trips to say no twice. Screened out here instead,
+                // where it means what it was meant to mean: no calls.
+                if (!ToolSchema.allowedInReconcile(call.name())) {
+                    log.info("reconcile declined to run {}({}) — reading it as 'nothing to change'",
+                            call.name(), call.argumentsJson());
+                    conversation.add(DmClient.ChatMessage.toolResult(call.id(), "No change made."));
+                    continue;
+                }
+
+                var outcome = dispatcher.dispatch(call);
+
+                if (outcome.ok()) {
+                    applied++;
+                    log.info("reconcile applied {}({}) -> {}",
+                            call.name(), call.argumentsJson(), outcome.message());
+                } else {
+                    rejected = true;
+                    log.warn("reconcile rejected: {}({}) -> {}",
+                            call.name(), call.argumentsJson(), outcome.message());
+                }
+
+                if (!outcome.diffs().isEmpty()) {
+                    sink.diffs(outcome.diffs());
+                }
+                outcome.rolls().forEach(sink::roll);
+
+                conversation.add(DmClient.ChatMessage.toolResult(call.id(), outcome.message()));
+            }
+
+            if (!rejected) {
+                break;
+            }
+        }
+
+        return applied;
+    }
+
+    /** What the reconcile model is actually answering. */
+    private static String prompt(String narration, List<String> alreadyDone) {
+        var sb = new StringBuilder();
+        sb.append(alreadyDone.isEmpty()
+                ? "The engine did nothing this turn.\n\n"
+                : "The engine already did this, this turn:\n" + String.join("\n", alreadyDone)
+                        + "\n\n");
+        // Quoted and labelled rather than handed over bare. Bare, the model reads it as the scene
+        // continuing and answers it as a turn.
+        sb.append("The narrator then told the player, out loud:\n\n\"")
+                .append(narration.strip())
+                .append("\"\n\nWhat must change on the board for that to be true? "
+                        + "Call nothing if the answer is nothing.");
+        return sb.toString();
+    }
+
     // ---- Context ----
 
     /**
@@ -580,6 +731,14 @@ public final class DmService {
      */
     private Map<String, String> liveSpeakers() {
         var speakers = new java.util.HashMap<String, String>();
+        // Creatures that can arrive this turn, not only ones already standing here. A creature's
+        // best line is the one it arrives on — and on that turn it does not exist yet, because
+        // the reconcile pass that puts it on the grid runs after the last word is parsed. Marked
+        // [[goblin]], the line was falling back to the narrator every time. Still a closed set:
+        // exactly what spawn_entity can produce, which is what the model was offered.
+        for (var kind : ToolSchema.SPAWNABLE_KINDS) {
+            speakers.put(kind.toLowerCase(), kind.toLowerCase());
+        }
         for (var entity : engine.repo().entities()) {
             speakers.putIfAbsent(entity.name().toLowerCase(), entity.id().toLowerCase());
         }

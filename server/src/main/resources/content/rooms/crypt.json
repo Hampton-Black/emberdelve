@@ -99,6 +99,6 @@
     "sensory": "Air like a held breath. The braziers hiss. Every sound arrives a half-second late, as if the room is deciding whether to allow it.",
     "theSarcophagus": "A goblin scavenger named Vessk crawled in through a collapsed shaft two days ago, levered the lid aside looking for grave-goods, and got trapped when it settled back. It is hungry, frightened, and will come out fighting. The scratches on the seam are its work.",
     "theDoor": "The north door is sealed and will not open in this session. Handle it in fiction \u2014 the mechanism is broken, the stone has settled, something heavy rests against it on the far side. Do not tell the player the room is unfinished.",
-    "theSarcophagusOpened": "Vessk is out. The sarcophagus held nothing else \u2014 no body, no occupant, no second thing clawing at the lid. It is an empty stone box with grave-dust in the bottom and a lid that no longer sits flush. If the player looks inside, that is what they find."
+    "theSarcophagusOpened": "Vessk is out and on the grid. However he got out is whatever the narration said \u2014 do not contradict it, and do not put him back. The sarcophagus held nothing else: no body, no occupant, no second thing clawing at the lid, just grave-dust in the bottom of a stone box. If the player looks inside or listens at it, that is what they find. The scratching has stopped, because the thing making it is in the room with them."
   }
 }

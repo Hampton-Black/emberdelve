@@ -24,6 +24,7 @@ public final class TurnMetrics {
     private final AtomicInteger toolsRejected = new AtomicInteger();
     private final AtomicLong totalToolPhaseMs = new AtomicLong();
     private final AtomicLong totalProseMs = new AtomicLong();
+    private final AtomicInteger turnsReconciled = new AtomicInteger();
 
     public void record(TurnShape shape) {
         turns.incrementAndGet();
@@ -34,17 +35,21 @@ public final class TurnMetrics {
         toolsRejected.addAndGet(shape.rejected());
         totalToolPhaseMs.addAndGet(shape.toolPhaseMs());
         totalProseMs.addAndGet(shape.proseMs());
+        if (shape.reconciledCalls() > 0) {
+            turnsReconciled.incrementAndGet();
+        }
 
         // firstFeedbackMs is the number that matters: it is when the player sees dice, not
         // when the model finished deciding. Total phase time is diagnostic, not the budget.
         log.info("turn: FIRST FEEDBACK {}ms | tools {}ms ({} calls, {} rejected) | "
-                        + "prose {}ms first-token {}ms | total {}ms | "
-                        + "session: {}/{} turns used dice",
+                        + "prose {}ms first-token {}ms | reconcile {}ms ({} applied) | "
+                        + "total {}ms | session: {}/{} turns used dice, {} reconciled",
                 shape.firstFeedbackMs() < 0 ? "none" : shape.firstFeedbackMs(),
                 shape.toolPhaseMs(), shape.toolCalls(), shape.rejected(),
                 shape.proseMs(), shape.proseFirstTokenMs(),
-                shape.toolPhaseMs() + shape.proseMs(),
-                turnsWithTools.get(), turns.get());
+                shape.reconcileMs(), shape.reconciledCalls(),
+                shape.toolPhaseMs() + shape.proseMs() + shape.reconcileMs(),
+                turnsWithTools.get(), turns.get(), turnsReconciled.get());
     }
 
     private long average(AtomicLong total) {
@@ -61,7 +66,13 @@ public final class TurnMetrics {
             long firstFeedbackMs,
             long toolPhaseMs,
             long proseMs,
-            long proseFirstTokenMs
+            long proseFirstTokenMs,
+            /**
+             * Phase 3. Not on the player's clock the way the other two are: it starts once the
+             * prose has finished streaming, so it runs behind speech that is already queued.
+             */
+            long reconcileMs,
+            int reconciledCalls
     ) {
     }
 }
