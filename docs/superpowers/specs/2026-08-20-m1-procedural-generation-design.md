@@ -46,10 +46,10 @@ milestone takes generation first, deliberately.
 
 | Component | M1 form |
 |---|---|
-| Layout | Seeded, deterministic Java. Rooms, corridors, doors, connectivity graph |
+| Layout | Seeded, deterministic Java. Scenes, corridors, exits, connectivity graph |
 | Kit | Content-as-data: tile types, prop catalog with ids and footprints |
 | Dressing | One LLM pass per room, JIT on entry, validated server-side |
-| Navigation | Doors work. Scene swaps on room change |
+| Navigation | Exits work. Scene swaps on room change |
 | State | Multi-room, still in memory behind `GameRepository` |
 | Client | Existing Three.js client renders generated rooms |
 | Debug view | Terminal dump of a generated dungeon, for fast iteration |
@@ -72,8 +72,10 @@ milestone takes generation first, deliberately.
 
 Five pieces. Four have no model in the path.
 
-**`DungeonLayout`** — seeded, deterministic, pure. Produces rooms, corridors, doors and a
+**`DungeonLayout`** — seeded, deterministic, pure. Produces rooms, corridors, exits and a
 connectivity graph from `(seed, coordinates)`. Snapshot-testable: same seed, same dungeon, forever.
+Expected to become an interface with per-environment implementations (§7b); built against the crypt
+only, and not generalised in M1.
 
 **`RoomKit`** — content-as-data. Tile types, prop catalog with ids and footprints, placement rules.
 This is the closed enum the model picks from, and the project's first real content-as-data schema.
@@ -86,9 +88,14 @@ stub the narrator later expands. Every output validated server-side (§6).
 **`DungeonState`** — current room, visited rooms, entity positions per room. Behind the existing
 `GameRepository` interface; still an in-memory implementation.
 
-**Navigation** — doors become real. A door carries a target room id; the client sends a move; the
+**Navigation** — exits become real. An `Exit` carries a target scene id; the client sends a move; the
 server swaps the scene. M0's acceptance script step 9 ("the north door is a wall, handled in
 fiction") stops being a graceful excuse and becomes a real transition.
+
+**`Exit`, not `Door`** — deliberately. The edge between two scenes is a door in a crypt, but it is a
+road out of a village, a path over a mountain pass, a ford across a river. M1 only ever builds doors;
+the name is chosen now because it costs nothing today and is a painful retrofit later. Same class of
+decision as `RollResult.faces` being a list from day one.
 
 ---
 
@@ -116,7 +123,7 @@ Closed enums are still necessary and are no longer sufficient.
 > **Generated content is validated for spatial legality, not just enum membership.**
 
 A prop placed in a doorway is a **valid enum and an invalid world**. The validator must assert, at
-minimum: every door remains reachable, props do not overlap, no prop blocks the only path between
+minimum: every exit remains reachable, props do not overlap, no prop blocks the only path between
 two regions, and every room in the layout is connected.
 
 This is the same lesson as the goblin that gets vividly described and never spawns, one level up:
@@ -150,9 +157,9 @@ retrofit.
 
 | Layer | Deterministic? | Storage |
 |---|---|---|
-| Layout, doors, connectivity | Yes, from `(seed, coords)` | **Never stored** — regenerated on demand |
+| Layout, exits, connectivity | Yes, from `(seed, coords)` | **Never stored** — regenerated on demand |
 | Dress pass (what the room *is*) | **No** — an LLM wrote it | **Persisted on first visit** |
-| World deltas (door opened, goblin dead) | No | Persisted |
+| World deltas (exit opened, goblin dead) | No | Persisted |
 
 Minecraft and No Man's Sky are "infinite" on precisely this trick: store the seed and the deltas,
 not the world. The wrinkle specific to this project is that **the dress pass is not reproducible** —
@@ -168,6 +175,43 @@ room's identity on re-entry would be the generated-content version of the DM con
 **The long-term shape is bounded regions, unbounded in number**: each dungeon coherent and finite,
 the world made of many. *Expanding* is not the goal; room 40 meaning something is the goal, and
 meaning comes from structure (M7), not from generation.
+
+---
+
+## 7b. Environments beyond the crypt
+
+M1 builds one environment. This section exists so the model does not have to be unpicked when the
+second one arrives.
+
+**A "room" is a bounded scene, not a walled chamber.** The model is already a grid, a tile set,
+props, entities and exits — nothing in it requires walls or a ceiling. A village is cobblestone and
+grass tiles with building props and roads; a mountain pass is rock tiles with a linear topology.
+Structurally they are the same object, which is why the abstraction is worth keeping literal-minded.
+
+**Openness is a framing problem, not a data problem.** The isometric CRPGs this project resembles —
+Baldur's Gate, Pillars of Eternity, Divinity — are all bounded scenes and none of them read as boxes.
+Four techniques do the work: a backdrop with no gameplay in it (distant mountains, fog, a skyline);
+soft edges that give a reason not to walk that way (a cliff, a river, a treeline, a row of building
+fronts); a larger grid with the camera pulled further back; and detail near the player falling off to
+silhouette in the distance. `SceneState` already carries `LightingPreset`; a backdrop and an edge
+treatment are the same kind of field.
+
+**The narrative-exploration decision does most of the work.** Because the grid is rendered but not
+walkable outside combat, an open area only needs to be a *tactical* space when a fight starts and a
+*described* space the rest of the time. A village is a backdrop and a conversation until someone
+draws a blade, at which point it becomes a grid with cover. That is a far smaller problem than
+rendering a walkable town, and it is worth not giving up accidentally.
+
+**What changes when the second environment lands:**
+
+| Concern | Cost |
+|---|---|
+| Kits | Free — `RoomKit` is content-as-data, so a village kit is a JSON file |
+| Layout | Real work — a crypt is a graph of chambers, a settlement clusters around a centre, a pass is *linear*. `DungeonLayout` becomes an interface with implementations |
+| Scene attributes | Small — backdrop and edge treatment alongside the existing lighting preset |
+| Exits | Already handled, by the naming decision in §4 |
+
+None of this is built in M1. It is written down so that M1's choices do not preclude it.
 
 ---
 
@@ -246,6 +290,7 @@ The design doc is the long-range plan; these are the agreed amendments.
 - **A spatial-legality validator** is required, which the doc does not describe. §6.
 - **The deterministic/persisted split** is adopted now rather than at the persistence milestone. §7.
 - **The renderer choice** is explicitly re-examined and deferred, with a re-entry condition. §8b.
+- **`Exit` replaces `Door`** in the scene model, ahead of any non-dungeon environment. §4, §7b.
 
 ---
 
@@ -256,7 +301,7 @@ All offline, all fast, extending the `ScriptedDiceRoller` pattern to generation.
 - **Layout**: snapshot tests on seeded output. Same seed, same dungeon.
 - **Dresser**: run against a scripted `DmClient` with no network, asserting that valid output is
   accepted and that out-of-kit prop ids are rejected.
-- **Spatial legality**: place a prop in a doorway, assert rejection. Disconnect a room, assert
+- **Spatial legality**: place a prop in an exit, assert rejection. Disconnect a room, assert
   rejection.
 - **Navigation**: move between rooms, assert scene swap and preserved state in the room departed.
 
@@ -268,10 +313,10 @@ All offline, all fast, extending the `ScriptedDiceRoller` pattern to generation.
 #6, and the dress pass is where it is won or lost. The M0 finding applies directly: terse
 instructions beat explanatory ones, and this should be measured rather than argued about.
 
-**Threshold latency.** If narration fails to cover the dress pass, every doorway hangs. Uncovered
+**Threshold latency.** If narration fails to cover the dress pass, every threshold hangs. Uncovered
 waits are the ones players notice.
 
-**Dress-pass nonsense.** Blocked doors, overlapping props, unreachable rooms. The validator (§6) is
+**Dress-pass nonsense.** Blocked exits, overlapping props, unreachable rooms. The validator (§6) is
 the answer and must exist first.
 
 **Scope creep into the rules engine.** Generated encounters will make the ~40-line attack resolution
