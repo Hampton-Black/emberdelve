@@ -34,6 +34,20 @@ public final class NarrationParser {
     /** {@code [Engage with the perception success]} — written for the reader, never for the room. */
     private static final Pattern ASIDE = Pattern.compile("\\[[^\\]]*]");
 
+    /**
+     * {@code start_combat()} — the prose model writing down the machinery.
+     *
+     * <p>It has no tools and never did: the mechanics are decided by a different model before a
+     * word is written. But it is handed the results of those calls as context, and it imitates
+     * what it is shown — observed ending a turn by simply writing {@code start_combat()}, which
+     * the queue then read aloud. Built from the real tool names rather than a general pattern,
+     * so it cannot swallow a legitimate parenthesis, and so adding a tool cannot leave a gap.
+     */
+    private static final Pattern TOOL_CALL = Pattern.compile(
+            "\\b(" + String.join("|", ToolSchema.ROLL_CHECK, ToolSchema.REVEAL_PROP,
+                    ToolSchema.SPAWN_ENTITY, ToolSchema.START_COMBAT, "narrate")
+                    + ")\\s*\\([^)]*\\)");
+
     private final Set<String> knownSpeakers;
     private final Consumer<NarrationSegment> onSegment;
 
@@ -161,7 +175,8 @@ public final class NarrationParser {
     private void emit(String raw) {
         // Square brackets never appear in narration prose, and stage directions arrive both
         // inline and on their own line — so strip the span rather than test the whole segment.
-        String text = ASIDE.matcher(raw).replaceAll("").replace("`", "");
+        String text = TOOL_CALL.matcher(raw).replaceAll("");
+        text = ASIDE.matcher(text).replaceAll("").replace("`", "");
         // Nothing pronounceable, nothing to say. Models occasionally emit a stray markdown fence
         // or a lone divider, and the queue would dutifully read it as its own line.
         if (text.isBlank() || text.chars().noneMatch(Character::isLetterOrDigit)) {

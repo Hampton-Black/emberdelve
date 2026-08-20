@@ -129,6 +129,11 @@ public final class WsHandler {
             case "begin" -> {
                 if (dm != null) {
                     turns.submit(() -> dm.openScene(turnSink(ctx), false));
+                } else {
+                    // The client holds its input and its debug bar from the moment the player
+                    // clicks through the title, on the assumption that an opening is coming. With
+                    // no key configured one never does, and without this the hold never lifts.
+                    send(ctx, new ServerMessage.NarrationEnd());
                 }
             }
 
@@ -195,6 +200,11 @@ public final class WsHandler {
             return;
         }
 
+        // Read before the turn runs. Every combatant acts once per round, so a creature's
+        // first turn is always in round 1 — but a turn that closes the round leaves the
+        // counter reading 2 by the time it is over.
+        int round = engine.combat().view().round();
+
         turns.submit(() -> {
             var theirs = new Beats(ctx);
             try {
@@ -206,10 +216,19 @@ public final class WsHandler {
             } finally {
                 automatic.set(false);
             }
+
             // The enemy's whole turn as one call — move and swing together, never one call
             // each. The client is still animating it, which is the cover the prose model
             // needs, exactly as the dice cover an exploration turn.
-            narrate(ctx, theirs.facts);
+            //
+            // Its first turn is always narrated: that is where the creature gets a voice and a
+            // shape, and it is the half of T11 that actually lands. After that, only the beats
+            // worth stopping for. Narrating every turn meant 226 characters of prose for a
+            // swing that missed, every time — six straight misses became six paragraphs about
+            // nothing happening, and a narrator filling silence is worse than the silence.
+            if (round == 1 || theirs.dramatic) {
+                narrate(ctx, theirs.facts);
+            }
         });
     }
 

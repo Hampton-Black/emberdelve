@@ -34,6 +34,43 @@ class NarrationParserTest {
     }
 
     @Test
+    @DisplayName("a leaked tool call never reaches the voice")
+    void toolCallStripped() {
+        var p = parser();
+        p.accept("The goblin scrambles clear of the lid. start_combat()");
+        p.finish();
+
+        assertFalse(textOf("narrator").contains("start_combat"),
+                "the prose model imitates the machinery it is shown, and the queue reads "
+                        + "whatever it is handed");
+        assertTrue(textOf("narrator").contains("scrambles clear"));
+    }
+
+    @Test
+    @DisplayName("a tool call with arguments goes too, and takes its arguments with it")
+    void toolCallWithArgumentsStripped() {
+        var p = parser();
+        p.accept("Something moves in the dark. spawn_entity({\"kind\": \"goblin\"}) It hisses.");
+        p.finish();
+
+        String spoken = textOf("narrator");
+        assertFalse(spoken.contains("spawn_entity"));
+        assertFalse(spoken.contains("kind"));
+        assertTrue(spoken.contains("moves in the dark"));
+        assertTrue(spoken.contains("It hisses"));
+    }
+
+    @Test
+    @DisplayName("an ordinary parenthesis in prose survives")
+    void parenthesesSurvive() {
+        var p = parser();
+        p.accept("The brazier (the nearer one) gutters and spits.");
+        p.finish();
+
+        assertTrue(textOf("narrator").contains("the nearer one"));
+    }
+
+    @Test
     @DisplayName("plain narration is attributed to the narrator")
     void plainNarration() {
         var p = parser();

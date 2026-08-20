@@ -58,6 +58,15 @@ public final class GameEngine {
         repo.setMode(Mode.EXPLORATION);
     }
 
+    /**
+     * The content files, for anything that needs what an entity <em>is</em> rather than where it
+     * stands — the narrator needs to know the fighter carries a longsword, and {@link Entity}
+     * deliberately carries only what the rules use.
+     */
+    public ContentLoader content() {
+        return content;
+    }
+
     public RoomDefinition room() {
         return room;
     }

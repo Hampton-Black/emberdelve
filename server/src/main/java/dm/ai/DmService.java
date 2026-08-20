@@ -49,7 +49,9 @@ public final class DmService {
      * a fight is a rally, and a narrator who writes a paragraph between swings stops the rally.
      */
     private static final String COMBAT_BEAT = "Narrate this moment of the fight. "
-            + "One or two sentences. Do not say whose turn it is.";
+            + "One or two sentences. Do not say whose turn it is. "
+            + "Describe only what the facts state — no swing they do not mention, "
+            + "no wound they do not report.";
 
     /** §7: reject, let it retry once, then take the tools away. */
     private static final int REJECTIONS_BEFORE_DEGRADING = 2;
@@ -437,6 +439,14 @@ public final class DmService {
                     .append(" hp, at (").append(entity.x()).append(",").append(entity.y())
                     .append(")").append(entity.isPlayerControlled() ? " [the player]" : "")
                     .append(entity.isAlive() ? "" : " [dead]")
+                    // What they look like and what they are holding. Props have carried their
+                    // description here from the start and creatures never did, so the narrator
+                    // was writing fights between two entities it knew nothing about beyond a
+                    // name — observed giving the fighter's killing blow a scimitar, which is
+                    // the goblin's kind of weapon and in fact nobody's: the fighter carries a
+                    // longsword and the goblin a notched shortsword, and both facts were
+                    // sitting unread in the content files.
+                    .append(". ").append(engine.content().entity(entity.kind()).description())
                     .append("\n");
         }
 

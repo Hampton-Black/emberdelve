@@ -102,7 +102,13 @@ export const useGame = create<GameState>((set) => ({
   setConnected: (connected) => set({ connected }),
   // One way. A dropped socket reconnects to a session already under way; it does not put the
   // title back up, and the server will not narrate the opening twice.
-  setStarted: () => set({ started: true }),
+  //
+  // The DM has the floor from this moment, not from the moment its first token lands. Those are
+  // about 700ms apart, and in that window the debug bar was live and the input box was open —
+  // long enough to start a fight underneath the opening narration, which the server then has to
+  // drop as a collision. Every other way of giving the DM the floor sets this on the way in;
+  // this one was the exception.
+  setStarted: () => set({ started: true, awaitingDm: true }),
   setDemoMode: (demoMode) => set({ demoMode }),
   // Mode rides with the scene rather than being left to the diff that changed it: a client
   // that connects mid-fight gets one message, and it has to be the whole truth.

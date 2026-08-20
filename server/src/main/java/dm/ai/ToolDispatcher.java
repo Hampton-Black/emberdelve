@@ -166,9 +166,17 @@ public final class ToolDispatcher {
                 .map(c -> c.name() + " (" + c.initiative() + ")")
                 .collect(java.util.stream.Collectors.joining(", "));
 
+        // Bounded on purpose. Given only "describe the moment the fight starts", the prose model
+        // runs on into the fight itself — observed narrating the goblin's spear opening the
+        // player's thigh while the engine had already rolled that same swing a miss, and the
+        // real beat then arrived and correctly described a sidestep. Two accounts of one swing,
+        // one of them invented. The standing rule in dm.md forbids this; the directive has to
+        // as well, because this is the sentence the model is actually answering.
         return new Result(true,
                 "Combat has begun. Initiative order: " + order + ". "
-                        + "Describe the moment the fight starts — do not list the order.",
+                        + "Describe only the instant the fight breaks out — one or two "
+                        + "sentences. Do not list the order. Do not narrate anyone's turn, "
+                        + "attack, movement or wound: none of that has happened yet.",
                 buffer.collectedDiffs(), buffer.collectedRolls());
     }
 
