@@ -59,6 +59,20 @@ public final class GameEngine {
     }
 
     /**
+     * Wipe the session and lay the room out again.
+     *
+     * <p>Not save/load, which §12 rules out — there is nothing to load. It is the same thing
+     * restarting the process does, reached without restarting the process, which matters because
+     * the goblin is genuinely dangerous and a playtest that ends in death should not also end in
+     * a terminal.
+     */
+    public void restart() {
+        combat.reset();
+        repo.clear();
+        start();
+    }
+
+    /**
      * The content files, for anything that needs what an entity <em>is</em> rather than where it
      * stands — the narrator needs to know the fighter carries a longsword, and {@link Entity}
      * deliberately carries only what the rules use.

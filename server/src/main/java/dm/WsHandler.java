@@ -140,6 +140,17 @@ public final class WsHandler {
                 }
             }
 
+            // A new session in the same process. The client reloads once the fresh scene lands,
+            // which is also how it gets a title screen and a real click to unlock audio again.
+            case "restart" -> {
+                engine.restart();
+                if (dm != null) {
+                    dm.reset();
+                }
+                log.info("session restarted");
+                send(ctx, new ServerMessage.Scene(engine.scene()));
+            }
+
             case "debugScene" -> send(ctx, new ServerMessage.Scene(engine.scene()));
 
             // Combat without a model in the path, for the same reason debugRoll exists.
@@ -305,7 +316,7 @@ public final class WsHandler {
         // Same reason the engine refuses a move: a dead fighter has no turns left to take, and
         // a DM asked to narrate one would invent a living player to narrate it for.
         if (engine.repo().find(actorId).filter(Entity::isAlive).isEmpty()) {
-            send(ctx, new ServerMessage.Error("Roderick is dead. Restart the server to play again."));
+            send(ctx, new ServerMessage.Error("Roderick is dead. Descend again to start a new session."));
             return;
         }
 

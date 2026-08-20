@@ -8,6 +8,12 @@ const RECONNECT_DELAY_MS = 1000;
 let socket: WebSocket | null = null;
 
 /**
+ * Set while a restart is in flight, so the fresh scene the server sends back is recognised as
+ * the end of this session rather than the middle of one.
+ */
+let restarting = false;
+
+/**
  * One connection for the whole app. The server is authoritative (invariant #1) — everything
  * arriving here is applied as told, never recomputed.
  */
@@ -53,6 +59,14 @@ function dispatch(message: ServerMessage): void {
       useServerVoice(message.voice);
       break;
     case "scene":
+      // A restart reaches back further than the store does — the transcript, the dice log, the
+      // renderer's tokens and the title screen are all still the old game's. Reloading is the
+      // one move that clears every one of them, and it costs nothing: the session it would be
+      // preserving has just been thrown away on purpose.
+      if (restarting) {
+        window.location.reload();
+        return;
+      }
       game.setScene(message.scene);
       break;
     case "diffs":
@@ -79,4 +93,15 @@ export function send(message: ClientMessage): void {
     return;
   }
   socket.send(JSON.stringify(message));
+}
+
+/**
+ * Start a new session.
+ *
+ * <p>Deliberately not a page reload on its own: the reload has to happen <em>after</em> the
+ * server has thrown the old game away, or the new page reconnects to the old one.
+ */
+export function restart(): void {
+  restarting = true;
+  send({ type: "restart" });
 }

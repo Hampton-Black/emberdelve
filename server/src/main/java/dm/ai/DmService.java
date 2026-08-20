@@ -479,10 +479,28 @@ public final class DmService {
                     + "the round number, or anyone's hit points. Those are on screen.\n");
         }
 
-        sb.append("\nThe grid is ").append(room.width()).append("x").append(room.height())
-                .append(", x eastward and y northward. Mode: ").append(engine.mode()).append(".\n");
+        // Deliberately a labelled block rather than the sentence this used to be. It is the last
+        // thing before the model starts writing, and a plain trailing sentence is something it
+        // can simply carry on — observed ending a piece of narration with "Mode: EXPLORATION
+        // Position: (6,1)", which the voice then read aloud. Models imitate the shape of what
+        // you send them, so the shape has to be obviously not prose.
+        sb.append("\n## Grid\n\n")
+                .append("- size: ").append(room.width()).append("x").append(room.height())
+                .append("\n- axes: x eastward, y northward")
+                .append("\n- mode: ").append(engine.mode()).append("\n");
 
         return sb.toString();
+    }
+
+    /**
+     * Forget the session: the transcript so far, and that the scene was ever opened.
+     *
+     * <p>Without the history a restarted game would still be answering the last one — the model
+     * remembers a goblin it killed in a room that no longer contains it.
+     */
+    public void reset() {
+        history.clear();
+        opened.set(false);
     }
 
     /**

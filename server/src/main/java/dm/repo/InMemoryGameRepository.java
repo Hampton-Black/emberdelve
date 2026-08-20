@@ -14,7 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * M0 has no save. Restarting the process is a new game, and that is fine (§12).
+ * M0 has no save. A new game is {@link #clear} and a fresh spawn, not a file (§12).
  */
 public final class InMemoryGameRepository implements GameRepository {
 
@@ -23,6 +23,15 @@ public final class InMemoryGameRepository implements GameRepository {
     private final List<Event> events = new CopyOnWriteArrayList<>();
     private final AtomicReference<List<PartyMember>> party = new AtomicReference<>(List.of());
     private final AtomicReference<Mode> mode = new AtomicReference<>(Mode.EXPLORATION);
+
+    @Override
+    public void clear() {
+        entities.clear();
+        revealed.clear();
+        events.clear();
+        party.set(List.of());
+        mode.set(Mode.EXPLORATION);
+    }
 
     @Override
     public Optional<Entity> find(String entityId) {

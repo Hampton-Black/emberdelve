@@ -59,6 +59,16 @@ public final class CombatEngine {
         return active;
     }
 
+    /** Drop the fight without ending it in fiction. Only a new session should call this. */
+    public void reset() {
+        active = false;
+        order = List.of();
+        turnIndex = 0;
+        round = 0;
+        movementRemaining = 0;
+        actionAvailable = false;
+    }
+
     /** Null when no fight is running — the shape {@link Diff.CombatChanged} carries. */
     public CombatView view() {
         if (!active) {

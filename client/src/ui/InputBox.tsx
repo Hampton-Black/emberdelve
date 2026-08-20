@@ -62,7 +62,7 @@ export function InputBox() {
         onChange={(e) => setDraft(e.target.value)}
         placeholder={
           down
-            ? "Roderick is dead. Restart the server to play again."
+            ? "Roderick is dead."
             : awaitingDm
               ? "the DM is speaking…"
               : fighting

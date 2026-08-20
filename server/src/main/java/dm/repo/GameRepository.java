@@ -40,4 +40,13 @@ public interface GameRepository {
     void append(Event event);
 
     List<Event> events();
+
+    /**
+     * Forget everything. A new session in the same process.
+     *
+     * <p>On the interface rather than only on the in-memory implementation because it is a real
+     * operation, not an accident of storing things in a map — M5's Postgres will have to answer
+     * it too, even if the answer there is "delete the rows for this session".
+     */
+    void clear();
 }
