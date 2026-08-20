@@ -8,6 +8,10 @@ import dm.model.Event;
 import dm.model.Mode;
 import dm.model.PartyMember;
 import dm.model.Prop;
+import dm.model.RollRequest;
+import dm.model.RollResult;
+import dm.model.Skill;
+import dm.model.Difficulty;
 import dm.model.SceneState;
 import dm.repo.GameRepository;
 
@@ -136,6 +140,21 @@ public final class GameEngine {
         repo.setMode(mode);
         repo.append(new Event.ModeEntered(Instant.now(), mode));
         return List.of(new Diff.ModeChanged(mode));
+    }
+
+    /**
+     * Rolls a skill check and logs it (invariant #6). The only path to one: the tool dispatcher
+     * and the debug hook both come through here, so tuning the dice tray against a debug roll
+     * tunes the real thing rather than a lookalike.
+     */
+    public RollResult rollCheck(String actorId, Skill skill, Difficulty difficulty) {
+        var actor = repo.find(actorId).orElseThrow(
+                () -> new IllegalArgumentException("No such entity: " + actorId));
+
+        var result = dice.roll(
+                RollRequest.skillCheck(actorId, skill, actor.skillModifier(skill), difficulty));
+        repo.append(Event.roll(result));
+        return result;
     }
 
     public boolean isInBounds(int x, int y) {

@@ -1,7 +1,9 @@
 import { useEffect } from "react";
+import { unlock } from "./audio/sfx";
 import { useGame } from "./store";
 import { connect, send } from "./ws";
 import { Canvas } from "./ui/Canvas";
+import { DiceTray } from "./ui/DiceTray";
 import { InputBox } from "./ui/InputBox";
 import { Transcript } from "./ui/Transcript";
 
@@ -15,6 +17,16 @@ export function App() {
 
   useEffect(() => {
     connect();
+
+    // Browsers will not start an AudioContext without a gesture, and the first thing the player
+    // does is click or type. Cheap to call repeatedly; it only does work once.
+    const wake = () => unlock();
+    window.addEventListener("pointerdown", wake);
+    window.addEventListener("keydown", wake);
+    return () => {
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("keydown", wake);
+    };
   }, []);
 
   const party = scene?.entities.filter((e) => e.isPlayerControlled) ?? [];
@@ -47,7 +59,10 @@ export function App() {
 
       <main style={styles.body}>
         <section style={styles.stage}>
-          <Canvas />
+          <div style={styles.viewport}>
+            <Canvas />
+            <DiceTray />
+          </div>
           <footer style={styles.debug}>
             <span style={styles.debugLabel}>debug</span>
             <button style={styles.button} onClick={() => send({ type: "debugSpawnGoblin" } as never)}>
@@ -58,6 +73,16 @@ export function App() {
               onClick={() => send({ type: "debugReveal", propId: "alcove" } as never)}
             >
               reveal alcove
+            </button>
+            {/* A real roll down the real path — how the dice get tuned without burning a turn. */}
+            <button
+              style={styles.button}
+              onClick={() =>
+                send({ type: "debugRoll", actorId: "fighter", skill: "PERCEPTION",
+                       difficulty: "MEDIUM" } as never)
+              }
+            >
+              roll d20
             </button>
           </footer>
         </section>
@@ -103,6 +128,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   body: { flex: 1, minHeight: 0, display: "flex" },
   stage: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
+  viewport: { flex: 1, minHeight: 0, position: "relative" },
   sidebar: {
     width: 380,
     flexShrink: 0,

@@ -59,6 +59,7 @@ export type Diff =
 // ---- Dice ----
 
 export type Advantage = "NORMAL" | "ADVANTAGE" | "DISADVANTAGE";
+export type Skill = "ATHLETICS" | "PERCEPTION" | "INVESTIGATION" | "STEALTH" | "PERSUASION";
 export type RollPurpose = "ATTACK" | "SAVE" | "SKILL_CHECK" | "DAMAGE" | "INITIATIVE";
 export type Outcome = "CRIT" | "HIT" | "MISS" | "SUCCESS" | "FAILURE" | "CRIT_FAIL";
 
@@ -70,6 +71,8 @@ export interface RollRequest {
   actorId: string;
   targetId?: string;
   dc?: number;
+  /** Present on skill checks, so the log and the tray can name what was tested. */
+  skill?: Skill;
 }
 
 export interface RollResult {
@@ -87,11 +90,14 @@ export interface NarrationSegment {
   text: string;
 }
 
-/** One paragraph in the transcript. `player` is a local speaker, never sent by the server. */
-export interface TranscriptEntry {
-  speakerId: string;
-  text: string;
-}
+/**
+ * One entry in the transcript. Rolls live in the same list as prose so the log preserves the
+ * order things actually happened in — the dice, then the narration that commits to them.
+ * `player` is a local speaker, never sent by the server.
+ */
+export type TranscriptEntry =
+  | { kind: "prose"; speakerId: string; text: string }
+  | { kind: "roll"; result: RollResult };
 
 // ---- Wire envelopes ----
 

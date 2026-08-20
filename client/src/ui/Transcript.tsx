@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
+import { caption, TONE_COLOR } from "../dice/tumble";
 import { useGame } from "../store";
+import type { RollResult } from "../types";
 
 const VOICE: Record<string, { label: string; color: string; italic?: boolean }> = {
   narrator: { label: "", color: "#cdc3b4" },
@@ -25,6 +27,10 @@ export function Transcript() {
       )}
 
       {transcript.map((entry, i) => {
+        // Rolls sit in the same list as prose, so the log preserves the order things happened
+        // in: the dice, then the narration that commits to them.
+        if (entry.kind === "roll") return <RollLine key={i} result={entry.result} />;
+
         const voice = VOICE[entry.speakerId] ?? { label: entry.speakerId, color: "#a99e8e" };
         const isPlayer = entry.speakerId === "player";
 
@@ -46,6 +52,21 @@ export function Transcript() {
 
       {awaitingDm && <p style={styles.thinking}>▍</p>}
       <div ref={bottomRef} />
+    </div>
+  );
+}
+
+/** The dice log: every roll, including the ones too routine to be animated. */
+function RollLine({ result }: { result: RollResult }) {
+  const text = caption(result);
+
+  return (
+    <div style={styles.roll}>
+      <span style={styles.rollLabel}>
+        {[text.label, text.target].filter(Boolean).join("  ·  ")}
+      </span>
+      <span style={styles.rollMath}>{text.arithmetic}</span>
+      <span style={{ ...styles.rollOutcome, color: TONE_COLOR[text.tone] }}>{text.outcome}</span>
     </div>
   );
 }
@@ -74,6 +95,20 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase",
     opacity: 0.55,
   },
+  roll: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    gap: ".5rem",
+    padding: ".38rem .55rem",
+    borderLeft: "2px solid #34313d",
+    background: "#12111a",
+    fontFamily: "ui-monospace, Menlo, monospace",
+    fontSize: 10,
+  },
+  rollLabel: { letterSpacing: ".08em", opacity: 0.5 },
+  rollMath: { color: "#d8cfc2", marginLeft: "auto" },
+  rollOutcome: { letterSpacing: ".08em", fontWeight: 700 },
   thinking: {
     margin: 0,
     opacity: 0.5,

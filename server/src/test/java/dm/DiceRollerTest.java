@@ -7,6 +7,7 @@ import dm.model.Difficulty;
 import dm.model.Outcome;
 import dm.model.RollPurpose;
 import dm.model.RollRequest;
+import dm.model.Skill;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +60,7 @@ class DiceRollerTest {
     void advantageKeepsHigher() {
         var roller = new ScriptedDiceRoller(7, 15);
         var request = new RollRequest("1d20", 0, Advantage.ADVANTAGE, RollPurpose.SKILL_CHECK,
-                "fighter", Optional.empty(), Optional.of(10));
+                "fighter", Optional.empty(), Optional.of(10), Optional.of(Skill.ATHLETICS));
         var result = roller.roll(request);
 
         assertEquals(15, result.natural(), "kept die must be first");
@@ -73,7 +74,7 @@ class DiceRollerTest {
     void disadvantageKeepsLower() {
         var roller = new ScriptedDiceRoller(7, 15);
         var request = new RollRequest("1d20", 0, Advantage.DISADVANTAGE, RollPurpose.SKILL_CHECK,
-                "fighter", Optional.empty(), Optional.of(10));
+                "fighter", Optional.empty(), Optional.of(10), Optional.of(Skill.ATHLETICS));
         var result = roller.roll(request);
 
         assertEquals(7, result.natural());
@@ -83,7 +84,7 @@ class DiceRollerTest {
     @Test
     @DisplayName("skill checks pass and fail against the banded DC")
     void skillCheckAgainstDc() {
-        var request = RollRequest.skillCheck("fighter", 3, Difficulty.MEDIUM); // DC 15
+        var request = RollRequest.skillCheck("fighter", Skill.ATHLETICS, 3, Difficulty.MEDIUM); // DC 15
 
         assertEquals(Outcome.SUCCESS, new ScriptedDiceRoller(12).roll(request).outcome(), "12+3=15");
         assertEquals(Outcome.FAILURE, new ScriptedDiceRoller(11).roll(request).outcome(), "11+3=14");
@@ -135,7 +136,7 @@ class DiceRollerTest {
     void skillCheckWithoutDcThrows() {
         var roller = new ScriptedDiceRoller(10);
         var request = new RollRequest("1d20", 0, Advantage.NORMAL, RollPurpose.SKILL_CHECK,
-                "fighter", Optional.empty(), Optional.empty());
+                "fighter", Optional.empty(), Optional.empty(), Optional.of(Skill.ATHLETICS));
 
         assertThrows(IllegalArgumentException.class, () -> roller.roll(request));
     }

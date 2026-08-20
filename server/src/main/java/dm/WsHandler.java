@@ -3,7 +3,9 @@ package dm;
 import com.fasterxml.jackson.databind.JsonNode;
 import dm.ai.DmService;
 import dm.engine.GameEngine;
+import dm.model.Difficulty;
 import dm.model.Diff;
+import dm.model.Skill;
 import dm.model.Mode;
 import dm.wire.Json;
 import dm.wire.ServerMessage;
@@ -85,6 +87,13 @@ public final class WsHandler {
                     engine.setMode(Mode.valueOf(message.path("mode").asText())));
 
             case "debugScene" -> send(ctx, new ServerMessage.Scene(engine.scene()));
+
+            // A real roll down the real path, with no model in it. Exists so the dice tray's
+            // feel can be tuned in a tight loop, and so the client works without an API key.
+            case "debugRoll" -> send(ctx, new ServerMessage.Roll(engine.rollCheck(
+                    message.path("actorId").asText("fighter"),
+                    Skill.valueOf(message.path("skill").asText("PERCEPTION")),
+                    Difficulty.valueOf(message.path("difficulty").asText("MEDIUM")))));
 
             default -> throw new IllegalArgumentException("Unknown message type: " + type);
         }

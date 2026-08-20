@@ -16,3 +16,4 @@ client/.vite/
 .idea/
 *.iml
 .DS_Store
+client/tsconfig.tsbuildinfo

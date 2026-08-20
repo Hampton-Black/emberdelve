@@ -69,6 +69,8 @@ The plan is the spec; these are the agreed amendments to it.
 - **`Diff` gains `PropRevealed`.** Without it a revealed prop never reaches the client.
 - **Acceptance script step 3** exercises `reveal_prop`, so the player's first input produces a
   visible world change rather than narration alone.
+- **`RollRequest` gains `Optional<Skill> skill`.** Without it the event log records that
+  *something* was tested but not what, and the dice tray can only say "SKILL CHECK 22 vs DC 15".
 
 ---
 
@@ -232,6 +234,33 @@ Measured end-to-end, `--demo`, "heave the sarcophagus lid open":
 | Split, degraded tools model | 33,908ms | 45,616ms | 48,323ms |
 | Split, healthy tools model | **1,025ms** | 7,394ms | 8,860ms |
 
+## Dice
+
+The dice are not decoration. They are what makes a ~6s prose latency tolerable: something with
+weight happens at ~1s, and the narration lands while the player is still watching it.
+
+- **The server decides, the animation displays.** Tumbling faces are noise; the instant a die
+  settles it shows `result.faces[i]`. `client/src/dice/tumble.ts` is pure and holds this rule
+  in one line. No physics library — see the design doc §7 on why most of them are the wrong
+  direction.
+- **Narration is held until the dice land** (`throughGate` in `store.ts`). Timer-based, not
+  driven by the tray component, so the gate still opens if the tray never mounts. Today the
+  prose model is slow enough that ordering is never in doubt; a faster one would otherwise
+  announce the outcome over a die still in the air.
+- **The sidebar log is also gated.** A record that arrives before the throw finishes spoils it.
+- **Not every roll animates** — `isDramatic()`. M0 only rolls for the player so everything
+  animates, but T10/T11 will not have to retrofit the gate.
+- **Audio carries most of the satisfaction.** Rattle at 0ms, throw at 240ms, one clack per die
+  staggered 130ms apart. Every clip gets random pitch jitter; without it the clatter sounds
+  canned by the third roll.
+- The stakes are drawn from the first frame — you can read "ATHLETICS CHECK · DC 20" while the
+  die is still in the air. That is most of the tension.
+
+`debug → roll d20` sends a real roll down the real path with no model in it, which is how the
+feel gets tuned without burning a turn or an API key.
+
+---
+
 ## Commands
 
 ```bash
@@ -243,5 +272,5 @@ cd client && npm run dev            # vite on :5173
 
 ## Secrets
 
-`ANTHROPIC_API_KEY` and `ELEVENLABS_API_KEY` come from a gitignored `.env`.
+`VENICE_API_KEY` and `ELEVENLABS_API_KEY` come from a gitignored `.env`.
 Never commit a key. Never log one.

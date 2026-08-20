@@ -90,17 +90,14 @@ public final class ToolDispatcher {
             return Result.rejected("no entity '" + actorId + "' is present");
         }
 
-        int modifier = actor.get().skillModifier(skill.get());
-        RollResult result = engine.dice().roll(
-                RollRequest.skillCheck(actorId, modifier, difficulty.get()));
-        engine.repo().append(Event.roll(result));
+        RollResult result = engine.rollCheck(actorId, skill.get(), difficulty.get());
 
         String message = ("%s check, DC %d. Rolled %d %+d = %d — %s. "
                 + "Narrate this outcome and commit to it.").formatted(
                 skill.get().name().toLowerCase(Locale.ROOT),
                 difficulty.get().dc(),
                 result.natural(),
-                modifier,
+                result.request().modifier(),
                 result.total(),
                 result.outcome());
 

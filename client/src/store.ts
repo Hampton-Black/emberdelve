@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { isDramatic, revealAt } from "./dice/tumble";
 import type {
   Diff,
   Mode,
@@ -24,6 +25,11 @@ interface GameState {
   /** True while the DM is mid-turn. Drives the thinking indicator and input lockout. */
   awaitingDm: boolean;
 
+  /** The roll the tray is currently throwing, and when it arrived. Null when nothing is in flight. */
+  activeRoll: { result: RollResult; startedAt: number } | null;
+  /** When the tray began fading, in `performance.now()` terms. Null while it is still held. */
+  diceDismissAt: number | null;
+
   setConnected: (connected: boolean) => void;
   setDemoMode: (demoMode: boolean) => void;
   setScene: (scene: SceneState) => void;
@@ -35,7 +41,7 @@ interface GameState {
   setError: (error: string | null) => void;
 }
 
-export const useGame = create<GameState>((set) => ({
+export const useGame = create<GameState>((set, get) => ({
   connected: false,
   demoMode: false,
   scene: null,
@@ -44,6 +50,8 @@ export const useGame = create<GameState>((set) => ({
   rolls: [],
   error: null,
   awaitingDm: false,
+  activeRoll: null,
+  diceDismissAt: null,
 
   setConnected: (connected) => set({ connected }),
   setDemoMode: (demoMode) => set({ demoMode }),
@@ -59,7 +67,14 @@ export const useGame = create<GameState>((set) => ({
       for (const diff of diffs) {
         switch (diff.kind) {
           case "EntityAdded":
-            scene = { ...scene, entities: [...scene.entities, diff.entity] };
+            // Idempotent by id. M0's goblin has a hardcoded id, so spawning a second one
+            // replaces the first server-side — appending here would leave a phantom behind.
+            scene = {
+              ...scene,
+              entities: scene.entities.some((e) => e.id === diff.entity.id)
+                ? scene.entities.map((e) => (e.id === diff.entity.id ? diff.entity : e))
+                : [...scene.entities, diff.entity],
+            };
             break;
 
           case "EntityRemoved":
@@ -111,28 +126,66 @@ export const useGame = create<GameState>((set) => ({
    * Narration arrives a sentence at a time. Consecutive sentences from the same speaker
    * extend the current paragraph, so the transcript reads as prose rather than as a list
    * of fragments. A speaker change starts a new paragraph.
+   *
+   * Held behind the dice: see {@link throughGate}.
    */
   appendNarration: (segment) =>
-    set((state) => {
-      const last = state.transcript.at(-1);
+    throughGate(() =>
+      set((state) => {
+        // The first word of narration is the tray's cue to leave.
+        const dismiss =
+          state.activeRoll && state.diceDismissAt === null
+            ? { diceDismissAt: performance.now() }
+            : {};
 
-      if (state.awaitingDm && last?.speakerId === segment.speakerId) {
-        const transcript = state.transcript.slice(0, -1);
-        transcript.push({ ...last, text: joinProse(last.text, segment.text) });
-        return { transcript };
-      }
-      return { transcript: [...state.transcript, { ...segment }], awaitingDm: true };
-    }),
+        const last = state.transcript.at(-1);
+        if (state.awaitingDm && last?.kind === "prose" && last.speakerId === segment.speakerId) {
+          const transcript = state.transcript.slice(0, -1);
+          transcript.push({ ...last, text: joinProse(last.text, segment.text) });
+          return { transcript, ...dismiss };
+        }
 
-  endNarration: () => set({ awaitingDm: false }),
+        return {
+          transcript: [...state.transcript, { kind: "prose", ...segment }],
+          awaitingDm: true,
+          ...dismiss,
+        };
+      }),
+    ),
+
+  endNarration: () => throughGate(() => set({ awaitingDm: false })),
 
   sayAsPlayer: (text) =>
     set((state) => ({
-      transcript: [...state.transcript, { speakerId: "player", text }],
+      transcript: [...state.transcript, { kind: "prose", speakerId: "player", text }],
       awaitingDm: true,
     })),
 
-  addRoll: (result) => set((state) => ({ rolls: [...state.rolls, result] })),
+  /**
+   * Every roll reaches the log; only dramatic ones get thrown. Closing the narration gate here
+   * is what makes "the dice decide, then the DM speaks" true by construction rather than by
+   * luck — today the prose model is slow enough that the order is never in doubt, but a faster
+   * one would otherwise announce the outcome over a die still in the air.
+   */
+  addRoll: (result) => {
+    const dramatic = isDramatic(result, playerIds(get().scene));
+    const startedAt = performance.now();
+
+    if (dramatic) closeGateUntil(startedAt + revealAt(result.faces.length));
+
+    set((state) => ({
+      rolls: [...state.rolls, result],
+      ...(dramatic ? { activeRoll: { result, startedAt }, diceDismissAt: null } : {}),
+    }));
+
+    // The log is a record, and records lag. Appending it now would print the total in the
+    // sidebar while the die is still in the air, which spoils the throw.
+    throughGate(() =>
+      set((state) => ({ transcript: [...state.transcript, { kind: "roll", result }] })),
+    );
+  },
+
+  // Errors bypass the gate: a stuck turn must never be hidden behind a die.
   setError: (error) => set({ error, awaitingDm: false }),
 }));
 
@@ -143,4 +196,49 @@ function joinProse(existing: string, addition: string): string {
   if (!left) return right;
   if (!right) return left;
   return `${left} ${right}`;
+}
+
+function playerIds(scene: SceneState | null): ReadonlySet<string> {
+  return new Set(scene?.entities.filter((e) => e.isPlayerControlled).map((e) => e.id) ?? []);
+}
+
+// ---- The narration gate ----
+//
+// Narration is withheld until the dice it describes have landed, and released in arrival order.
+// Deliberately timer-based rather than driven by the tray component: if the tray never mounts,
+// the gate must still open.
+
+let gateOpensAt = 0;
+let held: Array<() => void> = [];
+let timer: ReturnType<typeof setTimeout> | null = null;
+
+function throughGate(action: () => void): void {
+  if (gateOpensAt - performance.now() <= 0 && held.length === 0) {
+    action();
+    return;
+  }
+  held.push(action);
+  if (timer === null) {
+    timer = setTimeout(openGate, Math.max(gateOpensAt - performance.now(), 0));
+  }
+}
+
+function openGate(): void {
+  timer = null;
+
+  // A second roll may have extended the hold while narration was queued.
+  const remaining = gateOpensAt - performance.now();
+  if (remaining > 0 && held.length > 0) {
+    timer = setTimeout(openGate, remaining);
+    return;
+  }
+
+  const queued = held;
+  held = [];
+  gateOpensAt = 0;
+  for (const action of queued) action();
+}
+
+function closeGateUntil(at: number): void {
+  gateOpensAt = Math.max(gateOpensAt, at);
 }

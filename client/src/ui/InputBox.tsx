@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { unlock } from "../audio/sfx";
 import { useGame } from "../store";
 import { send } from "../ws";
 
@@ -19,6 +20,8 @@ export function InputBox() {
     if (!canSend || !actorId) return;
     const text = draft.trim();
 
+    // The gesture immediately before the dice arrive — the last chance to have audio ready.
+    unlock();
     sayAsPlayer(text);
     send({ type: "freeText", actorId, text });
     setDraft("");

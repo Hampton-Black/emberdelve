@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/store.ts","./src/types.ts","./src/ws.ts","./src/scene/renderer.ts","./src/scene/assets.ts","./src/scene/props.ts","./src/scene/tokens.ts","./src/ui/canvas.tsx","./src/ui/inputbox.tsx","./src/ui/transcript.tsx"],"version":"5.9.3"}
