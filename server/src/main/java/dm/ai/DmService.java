@@ -429,7 +429,18 @@ public final class DmService {
         }
 
         sb.append("\n## Secrets you know and the player does not\n\n");
-        sb.append(room.dmNotes().theSarcophagus()).append("\n\n");
+        // A secret stops being one the moment it happens. This note promises a goblin that is
+        // still in the sarcophagus and will come out fighting — true until it does, and after
+        // that a contradiction handed to the model every turn, under a heading telling it this
+        // is something the player has not seen yet. Observed re-introducing Vessk as a fresh
+        // menace under the lid several turns after the player had killed him.
+        //
+        // The door note is not like this and stays: "the north door never opens" is a standing
+        // constraint rather than a pending beat, and it is exactly as true on the last turn as
+        // on the first.
+        if (engine.repo().find("goblin").isEmpty()) {
+            sb.append(room.dmNotes().theSarcophagus()).append("\n\n");
+        }
         sb.append(room.dmNotes().theDoor()).append("\n\n");
 
         sb.append("## Entities present\n\n");
