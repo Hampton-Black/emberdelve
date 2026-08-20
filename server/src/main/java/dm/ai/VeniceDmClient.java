@@ -180,6 +180,14 @@ public final class VeniceDmClient implements DmClient {
         if (tools != null && tools.isArray() && !tools.isEmpty()) {
             root.set("tools", tools);
             root.put("tool_choice", "auto");
+        } else {
+            // A call with no tools is a narration call, and only narration wants these. A model
+            // penalised for reusing tokens is a model less willing to emit the same tool name and
+            // the same argument keys it emitted correctly last time, and phase 1 has no prose to
+            // protect. Observed without them: "Over the scratching, you hear a thin scratching
+            // sound from inside." Kept low — this is a dial that flattens writing if leaned on.
+            root.put("frequency_penalty", 0.4);
+            root.put("presence_penalty", 0.3);
         }
 
         // Venice-specific: no system-prompt injection.

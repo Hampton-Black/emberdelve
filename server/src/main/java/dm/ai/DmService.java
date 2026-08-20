@@ -226,6 +226,9 @@ public final class DmService {
      */
     public void handleFreeText(String actorId, String text, TurnSink sink) {
         engine.repo().append(Event.action(actorId, "said: " + text));
+        // The other half of the transcript. Without it the log showed everything the DM said and
+        // nothing it was answering, which makes a turn that went wrong unreadable after the fact.
+        log.info("| {} | {}", actorId, text);
 
         // Waits rather than gives up. The tool phase runs inside the lock too: it puts dice on
         // the table, and dice landing under someone else's narration is the same collision.
@@ -249,7 +252,11 @@ public final class DmService {
         }
 
         long proseStart = System.nanoTime();
-        var prose = runProsePhase(text, mechanics.results(), sink, failed, false);
+        // A creature does not get the benefit of the doubt on an unmarked quotation when the
+        // player might also be talking. When they plainly are not, it does.
+        boolean playerMightBeSpeaking = soundsLikeSpeech(text);
+        var prose = runProsePhase(text, mechanics.results(), sink, failed,
+                !playerMightBeSpeaking);
         long proseMs = (System.nanoTime() - proseStart) / 1_000_000;
 
         if (failed[0]) {
@@ -423,14 +430,33 @@ public final class DmService {
         // is the message the model is actually answering. Length is not a style preference now
         // that a real voice reads it: three sentences is about fifteen seconds of audio and the
         // whole world waits behind it.
-        conversation.add(DmClient.ChatMessage.user(mechanics.isEmpty()
-                ? "Three sentences at most."
-                : "The engine has already resolved this action. Every line below happened, in "
-                        + "this order. Narrate all of them as one continuous moment — a failed "
-                        + "check followed by something else means the attempt failed AND the "
-                        + "something else happened anyway.\n\n"
-                        + String.join("\n", mechanics)
-                        + "\n\nThree sentences at most."));
+        var directive = new StringBuilder();
+        if (!mechanics.isEmpty()) {
+            directive.append("The engine has already resolved this action. Every line below "
+                            + "happened, in this order. Narrate all of them as one continuous "
+                            + "moment — a failed check followed by something else means the "
+                            + "attempt failed AND the something else happened anyway.\n\n")
+                    .append(String.join("\n", mechanics))
+                    .append("\n\n");
+        }
+        // The failure this is aimed at, seen in full: late in a session a player sent something
+        // close to what they had sent earlier, and the model replied with its own narration from
+        // that earlier turn reproduced character for character — the lid grinding open and the
+        // goblin scrambling out of it, read aloud again while that same goblin was standing in
+        // the room mid-fight. With the whole transcript in context and no compaction (shortcut
+        // #11), a repeated question gets the repeated answer.
+        //
+        // Said here rather than in the system prompt because it is only true on the turns where
+        // it is true, and a standing "do not repeat yourself" is a rule the model has no way to
+        // check itself against.
+        if (isRepeat(text)) {
+            directive.append("The player has tried something like this before, and the "
+                    + "transcript has what happened last time. Do not tell it again. Narrate "
+                    + "what is different now — the same action against a room that has changed, "
+                    + "or the same obstacle refusing them a second time and what that costs.\n\n");
+        }
+        directive.append("Three sentences at most.");
+        conversation.add(DmClient.ChatMessage.user(directive.toString()));
 
         // No tools in this phase: narration only.
         proseClient.streamTurn(conversation, null, listener);
@@ -725,6 +751,95 @@ public final class DmService {
                 .toList();
         return creatures.size() == 1 ? creatures.getFirst() : null;
     }
+
+    /**
+     * Whether the player has already asked for something much like this.
+     *
+     * <p>Compared as bags of significant words rather than as strings: "I shove the lid open" and
+     * "I try shoving that lid open again" are the same request and share no exact prefix. Only
+     * what the player typed is compared, never the narration, and only against their own earlier
+     * turns in this session.
+     */
+    private boolean isRepeat(String text) {
+        var earlier = history.stream()
+                .filter(m -> "user".equals(m.role()) && m.content() != null)
+                .map(DmClient.ChatMessage::content)
+                .toList();
+        return resemblesAny(text, earlier);
+    }
+
+    /** Package-private so the threshold can be tested without a model or a session. */
+    static boolean resemblesAny(String text, List<String> earlierInputs) {
+        var words = significantWords(text);
+        if (words.size() < 2) {
+            return false;
+        }
+        for (String previous : earlierInputs) {
+            var earlier = significantWords(previous);
+            if (earlier.isEmpty()) {
+                continue;
+            }
+            var shared = new java.util.HashSet<>(words);
+            shared.retainAll(earlier);
+            // Two thirds of the shorter one. Loose enough to catch a reworded retry, tight enough
+            // that "I look at the door" and "I look at the sarcophagus" stay different questions.
+            if (shared.size() * 3 >= Math.min(words.size(), earlier.size()) * 2) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Content words, lowercased. Everything a retry would keep and nothing it would not. */
+    private static java.util.Set<String> significantWords(String text) {
+        var words = new java.util.HashSet<String>();
+        for (String word : text.toLowerCase().split("[^a-z]+")) {
+            if (word.length() > 2 && !FILLER.contains(word)) {
+                words.add(word);
+            }
+        }
+        return words;
+    }
+
+    private static final java.util.Set<String> FILLER = java.util.Set.of(
+            "the", "and", "but", "for", "with", "into", "onto", "out", "off", "try", "trying",
+            "again", "then", "now", "get", "gets", "put", "puts", "this", "that", "there",
+            "here", "one", "over", "back", "down", "any", "all", "some", "you", "your", "his",
+            "her", "its", "our", "their");
+
+    /**
+     * Whether the player's own words might be about to appear in quotation marks.
+     *
+     * <p>Decides who an unmarked quotation belongs to. The narrator writes the player's dialogue
+     * now, so on a turn where they said they shout something, a quotation could be either voice
+     * and the narrator keeps it — guessing wrong there puts their taunt in the mouth, the colour
+     * and the voice of the thing they were taunting. On a turn where they heaved at a stone lid,
+     * it cannot be them, and the creature should get its line rather than having its arrival
+     * read in the same measured voice that just described the room.
+     *
+     * <p>Crude on purpose, and crude in the safe direction: a false positive costs a creature's
+     * line its voice, a false negative misattributes a real person's words.
+     */
+    static boolean soundsLikeSpeech(String text) {
+        String lower = text.toLowerCase();
+        if (lower.indexOf('"') >= 0 || lower.indexOf('\u201c') >= 0 || lower.indexOf('\'') >= 0) {
+            return true;
+        }
+        for (String verb : SPEECH_VERBS) {
+            if (lower.contains(verb)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Substrings, not words, so "shouts" and "shouting" come along without a stemmer. */
+    private static final List<String> SPEECH_VERBS = List.of(
+            "say", "said", "speak", "spoke", "talk", "tell", "told", "ask", "answer", "reply",
+            "shout", "yell", "scream", "call out", "cry out", "whisper", "mutter", "taunt",
+            "insult", "mock", "threaten", "warn", "beg", "plead", "greet", "hail", "bargain",
+            "negotiate", "persuade", "convince", "lie to", "curse at", "swear at", "sing",
+            "read aloud", "introduce myself", "name myself");
 
     /**
      * What the narration parser will honour in a {@code [[speaker]]} marker, mapped to the entity

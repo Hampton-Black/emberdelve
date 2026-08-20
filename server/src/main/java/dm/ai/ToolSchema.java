@@ -114,10 +114,17 @@ public final class ToolSchema {
                 },
                 "kind", "x", "y"));
 
-        tools.add(tool(START_COMBAT,
-                "Switch to tactical combat mode. Call this when violence actually begins.",
-                properties -> {
-                }));
+        // Not offered once a fight is running. Both models kept calling it mid-combat and
+        // collecting "combat has already started" — a wasted round trip each time, and for the
+        // mechanics model a rejection that counts towards having its tools taken away. Invariant
+        // #7's point is that the legal set is rebuilt from live state; this was the one tool
+        // still being offered unconditionally.
+        if (!engine.combat().isActive()) {
+            tools.add(tool(START_COMBAT,
+                    "Switch to tactical combat mode. Call this when violence actually begins.",
+                    properties -> {
+                    }));
+        }
 
         return tools;
     }
