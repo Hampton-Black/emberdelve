@@ -48,7 +48,7 @@ Resolved in a design review before implementation. Do not silently revisit these
 
 | Area | Decision |
 |---|---|
-| Assets | Kenney CC0. Architecture from Modular Dungeon Kit; props procedural until a kit provides them. |
+| Assets | Kenney CC0. Architecture from Modular Dungeon Kit, tokens from Mini Characters, antagonists available from Graveyard Kit. Props still procedural. |
 | LLM provider | **Venice.ai**, OpenAI-compatible, `https://api.venice.ai/api/v1`. One key, one endpoint, 100+ models. |
 | LLM model | Build on a strong tool-caller; A/B down at T13. **The model is a config string, never a literal.** |
 | Narration | **Text channel**, not a tool. Inline `[[speaker]]` markers, validated against live entities. |
@@ -233,6 +233,34 @@ Measured end-to-end, `--demo`, "heave the sarcophagus lid open":
 | Single model (`grok-4-6`) | — | — | 44,000ms |
 | Split, degraded tools model | 33,908ms | 45,616ms | 48,323ms |
 | Split, healthy tools model | **1,025ms** | 7,394ms | 8,860ms |
+
+## Characters
+
+Tokens are Kenney character models on a small base, in `client/public/assets/kits/characters/`.
+Every model across these kits carries the **same 32-clip rig** — `idle`, `walk`, `die`,
+`attack-melee-right` and so on — so swapping a character is one line in `MODELS` (`tokens.ts`)
+and nothing else.
+
+Three things that are not obvious and cost an hour each if forgotten:
+
+- **Each kit needs its own folder.** Every Kenney GLB references `Textures/colormap.png` by
+  *relative* path, and the mini and graveyard kits ship **different** colormaps under that same
+  name. Putting both kits in one directory silently renders one of them in the other's palette.
+- **Figures are deliberately oversized** — about 1.25 world units on a 1.0 square. At 480px
+  internal width a to-scale human is ~24 pixels and reads as a smudge. Oversizing the figure
+  relative to its base is what tactical RPGs do, for exactly this reason.
+- **Characters carry a faint emissive of their own colormap.** The crypt is genuinely dark away
+  from the two braziers, which is right for the room and wrong for the figures standing in it.
+  This lifts tokens off the floor without touching scene lighting — do not "fix" it by raising
+  the ambient.
+
+`mini` is Kenney's contemporary set (police officer, businessman, doctor); the fantasy-shaped
+options are `graveyard/character-skeleton`, `-zombie`, `-vampire`, `-keeper`.
+
+Origins differ between kits — mini models stand on y=0, graveyard models are centred on the hips
+— so `Token` measures the bounding box rather than keeping a table of offsets.
+
+---
 
 ## Dice
 

@@ -3,9 +3,9 @@ import type { EntityView, LightingPreset, Prop, SceneState } from "../types";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPixelatedPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { loadKitPiece, toWorld, type KitPiece } from "./assets";
+import { loadCharacter, loadKitPiece, toWorld, type KitPiece } from "./assets";
 import { buildProp, FLAME_INTENSITY } from "./props";
-import { buildToken } from "./tokens";
+import { characterPaths, Token } from "./tokens";
 
 /**
  * Horizontal resolution of the low-res render target. Everything is rendered at this width and
@@ -44,7 +44,7 @@ export class Renderer {
   private readonly scene = new THREE.Scene();
   private readonly camera: THREE.OrthographicCamera;
   private readonly room = new THREE.Group();
-  private readonly tokens = new Map<string, THREE.Group>();
+  private readonly tokens = new Map<string, Token>();
   private readonly props = new Map<string, THREE.Object3D>();
   private readonly flames: THREE.PointLight[] = [];
 
@@ -123,9 +123,17 @@ export class Renderer {
   }
 
   async init(): Promise<void> {
+    // Characters are preloaded here rather than on demand so addEntity stays synchronous —
+    // a diff must be able to put a token on the board on the frame it lands.
     const [floor, wall] = await Promise.all([
       loadKitPiece("template-floor"),
       loadKitPiece("template-wall"),
+      ...characterPaths().map((path) =>
+        // A missing character degrades to the placeholder figure rather than killing the scene.
+        loadCharacter(path).catch((error) => {
+          console.error(`character '${path}' failed to load`, error);
+        }),
+      ),
     ]);
     this.kit = { floor, wall };
   }
@@ -136,6 +144,7 @@ export class Renderer {
     if (!this.kit) throw new Error("Renderer.init() must complete before setScene()");
 
     this.room.clear();
+    for (const token of this.tokens.values()) token.dispose();
     this.tokens.clear();
     this.props.clear();
     this.flames.length = 0;
@@ -257,16 +266,20 @@ export class Renderer {
       this.moveEntity(entity.id, entity.x, entity.y);
       return;
     }
-    const token = buildToken(entity);
-    token.position.copy(toWorld(entity.x, entity.y, this.dims.width, this.dims.height));
-    this.room.add(token);
+    const token = new Token(entity);
+    token.group.position.copy(toWorld(entity.x, entity.y, this.dims.width, this.dims.height));
+    // Three-quarter view: facing the default camera corner reads better than facing straight
+    // down an axis, and it is what a figure placed on a table would look like.
+    token.faceTowards(1, 1);
+    this.room.add(token.group);
     this.tokens.set(entity.id, token);
   }
 
   removeEntity(entityId: string): void {
     const token = this.tokens.get(entityId);
     if (!token) return;
-    this.room.remove(token);
+    token.dispose();
+    this.room.remove(token.group);
     this.tokens.delete(entityId);
   }
 
@@ -280,9 +293,12 @@ export class Renderer {
     if (!token) return;
 
     const to = toWorld(x, y, this.dims.width, this.dims.height);
-    if (token.position.distanceToSquared(to) < 1e-6) return;
+    const from = token.group.position;
+    if (from.distanceToSquared(to) < 1e-6) return;
 
-    this.moving.set(entityId, { from: token.position.clone(), to, t: 0 });
+    token.faceTowards(to.x - from.x, to.z - from.z);
+    token.play("walk");
+    this.moving.set(entityId, { from: from.clone(), to, t: 0 });
   }
 
   /** Advance in-flight slides. Duration scales with distance so long moves do not crawl. */
@@ -299,12 +315,16 @@ export class Renderer {
       move.t = Math.min(move.t + delta / duration, 1);
 
       const eased = easeOutCubic(move.t);
-      token.position.lerpVectors(move.from, move.to, eased);
-      // A small hop sells the step without needing an animation rig.
-      token.position.y = Math.sin(eased * Math.PI) * 0.12 * Math.min(squares, 2);
+      token.group.position.lerpVectors(move.from, move.to, eased);
+      // The hop stands in for a walk cycle, so a token that has one does not need it — a
+      // figure that strides and bounces at the same time looks wrong.
+      if (!token.animated) {
+        token.group.position.y = Math.sin(eased * Math.PI) * 0.12 * Math.min(squares, 2);
+      }
 
       if (move.t >= 1) {
-        token.position.copy(move.to);
+        token.group.position.copy(move.to);
+        token.play("idle");
         this.moving.delete(entityId);
       }
     }
@@ -324,6 +344,7 @@ export class Renderer {
 
       this.advanceMovement(delta);
       this.advanceRotation(delta);
+      for (const token of this.tokens.values()) token.update(delta);
       // Cheap two-frequency flicker so the braziers never pulse in lockstep.
       this.flames.forEach((flame, i) => {
         flame.intensity =

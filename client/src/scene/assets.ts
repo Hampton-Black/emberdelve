@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 
 /**
  * Kenney's Modular Dungeon Kit is authored on a 4-unit module grid (template-floor.glb
@@ -55,4 +56,43 @@ export function toWorld(
     0,
     -(gy - height / 2 + 0.5), // +y is north, which is -Z away from the camera
   );
+}
+
+// ---- Characters ----
+
+const CHARACTER_BASE = "/assets/kits/characters";
+
+/** A loaded character kit model: the rig plus every clip Kenney ships with it. */
+export interface CharacterModel {
+  scene: THREE.Group;
+  animations: THREE.AnimationClip[];
+}
+
+const characters = new Map<string, CharacterModel>();
+
+/**
+ * Loads a character once and caches it. `path` is kit-relative, e.g. `mini/character-male-b`.
+ *
+ * <p>The kit folder matters: every Kenney GLB references `Textures/colormap.png` by relative
+ * path, and the mini and graveyard kits ship <em>different</em> colormaps. Serving them from one
+ * directory silently renders one kit in the other's palette.
+ */
+export async function loadCharacter(path: string): Promise<CharacterModel> {
+  const cached = characters.get(path);
+  if (cached) return cached;
+
+  const gltf = await loader.loadAsync(`${CHARACTER_BASE}/${path}.glb`);
+  const model: CharacterModel = { scene: gltf.scene, animations: gltf.animations };
+  characters.set(path, model);
+  return model;
+}
+
+/**
+ * A fresh, independently animatable copy. Plain `Object3D.clone()` is wrong here — it shares
+ * the skeleton, so two tokens of the same model would animate as one.
+ */
+export function instanceCharacter(path: string): CharacterModel | null {
+  const model = characters.get(path);
+  if (!model) return null;
+  return { scene: SkeletonUtils.clone(model.scene) as THREE.Group, animations: model.animations };
 }

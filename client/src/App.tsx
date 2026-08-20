@@ -74,6 +74,16 @@ export function App() {
             >
               reveal alcove
             </button>
+            {/* Exercises the walk cycle and facing without waiting for T10's click-to-move. */}
+            <button
+              style={styles.button}
+              onClick={() => {
+                const me = scene?.entities.find((e) => e.isPlayerControlled);
+                if (me) send({ type: "moveTo", actorId: me.id, x: me.x, y: me.y >= 6 ? 1 : 9 });
+              }}
+            >
+              walk
+            </button>
             {/* A real roll down the real path — how the dice get tuned without burning a turn. */}
             <button
               style={styles.button}
