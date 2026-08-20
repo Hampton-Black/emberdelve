@@ -111,7 +111,7 @@ Measured against the real tool schema, one round, "heave the sarcophagus lid ope
 
 Two findings that should survive this milestone:
 
-1. **Reasoning models cannot hit the 800ms gate.** Reasoning-on models land at 1.9–5.0s to
+1. **Reasoning models cannot hit the first-feedback gate.** Reasoning-on models land at 1.9–5.0s to
    first token; reasoning-off models land at 0.7–1.6s. The split is clean. Worse, the agentic
    loop multiplies it: a turn with three tool calls on `grok-4-6` measured **44 seconds**.
 2. **The uncensored and roleplay models are the ones that cannot drive this architecture.**
@@ -197,12 +197,44 @@ These are the things most likely to eat week two.
 
 ## Latency targets — these are the gate
 
-| Path | Budget |
-|---|---|
-| Keypress → first streamed token | < 800ms |
-| Keypress → first spoken word | < 1.5s |
-| Click-to-move → token starts moving | < 100ms (no model in this path) |
-| Full enemy round resolved and narrated | < 4s |
+| Path | Budget | Where it stands |
+|---|---|---|
+| Keypress → the UI acknowledges the input | < 100ms | no model in this path |
+| Keypress → first mechanical feedback (dice in the air) | < 1.2s | **measured 0.8–1.6s**, typically ~1.0s |
+| Keypress → first spoken word, **gap filled** | < 8s | measured 4.4–8.9s end to end |
+| Keypress → first spoken word, **nothing on screen** | < 2.5s | *provisional — unmeasured. T13.* |
+| Click-to-move → token starts moving | < 100ms | no model in this path. T10 |
+| Full enemy round resolved and narrated | < 4s | T11 |
+
+### Why these are not the numbers in `docs/m0-build-plan.md`
+
+The plan's targets — first token < 800ms, first spoken word < 1.5s — come from a text-chat mental
+model, where the first token *is* the experience and silence before it is the whole cost. This
+game is not that. There are dice on the table and a voice talking, and those change what the
+player is actually waiting through.
+
+Two consequences:
+
+- **"First token" is the wrong thing to measure.** What matters is the first moment something
+  *happens* — a die leaving the hand. That is a tool-phase number, not a prose number, and it is
+  why `TurnMetrics` logs `FIRST FEEDBACK` in preference to everything else it records.
+- **Speech latency is only expensive when nothing covers it.** With dice tumbling for ~1.5s and
+  the tray holding until narration starts, a seven-second wait for the first word does not read as
+  a wait. With an empty screen, two seconds does. Hence one budget split into two.
+
+### What T13 has to decide
+
+The generous number above is defensible **only** while the gap is filled. Two open questions,
+both to be answered with data and not by argument:
+
+1. **How often is a turn tool-free?** `TurnMetrics` logs a running `n/m turns used dice` for
+   exactly this. If most real play turns out to have no dice, the 2.5s row is the one that
+   governs and the design needs to change — a thinking state that is worth looking at, or a
+   faster prose model. Do not judge this from the sample collected while building the dice; it is
+   biased by construction.
+2. **Is ~20 seconds of speech per turn too long?** Narration runs about 20 characters a second,
+   so a 400-character reply is 20 seconds before the player acts again. The tail matters more
+   than the head, and no target above covers it.
 
 ---
 

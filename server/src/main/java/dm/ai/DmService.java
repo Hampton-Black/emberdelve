@@ -16,8 +16,8 @@ import java.util.stream.Collectors;
  *
  * <p><b>Phase 1 — mechanics, fast model.</b> Decides tool calls and nothing else; any prose it
  * emits is discarded. Loops until it stops asking for tools, seeing each engine result before
- * choosing the next call. This is the phase the &lt;800ms budget applies to, because it is what
- * puts dice on the table.
+ * choosing the next call. This is the phase the first-feedback budget applies to, because it is
+ * what puts dice on the table.
  *
  * <p><b>Phase 2 — narration, strong model.</b> Writes the prose, with the engine's actual results
  * as context. It runs <em>while the dice are still animating</em>, which is what buys it the time

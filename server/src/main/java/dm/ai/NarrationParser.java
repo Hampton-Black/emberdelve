@@ -15,8 +15,8 @@ import java.util.function.Consumer;
  *   <li>Split on inline {@code [[speaker]]} markers so the goblin gets a different voice. A marker
  *       can arrive split across deltas ({@code "[[gob"} then {@code "lin]]"}), so a partial marker
  *       is held back rather than emitted as prose.
- *   <li>Flush at sentence boundaries. TTS cannot start until it has a complete sentence, so
- *       waiting for the whole turn would blow the 1.5s spoken-word budget on its own.
+ *   <li>Flush at sentence boundaries. A voice cannot start until it has a complete sentence, so
+ *       waiting for the whole turn would add its entire generation time to the spoken-word budget.
  * </ul>
  *
  * <p>An unknown speaker falls back to the narrator — invariant #7 in the one place the model

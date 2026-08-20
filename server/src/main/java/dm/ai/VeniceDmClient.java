@@ -22,8 +22,8 @@ import java.util.stream.Stream;
  * Streaming chat against Venice's OpenAI-compatible endpoint.
  *
  * <p>Hand-rolled over {@link HttpClient} rather than pulled from an SDK: the wire format is
- * stable, SSE parsing is short, and M0 wants full control of the path that owns the &lt;800ms
- * first-token budget.
+ * stable, SSE parsing is short, and M0 wants full control of the path that owns the
+ * first-feedback budget.
  */
 public final class VeniceDmClient implements DmClient {
 

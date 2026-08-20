@@ -12,7 +12,7 @@ public interface DmClient {
 
     /**
      * Streams one DM turn. Text deltas reach the listener as the model produces them — the
-     * &lt;800ms first-token budget depends on this never buffering a whole response.
+     * first-feedback budget depends on this never buffering a whole response.
      *
      * @param tools tool definitions legal for this turn, rebuilt from live state
      * @return the assembled text and any tool calls the model wants applied
