@@ -50,6 +50,7 @@ milestone takes generation first, deliberately.
 | Kit | Content-as-data: tile types, prop catalog with ids and footprints |
 | Dressing | One LLM pass per room, JIT on entry, validated server-side |
 | Navigation | Exits work. Scene swaps on room change |
+| Movement | Free movement outside combat, and the player's position as DM context (§6b) |
 | State | Multi-room, still in memory behind `GameRepository` |
 | Client | Existing Three.js client renders generated rooms |
 | Debug view | Terminal dump of a generated dungeon, for fast iteration |
@@ -132,6 +133,36 @@ generated room reaches a client, not after the first bad one does.
 
 ---
 
+## 6b. Free movement, and position as context
+
+`ai-dm-system-design.md` §15 defers grid-walkable exploration until "combat is polished and you want
+interactable props." That deferral is about a *mechanic* — walking to things as the way you interact
+with them, proximity triggers, an interaction model per prop, and a content pipeline behind it. That
+remains deferred.
+
+What M1 adds is narrower and much cheaper: **free movement as embodiment.** The player may walk
+anywhere unobstructed outside combat because the token answering them feels good. Nothing is
+triggered by proximity. Typing is still the only interaction verb.
+
+The machinery already exists — pathfinding, the slide animation, footstep audio, and
+server-authoritative legal-move computation all shipped in M0. The only change is computing a
+legal-move set outside combat, which is every unobstructed square, since there is no movement budget
+to spend.
+
+**Position becomes DM context, and that is the actual reason to do it.** The world state handed to
+the narrator gains what the player is standing next to. A player who walks to the sarcophagus and
+types "I examine this" no longer requires the narrator to guess the referent, and "you press your
+shoulder to the lid" is truer when the token is beside it. `m0-evaluation.md` §4.3 named grounding as
+the metric this project lives or dies on; this is an input channel that serves it for the cost of one
+field.
+
+**The risk to watch: false affordance.** Being able to walk to the sarcophagus implies being able to
+click it. Typing is already the interaction verb and the DM answers it, but this should be observed
+in the first session with generated rooms rather than assumed away. If it bites, the fix is a
+narrower legal-move set, not an interaction model.
+
+---
+
 ## 7. Scaling — how this reaches a vast world
 
 The renderer never constrains this. One room is loaded at a time, so the client holds one room's
@@ -196,11 +227,15 @@ fronts); a larger grid with the camera pulled further back; and detail near the 
 silhouette in the distance. `SceneState` already carries `LightingPreset`; a backdrop and an edge
 treatment are the same kind of field.
 
-**The narrative-exploration decision does most of the work.** Because the grid is rendered but not
-walkable outside combat, an open area only needs to be a *tactical* space when a fight starts and a
-*described* space the rest of the time. A village is a backdrop and a conversation until someone
-draws a blade, at which point it becomes a grid with cover. That is a far smaller problem than
-rendering a walkable town, and it is worth not giving up accidentally.
+**Only combat needs tactical fidelity.** An open area has to be a *tactical* space when a fight
+starts and a *described* space the rest of the time. A village is a backdrop and a conversation until
+someone draws a blade, at which point it becomes a grid with cover, elevation and line of sight. That
+is a far smaller problem than rendering a fully interactable town, and it is worth not giving up
+accidentally.
+
+Note that free movement (§6b) does **not** weaken this. The player walking around a village is not
+the same as the village needing interaction-by-proximity; the mode that needs fidelity is still
+combat alone.
 
 **What changes when the second environment lands:**
 
@@ -291,6 +326,8 @@ The design doc is the long-range plan; these are the agreed amendments.
 - **The deterministic/persisted split** is adopted now rather than at the persistence milestone. §7.
 - **The renderer choice** is explicitly re-examined and deferred, with a re-entry condition. §8b.
 - **`Exit` replaces `Door`** in the scene model, ahead of any non-dungeon environment. §4, §7b.
+- **Free movement outside combat** is pulled in, narrowed to embodiment plus DM grounding rather than
+  the interaction mechanic the doc deferred. §6b.
 
 ---
 
