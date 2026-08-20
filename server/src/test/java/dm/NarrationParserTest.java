@@ -23,7 +23,12 @@ class NarrationParserTest {
     private final List<NarrationSegment> segments = new ArrayList<>();
 
     private NarrationParser parser() {
-        return new NarrationParser(Set.of("goblin", "fighter"), segments::add);
+        return new NarrationParser(Set.of("goblin", "fighter"), null, segments::add);
+    }
+
+    /** As the game builds it when one creature is in the room and can be inferred from. */
+    private NarrationParser parserWithCreature() {
+        return new NarrationParser(Set.of("goblin", "fighter"), "goblin", segments::add);
     }
 
     private String textOf(String speaker) {
@@ -31,6 +36,33 @@ class NarrationParserTest {
                 .filter(s -> s.speakerId().equals(speaker))
                 .map(NarrationSegment::text)
                 .reduce("", String::concat);
+    }
+
+    @Test
+    @DisplayName("the one creature in the room gets its dialogue without a marker")
+    void soleCreatureSpeaksUnmarked() {
+        var p = parserWithCreature();
+        p.accept("Vessk skids to a halt, eyes wide. \"I sssurrender! No more fighting!\" "
+                + "The shortsword clatters to the stone.");
+        p.finish();
+
+        assertTrue(textOf("goblin").contains("sssurrender"),
+                "a quotation in a turn the model never marked is still the goblin talking");
+        assertFalse(textOf("narrator").contains("sssurrender"));
+        // The prose around it is still the narrator's — the marker names a speaker, not a span.
+        assertTrue(textOf("narrator").contains("skids to a halt"));
+        assertTrue(textOf("narrator").contains("clatters to the stone"));
+    }
+
+    @Test
+    @DisplayName("with nobody to attribute to, a quotation stays with the narrator")
+    void unattributableQuotationStaysWithNarrator() {
+        var p = parser();
+        p.accept("A voice grinds out of the dark. \"Who goes there?\"");
+        p.finish();
+
+        assertTrue(textOf("narrator").contains("Who goes there"));
+        assertEquals("", textOf("goblin"));
     }
 
     @Test

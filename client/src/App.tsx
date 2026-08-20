@@ -7,6 +7,7 @@ import { useGame } from "./store";
 import { connect, send } from "./ws";
 import { Canvas } from "./ui/Canvas";
 import { CombatBar } from "./ui/CombatBar";
+import { Defeat } from "./ui/Defeat";
 import { DiceTray } from "./ui/DiceTray";
 import { InputBox } from "./ui/InputBox";
 import { Title } from "./ui/Title";
@@ -102,6 +103,7 @@ export function App() {
             <Canvas />
             <CombatBar />
             <DiceTray />
+            <Defeat />
             <Title />
           </div>
           <footer style={styles.debug}>

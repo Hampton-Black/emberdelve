@@ -23,8 +23,13 @@ export function InputBox() {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const actorId = scene?.entities.find((e) => e.isPlayerControlled)?.id;
-  const canSend = connected && started && !awaitingDm && !!actorId && draft.trim().length > 0;
+  const player = scene?.entities.find((e) => e.isPlayerControlled);
+  const actorId = player?.id;
+  // M0 has no save and no restart (§12), so this is the end of the session rather than a state
+  // to recover from. It still has to look like an ending instead of a stuck box.
+  const down = player !== undefined && player.hp <= 0;
+  const canSend =
+    connected && started && !awaitingDm && !down && !!actorId && draft.trim().length > 0;
   const fighting = mode === "COMBAT";
 
   const submit = () => {
@@ -56,13 +61,15 @@ export function InputBox() {
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder={
-          awaitingDm
-            ? "the DM is speaking…"
-            : fighting
-              ? "shout, taunt, or look around…"
-              : "I examine the sarcophagus."
+          down
+            ? "Roderick is dead. Restart the server to play again."
+            : awaitingDm
+              ? "the DM is speaking…"
+              : fighting
+                ? "shout, taunt, or look around…"
+                : "I examine the sarcophagus."
         }
-        disabled={!connected || !started || awaitingDm}
+        disabled={!connected || !started || awaitingDm || down}
         autoFocus
       />
       <button type="submit" style={{ ...styles.button, opacity: canSend ? 1 : 0.35 }}>

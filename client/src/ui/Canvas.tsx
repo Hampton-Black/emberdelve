@@ -196,6 +196,10 @@ function intent(renderer: Renderer, event: PointerEvent): Intent | null {
   // The server still refuses squares with something solid on them.
   const player = scene.entities.find((e) => e.isPlayerControlled);
   if (!player || !square) return null;
+  // The server refuses this too — it is authoritative and this is only the cursor agreeing with
+  // it. Without it a dead fighter still gets a pointer and a highlight over every square, which
+  // reads as a game that has not noticed.
+  if (player.hp <= 0) return null;
   if (square.x === player.x && square.y === player.y) return null;
   return { kind: "move", actorId: player.id, square };
 }

@@ -341,7 +341,7 @@ public final class DmService {
     private Prose runProsePhase(String text, List<String> mechanics, TurnSink sink,
                                 boolean[] failed) {
         var narrated = new StringBuilder();
-        var parser = new NarrationParser(liveSpeakers(), segment -> {
+        var parser = new NarrationParser(liveSpeakers(), soleCreature(), segment -> {
             narrated.append(segment.text());
             engine.repo().append(Event.narration(segment.speakerId(), segment.text()));
             sink.narration(segment);
@@ -483,6 +483,20 @@ public final class DmService {
                 .append(", x eastward and y northward. Mode: ").append(engine.mode()).append(".\n");
 
         return sb.toString();
+    }
+
+    /**
+     * The one living creature in the room, or null when there is not exactly one.
+     *
+     * <p>Handed to the parser so an unmarked quotation can be attributed. M0 has a single goblin,
+     * which is precisely the case where the inference is safe.
+     */
+    private String soleCreature() {
+        var creatures = engine.repo().entities().stream()
+                .filter(e -> !e.isPlayerControlled() && e.isAlive())
+                .map(e -> e.id().toLowerCase())
+                .toList();
+        return creatures.size() == 1 ? creatures.getFirst() : null;
     }
 
     /** Speaker ids the narration parser will honour — everything else falls back to narrator. */

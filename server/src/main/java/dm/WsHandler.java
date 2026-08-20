@@ -5,6 +5,7 @@ import dm.ai.DmService;
 import dm.engine.CombatSink;
 import dm.engine.GameEngine;
 import dm.model.Difficulty;
+import dm.model.Entity;
 import dm.model.Diff;
 import dm.model.Outcome;
 import dm.model.Skill;
@@ -299,6 +300,12 @@ public final class WsHandler {
             return;
         }
         if (text.isBlank()) {
+            return;
+        }
+        // Same reason the engine refuses a move: a dead fighter has no turns left to take, and
+        // a DM asked to narrate one would invent a living player to narrate it for.
+        if (engine.repo().find(actorId).filter(Entity::isAlive).isEmpty()) {
+            send(ctx, new ServerMessage.Error("Roderick is dead. Restart the server to play again."));
             return;
         }
 

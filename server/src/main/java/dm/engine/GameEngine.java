@@ -125,6 +125,13 @@ public final class GameEngine {
         var entity = repo.find(actorId).orElseThrow(
                 () -> new IllegalArgumentException("No such entity: " + actorId));
 
+        // Out of combat nothing else was checking this. A fighter who lost the fight was still
+        // free to walk around the room he had just died in, because the only aliveness test here
+        // was on the square being moved into rather than on whoever was moving.
+        if (!entity.isAlive()) {
+            throw new IllegalArgumentException(entity.name() + " is dead.");
+        }
+
         if (!isInBounds(x, y)) {
             throw new IllegalArgumentException("Off the grid: " + x + "," + y);
         }

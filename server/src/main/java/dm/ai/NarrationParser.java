@@ -63,11 +63,24 @@ public final class NarrationParser {
      * <p>Models mark a creature's first line and then let it speak again with no marker at all,
      * which had the narrator reading the goblin's dialogue. In a scene with one creature, an
      * unattributed quotation is that creature far more often than it is anything else.
+     *
+     * <p>Seeded rather than starting empty, for the same reason it persists. A parser lives for
+     * one call, and a combat beat is its own call — so a turn where the model never wrote a
+     * marker had the narrator reading the goblin's surrender in its own voice, while an earlier
+     * turn that happened to include one got it right. Whether the goblin sounds like the goblin
+     * should not depend on which call it spoke in.
      */
     private String lastCreature;
 
-    public NarrationParser(Set<String> knownSpeakers, Consumer<NarrationSegment> onSegment) {
+    /**
+     * @param soleCreature the one living creature in the room, or null when there is not exactly
+     *                     one. With two, an unattributed quotation is a guess rather than an
+     *                     inference, and the narrator keeps it.
+     */
+    public NarrationParser(Set<String> knownSpeakers, String soleCreature,
+                           Consumer<NarrationSegment> onSegment) {
         this.knownSpeakers = Set.copyOf(knownSpeakers);
+        this.lastCreature = soleCreature;
         this.onSegment = onSegment;
     }
 
