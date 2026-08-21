@@ -19,6 +19,10 @@ public final class ContentLoader {
         return read("/content/rooms/" + roomId + ".json", RoomDefinition.class);
     }
 
+    public KitDefinition kit(String kitId) {
+        return read("/content/kits/" + kitId + ".json", KitDefinition.class);
+    }
+
     public EntityDefinition entity(String kind) {
         return read("/content/entities/" + kind + ".json", EntityDefinition.class);
     }

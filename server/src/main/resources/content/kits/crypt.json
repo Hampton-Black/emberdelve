@@ -1,0 +1,14 @@
+{
+  "kitId": "crypt",
+  "floors": ["STONE", "CRACKED_STONE", "TILED"],
+  "walls": ["STONE", "CARVED"],
+  "lightings": ["TORCHLIT", "DIM", "DARK"],
+  "size": { "min": 10, "max": 16 },
+  "props": [
+    { "type": "SARCOPHAGUS", "minCount": 1, "maxCount": 1, "unique": true },
+    { "type": "BRAZIER",     "minCount": 0, "maxCount": 4, "unique": false },
+    { "type": "PILLAR",      "minCount": 0, "maxCount": 4, "unique": false },
+    { "type": "RUBBLE",      "minCount": 0, "maxCount": 3, "unique": false },
+    { "type": "ALCOVE",      "minCount": 0, "maxCount": 2, "unique": false }
+  ]
+}
