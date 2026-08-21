@@ -219,13 +219,13 @@ class PropPlacerTest {
             for (var prop : room.props()) {
                 if (!onWall(room.shape(), prop)) continue;
 
-                // The authored crypt is the reference: its north-wall door is 180 and its
-                // east-side alcove is 270, which puts south at 0 and west at 90.
+                // Local +Z is a prop's back, and a Y rotation of t sends it to (sin t, cos t).
+                // Matching that against the wall each square backs onto gives these four.
                 Integer expected = null;
                 if (prop.y() == 0) expected = 0;
-                else if (prop.x() == 0) expected = 90;
+                else if (prop.x() == 0) expected = 270;
                 else if (prop.y() == room.shape().height() - 1) expected = 180;
-                else if (prop.x() == room.shape().width() - 1) expected = 270;
+                else if (prop.x() == room.shape().width() - 1) expected = 90;
 
                 assertEquals(expected, prop.rotation(),
                         prop.type() + " at (" + prop.x() + "," + prop.y()

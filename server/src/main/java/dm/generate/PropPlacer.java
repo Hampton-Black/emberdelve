@@ -208,11 +208,19 @@ public final class PropPlacer {
      * Which way a prop turns to face.
      *
      * <p>A thing against a wall faces into the room; the tomb on the axis squares up to the
-     * party; anything else takes a free rotation. The cardinal values come from the
-     * hand-authored crypt, whose north-wall door reads 180 and whose east-side alcove reads
-     * 270 — which puts south at 0 and west at 90. Corners are resolved south-first,
+     * party; anything else takes a free rotation. Corners are resolved south-first,
      * arbitrarily but consistently: either wall is a wall it could be cut into, and the
      * renderer needs one answer rather than the better of two.
+     *
+     * <p>The cardinal values are fixed by the renderer, not chosen here. A prop's local +Z is
+     * its back, and a Y rotation of t sends that to (sin t, cos t) in world space; the wall a
+     * given square backs onto is known from the square. Matching the two gives south 0, east
+     * 90, north 180, west 270.
+     *
+     * <p>East and west were the other way round at first, from reading the authored crypt's
+     * alcove — which sits at x=9 in a room 12 wide and so is not against a wall at all, and
+     * proved nothing. It showed up the moment the alcove became a recess: instead of being set
+     * into the west wall it stood half a square clear of it, facing the stone.
      *
      * <p>The axis case is the reason this takes a type at all. A free rotation is fine for a
      * pillar, which looks the same from every side, and wrong for the one object in the room
@@ -230,13 +238,13 @@ public final class PropPlacer {
             return 0;
         }
         if (square.x() == 0) {
-            return 90;
+            return 270;
         }
         if (square.y() == shape.height() - 1) {
             return 180;
         }
         if (square.x() == shape.width() - 1) {
-            return 270;
+            return 90;
         }
         return random.pick(List.of(0, 90, 180, 270));
     }

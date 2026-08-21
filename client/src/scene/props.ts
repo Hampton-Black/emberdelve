@@ -185,36 +185,68 @@ function rubble(): THREE.Object3D {
   return group;
 }
 
+/**
+ * A recess cut into the wall — or as close to one as an opaque wall allows.
+ *
+ * <p>This used to be a near-black box standing on the floor square, and once placement started
+ * putting alcoves against walls where they belong, it read as a slab leaning on the stone
+ * rather than a hole in it. Two things were wrong. It stood in the middle of its square, half
+ * a unit clear of the wall; and at 1.2 units tall it was taller than the wall it was supposedly
+ * cut into, which is 1.04.
+ *
+ * <p>The wall cannot actually be pierced — it is one instanced mesh and there is no CSG here —
+ * so the recess is faked the way low-poly kits always fake it: a very dark panel laid on the
+ * stone, with a frame standing proud of it. The depth on the frame is what sells it. A flat
+ * dark rectangle reads as something painted on the wall; the same rectangle behind an inch of
+ * jamb and lintel reads as a hole, because the frame casts and catches light on its edges.
+ *
+ * <p>Local +Z is into the wall. An alcove's square sits half a unit inside the wall plane and
+ * the wall slab is a quarter deep, so the stone face it mounts on is at z = 0.25.
+ */
 function alcove(): THREE.Object3D {
   const group = new THREE.Group();
 
-  const recess = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 0.9, 0.3),
-    new THREE.MeshStandardMaterial({ color: 0x14120f, roughness: 1 }),
-  );
-  recess.position.y = 0.75;
+  /** The inner face of the wall, in this prop's local space. */
+  const FACE = 0.25;
+  const LAMP = 0xd9b271;
 
+  const frameMat = new THREE.MeshStandardMaterial({ color: STONE, roughness: 0.95 });
+  const voidMat = new THREE.MeshStandardMaterial({ color: 0x0b0a09, roughness: 1 });
+
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.64, 0.04), voidMat);
+  back.position.set(0, 0.56, FACE - 0.02);
+
+  const jambLeft = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.74, 0.17), frameMat);
+  jambLeft.position.set(-0.35, 0.56, FACE - 0.085);
+  const jambRight = jambLeft.clone();
+  jambRight.position.x = 0.35;
+
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.11, 0.19), frameMat);
+  lintel.position.set(0, 0.93, FACE - 0.09);
+
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.09, 0.22), frameMat);
+  sill.position.set(0, 0.2, FACE - 0.1);
+
+  // A votive lamp on the sill. The glow is the point: a dark recess with nothing burning in it
+  // is indistinguishable from a shadow at this resolution.
   const lamp = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.1, 0.13, 0.14, 8),
+    new THREE.CylinderGeometry(0.075, 0.1, 0.12, 8),
     new THREE.MeshStandardMaterial({
-      color: 0xd9b271,
-      emissive: 0xd9b271,
-      emissiveIntensity: 0.7,
+      color: LAMP,
+      emissive: LAMP,
+      emissiveIntensity: 0.9,
       roughness: 0.8,
     }),
   );
-  lamp.position.set(0, 0.5, 0.02);
+  lamp.position.set(0, 0.31, FACE - 0.11);
 
-  const cloth = new THREE.Mesh(
-    new THREE.BoxGeometry(0.34, 0.16, 0.2),
-    new THREE.MeshStandardMaterial({ color: 0x1d1a18, roughness: 1 }),
-  );
-  cloth.position.set(0, 0.95, 0.02);
+  // Deliberately short-range and dim. It exists to pick out the jambs and the back of the
+  // recess, not to light the room — that is the torches' job, and there are already up to
+  // fourteen lights in a room before this one is counted.
+  const glow = new THREE.PointLight(LAMP, 4, 2.4, 2);
+  glow.position.set(0, 0.45, FACE - 0.14);
 
-  const glow = new THREE.PointLight(0xd9b271, 6, 5, 2);
-  glow.position.set(0, 0.7, 0.3);
-
-  group.add(recess, lamp, cloth, glow);
+  group.add(back, jambLeft, jambRight, lintel, sill, lamp, glow);
   return group;
 }
 
