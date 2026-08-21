@@ -38,10 +38,15 @@ public final class GameEngine {
     private int consecutiveFailedChecks;
 
     public GameEngine(ContentLoader content, GameRepository repo, DiceRoller dice) {
+        this(content, repo, dice, content.room(ROOM_ID));
+    }
+
+    public GameEngine(ContentLoader content, GameRepository repo, DiceRoller dice,
+                      RoomDefinition room) {
         this.content = content;
         this.repo = repo;
         this.dice = dice;
-        this.room = content.room(ROOM_ID);
+        this.room = room;
         this.combat = new CombatEngine(repo, dice, room);
     }
 

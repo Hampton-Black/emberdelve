@@ -49,4 +49,28 @@ public record GeneratedRoom(
                         new RoomDefinition.Point(goblinSpawn.x(), goblinSpawn.y())),
                 new RoomDefinition.DmNotes(UNDRESSED, UNDRESSED, UNDRESSED, UNDRESSED, UNDRESSED));
     }
+
+    /** The same room, with the dress pass's prose written into it. */
+    public RoomDefinition toRoomDefinition(Dressing dressing) {
+        var definitions = props.stream()
+                .map(p -> new RoomDefinition.PropDefinition(
+                        p.id(), p.type(), p.x(), p.y(), p.rotation(), p.hidden(),
+                        dressing.propDescriptions().getOrDefault(p.id(), UNDRESSED),
+                        null, null))
+                .toList();
+
+        var plain = toRoomDefinition();
+        return new RoomDefinition(
+                plain.roomId(),
+                dressing.name(),
+                plain.width(),
+                plain.height(),
+                plain.floorType(),
+                plain.wallType(),
+                plain.lighting(),
+                definitions,
+                plain.startPositions(),
+                new RoomDefinition.DmNotes(
+                        dressing.overview(), dressing.sensory(), null, null, null));
+    }
 }

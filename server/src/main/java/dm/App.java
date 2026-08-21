@@ -5,10 +5,14 @@ import dm.ai.TtsClient;
 import dm.ai.DmService;
 import dm.ai.VeniceDmClient;
 import dm.content.ContentLoader;
+import dm.content.RoomDefinition;
 import dm.engine.DiceRoller;
 import dm.engine.GameEngine;
 import dm.engine.RandomDiceRoller;
 import dm.engine.ScriptedDiceRoller;
+import dm.generate.RoomDresser;
+import dm.generate.RoomGenerator;
+import dm.generate.RoomSource;
 import dm.repo.InMemoryGameRepository;
 import dm.wire.Json;
 import io.javalin.Javalin;
@@ -38,7 +42,32 @@ public final class App {
 
         var content = new ContentLoader();
         var repo = new InMemoryGameRepository();
-        var engine = new GameEngine(content, repo, dice);
+
+        // --generate <seed> boots into a procedurally generated room instead of the crypt.
+        // The crypt stays the default: it is the room every M0 measurement was taken in.
+        Long generateSeed = null;
+        for (int i = 0; i < args.length - 1; i++) {
+            if ("--generate".equals(args[i])) {
+                generateSeed = Long.parseLong(args[i + 1]);
+            }
+        }
+
+        RoomDefinition room;
+        if (generateSeed == null) {
+            room = RoomSource.authored(content, "crypt");
+        } else if (config.has("VENICE_API_KEY")) {
+            room = RoomSource.generated(content, new RoomDresser(
+                    new VeniceDmClient(config, config.get("DM_MODEL_TOOLS", "qwen3-next-80b"),
+                            java.time.Duration.ofSeconds(30)),
+                    content.prompt("dress-room")), "crypt", generateSeed);
+        } else {
+            // Undressed but playable — the generator half needs no key, and a room with no prose
+            // is more useful than a refusal to boot while tuning layout.
+            log.warn("VENICE_API_KEY not set — generating an undressed room.");
+            room = new RoomGenerator(content).generate("crypt", generateSeed).toRoomDefinition();
+        }
+
+        var engine = new GameEngine(content, repo, dice, room);
         engine.start();
 
         // Everything up to T5 runs without a key; only narration needs one.
