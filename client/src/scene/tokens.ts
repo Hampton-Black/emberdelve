@@ -44,12 +44,19 @@ const BAR_HEIGHT = 0.085;
  * <p>Figures deliberately overflow their square. Rendered at 480px internal width a
  * to-scale human is about 24 pixels tall and reads as a smudge; oversizing the figure relative
  * to its base is what tactical RPGs do, for exactly this reason.
+ *
+ * <p>The ceiling on that is the wall, which stands exactly one square tall. The fighter used
+ * to be 1.25 — taller than the perimeter of the room he is standing in. It went unnoticed
+ * while the walls were Kenney's smooth slab, which gives the eye nothing to measure against;
+ * the ruins wall is laid in visible courses of stone, and against real masonry a figure that
+ * overtops it reads as a giant rather than as legible. These sit under the wall and still well
+ * over the 0.6 a to-scale human would get.
  */
 const MODELS: Record<string, { path: string; height: number; tint?: number }> = {
-  fighter: { path: "graveyard/character-keeper", height: 1.25 },
+  fighter: { path: "graveyard/character-keeper", height: 0.8 },
   // No tint: the zombie is already the right green. Tinting a model that carries its own
   // colour just muddies the colormap.
-  goblin: { path: "graveyard/character-zombie", height: 1.05 },
+  goblin: { path: "graveyard/character-zombie", height: 0.68 },
 };
 
 /** Used when a model is missing, so a failed asset is a grey figure rather than a blank square. */

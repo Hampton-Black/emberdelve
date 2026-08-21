@@ -22,6 +22,19 @@ const EMBER = 0x63d18a; // the braziers burn green
 /** Candela, not a 0-1 factor. Point lights decay physically, so this is deliberately large. */
 export const FLAME_INTENSITY = 26;
 
+/**
+ * Finished heights, as a fraction of the wall — which stands exactly one square.
+ *
+ * <p>These props were all authored at close to full wall height back when the perimeter was a
+ * smooth Kenney slab with nothing on it to judge scale by. The ruins wall is laid in courses,
+ * and beside real masonry a coffin as tall as the room's wall reads as a shipping container.
+ * Each builder still composes at its original size and is brought down here, so the numbers
+ * inside them stay the ones that were tuned by eye.
+ */
+const TOMB_HEIGHT = 0.58;
+const BRAZIER_HEIGHT = 0.65;
+const ALCOVE_HEIGHT = 0.73;
+
 type Builder = (prop: Prop) => THREE.Object3D;
 
 /**
@@ -105,6 +118,9 @@ function sarcophagus(): THREE.Object3D {
     });
     lid.add(skull);
   }
+
+  // Waist-high on the fighter rather than shoulder-high on the wall.
+  group.scale.setScalar(TOMB_HEIGHT);
   return group;
 }
 
@@ -143,6 +159,10 @@ function brazier(): THREE.Object3D {
   light.castShadow = true;
 
   group.add(stem, bowl, coals, light);
+  // Scales the bowl and the height the flame sits at. A light's range is world units and is
+  // not touched by a parent's scale, which is what we want — the brazier gets smaller, the
+  // room it lights does not.
+  group.scale.setScalar(BRAZIER_HEIGHT);
   return group;
 }
 
@@ -208,8 +228,16 @@ function rubble(): THREE.Object3D {
 function alcove(): THREE.Object3D {
   const group = new THREE.Group();
 
+  // Built at its original size in an inner group and shrunk as a whole, so every number below
+  // stays the one that was tuned by eye. The mounting depth cannot ride along: the recess has
+  // to stay on the wall's face however small it gets, so the face is divided by the scale here
+  // and multiplied back out by it below.
+  const inner = new THREE.Group();
+  inner.scale.setScalar(ALCOVE_HEIGHT);
+  group.add(inner);
+
   /** The inner face of the wall, in this prop's local space. */
-  const FACE = WALL_FACE;
+  const FACE = WALL_FACE / ALCOVE_HEIGHT;
   const LAMP = 0xd9b271;
 
   const frameMat = new THREE.MeshStandardMaterial({ color: STONE, roughness: 0.95 });
@@ -248,7 +276,7 @@ function alcove(): THREE.Object3D {
   const glow = new THREE.PointLight(LAMP, 4, 2.4, 2);
   glow.position.set(0, 0.45, FACE - 0.14);
 
-  group.add(back, jambLeft, jambRight, lintel, sill, lamp, glow);
+  inner.add(back, jambLeft, jambRight, lintel, sill, lamp, glow);
   return group;
 }
 
