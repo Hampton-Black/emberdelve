@@ -142,6 +142,16 @@ public final class ToolDispatcher {
             return Result.rejected("(" + x + "," + y + ") is already occupied — pick another square");
         }
 
+        // The engine keeps one goblin and throws rather than overwrite it. Asked for a second,
+        // the model should be told why and left to write around it, not handed an exception.
+        var existing = engine.repo().find("goblin");
+        if (existing.isPresent()) {
+            return Result.rejected(existing.get().isAlive()
+                    ? "there is already a goblin on the grid — it cannot be spawned twice"
+                    : "the goblin is dead and cannot be spawned again; this build stats one "
+                            + "goblin, and it does not come back");
+        }
+
         List<Diff> diffs = engine.spawnGoblin(x, y);
         return Result.applied(
                 "A goblin is now on the grid at (%d,%d). Describe its arrival.".formatted(x, y),

@@ -184,10 +184,33 @@ public final class GameEngine {
         return List.of(new Diff.PropRevealed(definition.toProp().revealed()));
     }
 
+    /**
+     * Puts the goblin on the grid. There is room for exactly one.
+     *
+     * <p>The entity id is the definition's, which is the constant {@code "goblin"}, and
+     * {@code repo.put} is keyed by id — so a second spawn never added a second creature, it
+     * overwrote the first. Overwriting a <em>dead</em> one is a resurrection: back at full hp,
+     * back on the board, and rolling initiative in the next fight as though nothing had
+     * happened. Vessk came back from a fight he had lost.
+     *
+     * <p>Refusing is the honest fix rather than the convenient one. Handing each spawn its own
+     * id would let a second goblin exist, but the id is load-bearing in two places outside the
+     * engine — {@code TtsClient} picks the goblin's voice by it, and {@code DmService} decides
+     * which sarcophagus note to show by whether an entity called "goblin" exists — so a
+     * "goblin-2" would be narrated in the narrator's voice. One goblin is what this build
+     * actually supports, and it should say so instead of corrupting itself quietly.
+     */
     public List<Diff> spawnGoblin(int x, int y) {
         var definition = content.entity("goblin");
-        var goblin = definition.spawn(definition.id(), x, y);
 
+        var existing = repo.find(definition.id());
+        if (existing.isPresent()) {
+            throw new IllegalArgumentException(existing.get().isAlive()
+                    ? existing.get().name() + " is already on the grid."
+                    : existing.get().name() + " is dead. A spawn does not raise the dead.");
+        }
+
+        var goblin = definition.spawn(definition.id(), x, y);
         repo.put(goblin);
         repo.append(Event.action(goblin.id(), "appeared at " + x + "," + y));
         return List.of(new Diff.EntityAdded(goblin.toView()));

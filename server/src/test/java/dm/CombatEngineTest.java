@@ -392,4 +392,43 @@ class CombatEngineTest {
         assertEquals(new Square(6, 6),
                 new Square(fixture.get("goblin").x(), fixture.get("goblin").y()));
     }
+
+    // ---- The dead stay dead ----
+
+    @Test
+    @DisplayName("spawning again does not raise the goblin that already died")
+    void spawningDoesNotResurrect() {
+        var fixture = fight(20, 20, 20, 20, 20, 20);
+        var repo = fixture.repo();
+
+        // Kill him outright rather than rolling for it: this is about what a spawn does to a
+        // corpse, not about how the corpse got there.
+        repo.put(repo.find("goblin").orElseThrow().damaged(99));
+        assertFalse(repo.find("goblin").orElseThrow().isAlive(), "setup: the goblin should be dead");
+
+        var refused = assertThrows(IllegalArgumentException.class,
+                () -> fixture.engine().spawnGoblin(6, 6));
+        assertTrue(refused.getMessage().contains("dead"), refused.getMessage());
+
+        assertFalse(repo.find("goblin").orElseThrow().isAlive(),
+                "a spawn brought the dead goblin back to full health");
+    }
+
+    @Test
+    @DisplayName("a dead hostile never rolls initiative, however many times combat is started")
+    void deadHostileNeverRollsInitiative() {
+        var fixture = fight(20, 20, 20, 20, 20, 20);
+        var repo = fixture.repo();
+
+        repo.put(repo.find("goblin").orElseThrow().damaged(99));
+        assertThrows(IllegalArgumentException.class, () -> fixture.engine().spawnGoblin(6, 6));
+
+        var sink = fixture.start();
+
+        assertTrue(
+                sink.collectedRolls().stream().noneMatch(
+                        r -> r.request().purpose() == RollPurpose.INITIATIVE
+                                && "goblin".equals(r.request().actorId())),
+                "a dead goblin rolled for initiative");
+    }
 }
