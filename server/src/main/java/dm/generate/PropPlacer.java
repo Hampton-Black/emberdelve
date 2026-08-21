@@ -77,7 +77,7 @@ public final class PropPlacer {
                         entry.type(),
                         square.x(),
                         square.y(),
-                        facing(random, shape, square),
+                        facing(random, shape, square, partyStart, entry.type()),
                         false));
             }
         }
@@ -165,10 +165,12 @@ public final class PropPlacer {
                     .toList();
             case AXIS_FAR -> {
                 // The far half from wherever the party comes in, so the tomb is something you
-                // walk toward rather than something you are already standing next to.
+                // walk toward rather than something you are already standing next to. It stays
+                // off the end wall as well: a sarcophagus you can walk around reads as laid
+                // out for viewing, and one shoved flat against the stone reads as stored.
                 boolean partyLow = partyStart.y() < h / 2;
                 var column = new ArrayList<Square>();
-                for (int y = 0; y < h; y++) {
+                for (int y = 1; y < h - 1; y++) {
                     if (partyLow ? y > h / 2 : y < h / 2) {
                         column.add(new Square(w / 2, y));
                     }
@@ -205,13 +207,25 @@ public final class PropPlacer {
     /**
      * Which way a prop turns to face.
      *
-     * <p>A thing against a wall faces into the room; anything else takes a free rotation. The
-     * cardinal values come from the hand-authored crypt, whose north-wall door reads 180 and
-     * whose east-side alcove reads 270 — which puts south at 0 and west at 90. Corners are
-     * resolved south-first, arbitrarily but consistently: either wall is a wall it could be
-     * cut into, and the renderer needs one answer rather than the better of two.
+     * <p>A thing against a wall faces into the room; the tomb on the axis squares up to the
+     * party; anything else takes a free rotation. The cardinal values come from the
+     * hand-authored crypt, whose north-wall door reads 180 and whose east-side alcove reads
+     * 270 — which puts south at 0 and west at 90. Corners are resolved south-first,
+     * arbitrarily but consistently: either wall is a wall it could be cut into, and the
+     * renderer needs one answer rather than the better of two.
+     *
+     * <p>The axis case is the reason this takes a type at all. A free rotation is fine for a
+     * pillar, which looks the same from every side, and wrong for the one object in the room
+     * the player is walking toward: 157 of 200 seeds had the tomb sitting at some angle to the
+     * approach, which reads as dropped rather than laid to rest. The authored crypt's
+     * sarcophagus is rotation 0 with the party entering from the south, and this reproduces
+     * that — turning to 180 if a room ever puts the party at the other end.
      */
-    private static int facing(GenRandom random, RoomShape shape, Square square) {
+    private static int facing(GenRandom random, RoomShape shape, Square square,
+                              Square partyStart, PropType type) {
+        if (affinityOf(type) == Affinity.AXIS_FAR) {
+            return partyStart.y() < shape.height() / 2 ? 0 : 180;
+        }
         if (square.y() == 0) {
             return 0;
         }

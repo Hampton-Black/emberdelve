@@ -186,6 +186,8 @@ class PropPlacerTest {
             assertEquals(room.shape().width() / 2, tomb.x(), "off axis at seed " + seed);
             assertTrue(tomb.y() > room.shape().height() / 2,
                     "sarcophagus in the party's own half at seed " + seed);
+            assertTrue(tomb.y() < room.shape().height() - 1,
+                    "sarcophagus shoved against the end wall at seed " + seed);
         }
     }
 
@@ -230,5 +232,23 @@ class PropPlacerTest {
                                 + ") faces the wall on seed " + seed);
             }
         }
+    }
+
+    @Test
+    @DisplayName("the sarcophagus does not spin: it lies square to the party's approach")
+    void sarcophagusFacesTheParty() {
+        for (long seed = 0; seed < 100; seed++) {
+            // The party enters from the south, as it does in the authored crypt, whose
+            // sarcophagus reads rotation 0. Entering from the north turns it to face back.
+            assertEquals(0, tomb(seed, new Square(3, 0)).rotation(), "seed " + seed);
+            assertEquals(180, tomb(seed, new Square(3, 9)).rotation(), "seed " + seed);
+        }
+    }
+
+    private static Prop tomb(long seed, Square start) {
+        return room(seed, start).props().stream()
+                .filter(p -> p.type() == PropType.SARCOPHAGUS)
+                .findFirst()
+                .orElseThrow();
     }
 }
