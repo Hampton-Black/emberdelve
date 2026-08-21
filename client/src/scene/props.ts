@@ -86,7 +86,13 @@ function sarcophagus(): THREE.Object3D {
   // blob in the right place is the difference between a stone box and a grave.
   const skull = instanceProp(SKULL_MODEL, 0.15, 0.22);
   if (skull) {
-    skull.position.set(0, 0.955, 0.66);
+    // Lid-local, not world: the lid group is already lifted to the top of the chest, so the
+    // skull only has to clear the slab's own half-thickness. Reading 0.96 off the world height
+    // and setting it here floated the skull a full unit over the tomb.
+    //
+    // Past the end of the effigy ridge rather than on top of it, and at the end the party walks
+    // toward — this is the face of the thing you see on approach.
+    skull.position.set(0, 0.08, 0.8);
     skull.rotation.y = Math.PI;
 
     // Repainted rather than used as shipped. The kit's bone is a mid brown that all but
