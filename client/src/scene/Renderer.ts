@@ -55,7 +55,7 @@ const ROTATION_SECONDS = 0.55;
  * decision you cannot see the inputs to is not a decision. The move between them is the point
  * of the mode transition: the pull-back *is* the announcement.
  */
-const EXPLORATION_HALF_HEIGHT = 4.5;
+const EXPLORATION_HALF_HEIGHT = 5.4;
 const FRAMING_SECONDS = 1.1;
 
 /**
@@ -68,10 +68,30 @@ const FOLLOW_SECONDS = 0.34;
 /** The world origin is the middle of the room; see the halving in {@link buildWalls}. */
 const ROOM_CENTRE = new THREE.Vector3(0, 0, 0);
 
-/** How tall the walls stand, so the combat framing does not crop them. */
-const WALL_HEIGHT = 2;
+/**
+ * How tall a wall stands, in squares. The ruins wall is authored at exactly this.
+ *
+ * <p>The combat framing raises the room's corners to this height so the walls are not cropped,
+ * and it used to say 2 — twice what any wall in this game has ever been. It cost about a tenth
+ * of the zoom in a landscape window, pulling the camera back to clear a parapet that was not
+ * there.
+ */
+const WALL_UNIT = 1;
+
 /** Breathing room around the room in the combat framing. */
 const ROOM_MARGIN = 0.7;
+
+/**
+ * The furthest the combat camera may pull back.
+ *
+ * <p>Framing the whole floor is the right instinct and the wrong rule in a tall, narrow canvas.
+ * Fitting a fifteen-deep room across a viewport half as wide as it is high needs a half-height
+ * near eighteen — the room ends up a postage stamp in a field of black, and the tokens, which
+ * are now correctly scaled against the walls, become specks. A fight is the party and whatever
+ * is next to them; past this the extra floor is architecture, not information. Beyond the cap
+ * the camera follows instead, which {@link clampToRoom} already keeps honest.
+ */
+const COMBAT_MAX_HALF_HEIGHT = 10;
 
 /** How high up the wall a torch is mounted. The walls stand about one unit tall. */
 const WALL_TORCH_Y = 0.42;
@@ -119,9 +139,6 @@ interface WallVariant {
 
 /** Units per square in both Quaternius kits. See assets/kits/props/LICENSES.md. */
 const QUATERNIUS_MODULE = 2;
-
-/** How tall a wall stands, in squares. Ruins walls are authored at exactly this. */
-const WALL_UNIT = 1;
 
 const WALL_VARIANTS: WallVariant[] = [
   { path: "props/ruins/Wall", weight: 24 },
@@ -392,7 +409,7 @@ export class Renderer {
     let halfSpanUp = 0;
     for (const cx of [-x, x]) {
       for (const cz of [-z, z]) {
-        for (const cy of [0, WALL_HEIGHT]) {
+        for (const cy of [0, WALL_UNIT]) {
           const corner = new THREE.Vector3(cx, cy, cz);
           halfSpanRight = Math.max(halfSpanRight, Math.abs(corner.dot(right)));
           halfSpanUp = Math.max(halfSpanUp, Math.abs(corner.dot(up)));
@@ -400,8 +417,10 @@ export class Renderer {
       }
     }
 
-    // Whichever axis runs out first decides the zoom.
-    return Math.max(halfSpanUp, (halfSpanRight * height) / width) + ROOM_MARGIN;
+    // Whichever axis runs out first decides the zoom, up to the point where pulling back
+    // stops showing more fight and only shows more floor.
+    const fitted = Math.max(halfSpanUp, (halfSpanRight * height) / width) + ROOM_MARGIN;
+    return Math.min(fitted, COMBAT_MAX_HALF_HEIGHT);
   }
 
   /**

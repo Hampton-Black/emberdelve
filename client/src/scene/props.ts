@@ -333,8 +333,8 @@ const BUILDERS: Record<PropType, Builder> = {
  * cannot be dropped onto a floor square as a mesh without the wall around it.
  */
 const MESH_PROPS: Partial<Record<PropType, { path: string; height: number; footprint: number }>> = {
-  PILLAR: { path: "ruins/Column_Round", height: 2.4, footprint: 0.9 },
-  DOOR: { path: "ruins/Doors_RoundArch", height: 2.3, footprint: 1.4 },
+  PILLAR: { path: "ruins/Column_Round", height: 1.6, footprint: 0.9 },
+  DOOR: { path: "ruins/Doors_RoundArch", height: 0.9, footprint: 1.4 },
   RUBBLE: { path: "ruins/Bricks", height: 0.5, footprint: 0.85 },
 };
 
