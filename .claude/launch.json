@@ -12,6 +12,17 @@
       "port": 7070
     },
     {
+      "name": "server-generated",
+      "runtimeExecutable": "./gradlew",
+      "runtimeArgs": [
+        "run",
+        "--quiet",
+        "--args=--generate 7"
+      ],
+      "cwd": "server",
+      "port": 7070
+    },
+    {
       "name": "client",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

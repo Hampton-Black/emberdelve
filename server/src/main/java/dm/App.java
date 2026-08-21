@@ -57,11 +57,14 @@ public final class App {
         if (generateSeed == null) {
             room = RoomSource.authored(content, "crypt");
         } else if (config.has("VENICE_API_KEY")) {
-            // The dress pass is writing, not mechanics, so it goes on the prose model — the
-            // same fallback chain the DmService wiring uses below.
+            // The dress pass reads as writing, but what it must actually emit is a JSON object
+            // with a fixed shape — which is the tools model's skill, not the prose model's.
+            // Measured on seed 7, four samples each: venice-uncensored-role-play produced
+            // unparseable JSON 4/4 (a string opened with " and closed with ', a stray 'あ', a
+            // bad escape) and fell back to "An Unnamed Chamber" every time; qwen3-next-80b
+            // parsed 3/3. A prose model tuned for roleplay cannot hold a quote character.
             room = RoomSource.generated(content, new RoomDresser(
-                    new VeniceDmClient(config, config.get("DM_MODEL_PROSE",
-                            config.get("DM_MODEL", "claude-opus-5")),
+                    new VeniceDmClient(config, config.get("DM_MODEL_TOOLS", "qwen3-next-80b"),
                             java.time.Duration.ofSeconds(30)),
                     content.prompt("dress-room")), "crypt", generateSeed);
         } else {
