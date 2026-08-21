@@ -82,6 +82,7 @@ function brazier(): THREE.Object3D {
   const light = new THREE.PointLight(EMBER, FLAME_INTENSITY, 16, 2);
   light.position.y = 1.0;
   light.name = "flame";
+  light.userData.baseIntensity = FLAME_INTENSITY;
   light.castShadow = true;
 
   group.add(stem, bowl, coals, light);
@@ -218,9 +219,66 @@ const MESH_PROPS: Partial<Record<PropType, { path: string; height: number; footp
   RUBBLE: { path: "ruins/Bricks", height: 0.5, footprint: 0.85 },
 };
 
-/** Every model the prop table needs, for the renderer to preload before the first scene. */
+/**
+ * The wall torch, which is deliberately not a prop.
+ *
+ * <p>`LightingPreset` is already server-authoritative, and a wall torch is how a TORCHLIT room
+ * gets drawn — the same relationship the ambient colour and key light already have to it.
+ * Making torches props instead would put a dozen more objects on the board for the DM to
+ * describe and the validator to check, to say something the lighting preset already says.
+ *
+ * <p>Nothing about them is load-bearing: they occupy no square, block no movement, and appear
+ * in no diff. Delete this and the room is dimmer, not broken.
+ */
+const TORCH_MODEL = "ruins/Torch";
+
+/** Candela, like {@link FLAME_INTENSITY} — lower, because a room holds many more of them. */
+export const TORCH_INTENSITY = 9;
+
+/** How tall a mounted torch stands, and how far its light carries. */
+const TORCH_HEIGHT = 0.65;
+const TORCH_RANGE = 7;
+
+/** Every model the renderer must preload before the first scene. */
 export function propModelPaths(): string[] {
-  return Object.values(MESH_PROPS).map((m) => m.path);
+  return [...Object.values(MESH_PROPS).map((m) => m.path), TORCH_MODEL];
+}
+
+/** One wall torch, lit or unlit. Null if its model never loaded. */
+export function buildWallTorch(lit: boolean): THREE.Object3D | null {
+  const torch = instanceProp(TORCH_MODEL, TORCH_HEIGHT, 0.4);
+  if (!torch) return null;
+
+  torch.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) child.castShadow = true;
+  });
+
+  if (lit) {
+    // The head has to glow, not just emit. A point light inside an unlit model silhouettes it:
+    // the wall behind lights up and the torch itself reads as a dark stick. The brazier already
+    // solved this with its emissive coals, and at 480x270 that glowing blob is the whole
+    // difference between "a torch" and "a mark on the wall".
+    const flame = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 8, 6),
+      new THREE.MeshStandardMaterial({
+        color: EMBER,
+        emissive: EMBER,
+        emissiveIntensity: 1.1,
+        roughness: 1,
+      }),
+    );
+    flame.position.y = TORCH_HEIGHT * 0.94;
+    torch.add(flame);
+
+    const light = new THREE.PointLight(EMBER, TORCH_INTENSITY, TORCH_RANGE, 2);
+    light.position.y = TORCH_HEIGHT;
+    light.name = "flame";
+    // Read back by the flicker loop, which cannot assume every flame burns as hard as a
+    // brazier does.
+    light.userData.baseIntensity = TORCH_INTENSITY;
+    torch.add(light);
+  }
+  return torch;
 }
 
 export function buildProp(prop: Prop): THREE.Object3D {

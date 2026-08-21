@@ -12,7 +12,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPixelatedPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { loadCharacter, loadKitPiece, loadPropModel, toWorld, type KitPiece } from "./assets";
-import { buildProp, propModelPaths, FLAME_INTENSITY } from "./props";
+import { buildProp, buildWallTorch, propModelPaths, FLAME_INTENSITY } from "./props";
 import { characterPaths, moveSeconds, Token } from "./tokens";
 
 /**
@@ -62,6 +62,27 @@ const ROOM_CENTRE = new THREE.Vector3(0, 0, 0);
 const WALL_HEIGHT = 2;
 /** Breathing room around the room in the combat framing. */
 const ROOM_MARGIN = 0.7;
+
+/** How high up the wall a torch is mounted. The walls stand about one unit tall. */
+const WALL_TORCH_Y = 0.42;
+
+/**
+ * How many point lights the torches may claim between them. Chosen to sit under the count
+ * where the forward renderer starts costing more than the light adds.
+ */
+const MAX_TORCH_LIGHTS = 10;
+
+/**
+ * Torch spacing in squares, per lighting preset — 0 for none.
+ *
+ * <p>A DARK room has no torches rather than dim ones: the preset says nobody has been here to
+ * light them, and a wall of guttering flames would be arguing with the fiction.
+ */
+const TORCH_SPACING: Record<LightingPreset, number> = {
+  TORCHLIT: 3,
+  DIM: 5,
+  DARK: 0,
+};
 
 /** Overlay colours. Where you may go, who you may hit, and what is under the cursor. */
 const MOVE_TINT = 0x5c86c4;
@@ -466,6 +487,7 @@ export class Renderer {
     this.buildLighting(state.lighting);
     this.buildFloor(state);
     this.buildWalls(state);
+    this.buildWallTorches(state);
 
     for (const prop of state.props) this.addProp(prop);
     for (const entity of state.entities) this.addEntity(entity);
@@ -561,6 +583,61 @@ export class Renderer {
     mesh.instanceMatrix.needsUpdate = true;
     mesh.name = "walls";
     this.room.add(mesh);
+  }
+
+  /**
+   * Mounts torches around the walls, as the rendering of the room's lighting preset.
+   *
+   * <p>The generated rooms are large and their props sit around the edges, which left the
+   * middle of the floor an unlit void that read as missing rather than dark. Light on the
+   * perimeter is what makes an empty floor look like a room you are standing in.
+   *
+   * <p>Only a bounded number of torches actually carry a light. Every point light is real work
+   * in the shader, and a 15x15 room has sixty perimeter squares; past a handful the extra
+   * lights change the picture far less than they cost. The rest are geometry, lit by their
+   * neighbours.
+   */
+  private buildWallTorches(state: SceneState): void {
+    const spacing = TORCH_SPACING[state.lighting];
+    if (spacing === 0) return;
+
+    const { width, height } = state;
+    const halfW = width / 2;
+    const halfH = height / 2;
+    // Far enough off the wall face that the torch does not intersect it.
+    const inset = 0.32;
+
+    const mounts: Array<{ x: number; z: number; ry: number }> = [];
+    for (let gx = 0; gx < width; gx++) {
+      if (gx % spacing !== 0) continue;
+      const x = gx - halfW + 0.5;
+      mounts.push({ x, z: -halfH + inset, ry: 0 });
+      mounts.push({ x, z: halfH - inset, ry: Math.PI });
+    }
+    for (let gy = 0; gy < height; gy++) {
+      if (gy % spacing !== 0) continue;
+      const z = -(gy - halfH + 0.5);
+      mounts.push({ x: -halfW + inset, z, ry: Math.PI / 2 });
+      mounts.push({ x: halfW - inset, z, ry: -Math.PI / 2 });
+    }
+
+    let lights = 0;
+    for (const mount of mounts) {
+      const lit = lights < MAX_TORCH_LIGHTS;
+      const torch = buildWallTorch(lit);
+      if (!torch) return;
+      if (lit) lights++;
+
+      torch.position.set(mount.x, WALL_TORCH_Y, mount.z);
+      torch.rotation.y = mount.ry;
+      this.room.add(torch);
+
+      torch.traverse((child) => {
+        if (child instanceof THREE.PointLight && child.name === "flame") {
+          this.flames.push(child);
+        }
+      });
+    }
   }
 
   // ---- Incremental updates, driven by diffs ----
@@ -800,10 +877,12 @@ export class Renderer {
       this.moveMaterial.opacity = 0.22 + Math.sin(t * 2.4) * 0.08;
       // Cheap two-frequency flicker so the braziers never pulse in lockstep.
       this.flames.forEach((flame, i) => {
+        // Each flame flickers around its own brightness: a wall torch is not a brazier, and
+        // reading the brazier's constant here would flare every torch to match it.
+        const base = (flame.userData.baseIntensity as number | undefined) ?? FLAME_INTENSITY;
+        const swing = base / FLAME_INTENSITY;
         flame.intensity =
-          FLAME_INTENSITY +
-          Math.sin(t * 7.3 + i * 2.1) * 5 +
-          Math.sin(t * 17.7 + i) * 2.5;
+          base + Math.sin(t * 7.3 + i * 2.1) * 5 * swing + Math.sin(t * 17.7 + i) * 2.5 * swing;
       });
 
       this.composer.render();
