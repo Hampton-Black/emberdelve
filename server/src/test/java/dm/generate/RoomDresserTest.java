@@ -86,6 +86,27 @@ class RoomDresserTest {
     }
 
     @Test
+    @DisplayName("a reply carrying a // comment line still parses")
+    void toleratesComments() {
+        var target = room();
+        var firstProp = target.props().get(0).id();
+        var json = """
+                {
+                  "name": "The Weeping Vault",
+                  "overview": "A burial chamber.",
+                  "sensory": "Dripping.",
+                  // the objects the generator placed, described one by one
+                  "props": { "%s": "Slick with condensation." }
+                }
+                """.formatted(firstProp);
+
+        var dressing = new RoomDresser(new ScriptedDmClient(json), PROMPT).dress(target);
+
+        assertEquals("The Weeping Vault", dressing.name());
+        assertEquals("Slick with condensation.", dressing.propDescriptions().get(firstProp));
+    }
+
+    @Test
     @DisplayName("the dresser is told where each prop stands")
     void sendsPropPositions() {
         var target = room();

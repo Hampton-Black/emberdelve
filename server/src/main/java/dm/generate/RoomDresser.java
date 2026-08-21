@@ -1,5 +1,7 @@
 package dm.generate;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dm.ai.DmClient;
 import dm.model.Prop;
 import dm.wire.Json;
@@ -27,6 +29,11 @@ import java.util.stream.Collectors;
 public final class RoomDresser {
 
     private static final Logger log = LoggerFactory.getLogger(RoomDresser.class);
+
+    // A copy, not the shared mapper: the dresser's reply is the one place a model's stray
+    // "// note to itself" must not kill the parse, and the rest of the app keeps strict JSON.
+    private static final ObjectMapper LENIENT =
+            Json.MAPPER.copy().enable(JsonParser.Feature.ALLOW_COMMENTS);
 
     private final DmClient client;
     private final String prompt;
@@ -96,7 +103,7 @@ public final class RoomDresser {
                 .strip();
 
         try {
-            var node = Json.MAPPER.readTree(json);
+            var node = LENIENT.readTree(json);
             Set<String> known = room.props().stream().map(Prop::id).collect(Collectors.toSet());
 
             var descriptions = new LinkedHashMap<String, String>();
