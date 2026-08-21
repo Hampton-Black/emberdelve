@@ -622,8 +622,14 @@ public final class DmService {
         for (var prop : room.props()) {
             if (!prop.hidden() || revealed.contains(prop.id())) {
                 sb.append("- `").append(prop.id()).append("` at (")
-                        .append(prop.x()).append(",").append(prop.y()).append(") — ")
-                        .append(prop.description()).append("\n");
+                        .append(prop.x()).append(",").append(prop.y()).append(")");
+                // A prop the dresser skipped is still on the board, so it is still listed —
+                // but with no description there is nothing to describe, and printing the
+                // placeholder would hand the DM stage direction as prose.
+                if (prop.description() != null && !prop.description().isBlank()) {
+                    sb.append(" — ").append(prop.description());
+                }
+                sb.append("\n");
             }
         }
 
@@ -643,37 +649,48 @@ public final class DmService {
             }
         }
 
-        sb.append("\n## Secrets you know and the player does not\n\n");
-        // The one block that reads as a promise rather than a fact, and the narrator kept it.
-        // Told a goblin is inside the sarcophagus and "will come out fighting", the prose model
-        // wrote it climbing out — lid grinding open, hand on the rim, claws at the player's
-        // throat — on a turn where the mechanics model had spawned nothing and started no fight.
-        // Nothing appeared on the grid and the player kept walking around an empty room that had
-        // just attacked them. It was not disobeying: its own prompt used to describe tools it has
-        // never been given, so it believed writing a thing was how a thing happens.
-        if (forProse) {
-            sb.append("This is background, not a cue. None of it becomes true because you "
-                    + "narrate it: a creature is in the room when it is listed under Entities "
-                    + "present, and at no other time.\n\n");
-        }
-        // A secret stops being one the moment it happens, but the facts underneath it do not stop
-        // being true. The first version of this promised a goblin still inside the sarcophagus
-        // who would come out fighting, restated every turn under a heading saying the player has
-        // not seen it yet — so the DM re-introduced Vessk as a fresh menace under the lid several
-        // turns after the player had killed him.
-        //
-        // Deleting it once he was out fixed that and caused the opposite: with no note at all,
-        // the DM forgot the thing in the sarcophagus had *been* Vessk, kept the "something
-        // inside" thread running, and invented a robed corpse it can never spawn. So the note is
-        // swapped rather than dropped — the premise while it is pending, and what is true
-        // afterwards once it is spent.
-        //
-        // The door note is neither: "the north door never opens" is a standing constraint rather
-        // than a pending beat, and it is exactly as true on the last turn as on the first.
-        appendNote(sb, engine.repo().find("goblin").isEmpty()
+        // A generated room has no crypt-specific notes, and a Secrets heading with nothing
+        // under it is an invitation to invent one — so when neither note exists the whole
+        // block, preamble included, is omitted.
+        var sarcophagusNote = engine.repo().find("goblin").isEmpty()
                 ? room.dmNotes().theSarcophagus()
-                : room.dmNotes().theSarcophagusOpened());
-        appendNote(sb, room.dmNotes().theDoor());
+                : room.dmNotes().theSarcophagusOpened();
+        var doorNote = room.dmNotes().theDoor();
+        boolean anySecret = sarcophagusNote != null && !sarcophagusNote.isBlank()
+                || doorNote != null && !doorNote.isBlank();
+        if (anySecret) {
+            sb.append("\n## Secrets you know and the player does not\n\n");
+            // The one block that reads as a promise rather than a fact, and the narrator kept it.
+            // Told a goblin is inside the sarcophagus and "will come out fighting", the prose
+            // model wrote it climbing out — lid grinding open, hand on the rim, claws at the
+            // player's throat — on a turn where the mechanics model had spawned nothing and
+            // started no fight. Nothing appeared on the grid and the player kept walking around
+            // an empty room that had just attacked them. It was not disobeying: its own prompt
+            // used to describe tools it has never been given, so it believed writing a thing
+            // was how a thing happens.
+            if (forProse) {
+                sb.append("This is background, not a cue. None of it becomes true because you "
+                        + "narrate it: a creature is in the room when it is listed under Entities "
+                        + "present, and at no other time.\n\n");
+            }
+            // A secret stops being one the moment it happens, but the facts underneath it do not
+            // stop being true. The first version of this promised a goblin still inside the
+            // sarcophagus who would come out fighting, restated every turn under a heading
+            // saying the player has not seen it yet — so the DM re-introduced Vessk as a fresh
+            // menace under the lid several turns after the player had killed him.
+            //
+            // Deleting it once he was out fixed that and caused the opposite: with no note at
+            // all, the DM forgot the thing in the sarcophagus had *been* Vessk, kept the
+            // "something inside" thread running, and invented a robed corpse it can never
+            // spawn. So the note is swapped rather than dropped — the premise while it is
+            // pending, and what is true afterwards once it is spent.
+            //
+            // The door note is neither: "the north door never opens" is a standing constraint
+            // rather than a pending beat, and it is exactly as true on the last turn as on
+            // the first.
+            appendNote(sb, sarcophagusNote);
+            appendNote(sb, doorNote);
+        }
 
         sb.append("## Entities present\n\n");
         for (var entity : engine.repo().entities()) {

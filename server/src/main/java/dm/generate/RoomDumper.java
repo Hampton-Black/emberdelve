@@ -24,7 +24,10 @@ public final class RoomDumper {
                 .append(" / ").append(room.shape().lighting())
                 .append('\n');
 
-        for (int y = 0; y < room.shape().height(); y++) {
+        // North-up: larger y is north on the board and in worldState, so the far row prints
+        // first. Printed y=0-first the dump reads as a mirror of the screen — the party at
+        // the top, the goblin at the bottom.
+        for (int y = room.shape().height() - 1; y >= 0; y--) {
             out.append('|');
             for (int x = 0; x < room.shape().width(); x++) {
                 out.append(glyphAt(room, x, y));

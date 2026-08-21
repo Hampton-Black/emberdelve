@@ -11,6 +11,7 @@ import dm.engine.GameEngine;
 import dm.engine.RandomDiceRoller;
 import dm.engine.ScriptedDiceRoller;
 import dm.generate.RoomDresser;
+import dm.generate.RoomDumper;
 import dm.generate.RoomGenerator;
 import dm.generate.RoomSource;
 import dm.repo.InMemoryGameRepository;
@@ -56,15 +57,22 @@ public final class App {
         if (generateSeed == null) {
             room = RoomSource.authored(content, "crypt");
         } else if (config.has("VENICE_API_KEY")) {
+            // The dress pass is writing, not mechanics, so it goes on the prose model — the
+            // same fallback chain the DmService wiring uses below.
             room = RoomSource.generated(content, new RoomDresser(
-                    new VeniceDmClient(config, config.get("DM_MODEL_TOOLS", "qwen3-next-80b"),
+                    new VeniceDmClient(config, config.get("DM_MODEL_PROSE",
+                            config.get("DM_MODEL", "claude-opus-5")),
                             java.time.Duration.ofSeconds(30)),
                     content.prompt("dress-room")), "crypt", generateSeed);
         } else {
             // Undressed but playable — the generator half needs no key, and a room with no prose
-            // is more useful than a refusal to boot while tuning layout.
+            // is more useful than a refusal to boot while tuning layout. The dump is logged here
+            // too: this is the path that exists for tuning layout, and it is the one place the
+            // grid would otherwise never be seen.
             log.warn("VENICE_API_KEY not set — generating an undressed room.");
-            room = new RoomGenerator(content).generate("crypt", generateSeed).toRoomDefinition();
+            var generated = new RoomGenerator(content).generate("crypt", generateSeed);
+            log.info("generated room, seed {}:\n{}", generateSeed, RoomDumper.dump(generated));
+            room = generated.toRoomDefinition();
         }
 
         var engine = new GameEngine(content, repo, dice, room);

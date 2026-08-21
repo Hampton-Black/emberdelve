@@ -115,6 +115,47 @@ class RoomSourceTest {
                 for (var message : conversation) {
                     assertTrue(message.content() == null || !message.content().contains("null"),
                             "the DM was handed the word 'null': " + message.content());
+                    // The dresser may skip props; an undescribed one must reach the DM as a
+                    // bare entry, not as stage direction read out as if it were prose.
+                    assertTrue(message.content() == null
+                                    || !message.content().contains("not been dressed"),
+                            "the DM was handed stage direction as a prop description: "
+                                    + message.content());
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("a generated room with no secret notes gets no Secrets heading")
+    void generatedRoomPromptOmitsEmptySecrets() {
+        // The crypt's sarcophagus and door notes are Java null on a generated room, and an
+        // empty secrets block is an invitation to invent one — so the heading goes too.
+        var dresser = new RoomDresser(new ScriptedDmClient("""
+                { "name": "The Weeping Vault", "overview": "A burial chamber.",
+                  "sensory": "Dripping.", "props": {} }
+                """), CONTENT.prompt("dress-room"));
+        var room = RoomSource.generated(CONTENT, dresser, "crypt", 21);
+
+        var repo = new dm.repo.InMemoryGameRepository();
+        var engine = new dm.engine.GameEngine(CONTENT, repo, new dm.engine.RandomDiceRoller(),
+                room);
+        engine.start();
+
+        var tools = new ScriptedDmClient();
+        var prose = new ScriptedDmClient("The room answers in dripping silence.");
+        var dm = new DmService(tools, prose, engine,
+                CONTENT.prompt("dm-tools"), CONTENT.prompt("dm"), CONTENT.prompt("dm-reconcile"));
+
+        dm.handleFreeText("fighter", "I hold the lantern up and look around", new NoopSink());
+
+        for (var client : List.of(tools, prose)) {
+            for (var conversation : client.conversations()) {
+                for (var message : conversation) {
+                    assertTrue(message.content() == null
+                                    || !message.content().contains("Secrets you know"),
+                            "an empty Secrets block invites the model to invent one: "
+                                    + message.content());
                 }
             }
         }
