@@ -24,30 +24,81 @@ export const FLAME_INTENSITY = 26;
 
 type Builder = (prop: Prop) => THREE.Object3D;
 
+/**
+ * The tomb. Still built from primitives, and deliberately so.
+ *
+ * <p>None of the four imported packs ships a sarcophagus — they are dungeon furniture and
+ * ruined architecture, and the nearest things in them are a pedestal and a bed. Substituting
+ * one of those would put the wrong object at the centre of the room. A sarcophagus is a stack
+ * of stone boxes, which is a shape primitives describe exactly, so what it needed was not a
+ * model but proportion and detail.
+ *
+ * <p>Four things make it read as a tomb rather than a crate. It is tiered, so the silhouette
+ * steps rather than going straight up from the floor. The body tapers toward the top, which is
+ * what stops it looking like packaging. There is a void under the lid, so the gap the lid
+ * leaves is black instead of showing more stone. And the lid is shifted, turned and tilted far
+ * enough to see, because "something has been working at it from the inside" is the sentence on
+ * the title screen and it should be legible in the object itself.
+ */
 function sarcophagus(): THREE.Object3D {
   const group = new THREE.Group();
 
-  const dais = new THREE.Mesh(
-    new THREE.BoxGeometry(1.5, 0.12, 2.2),
-    new THREE.MeshStandardMaterial({ color: STONE_DARK, roughness: 0.95 }),
-  );
-  dais.position.y = 0.06;
+  const darkStone = new THREE.MeshStandardMaterial({ color: STONE_DARK, roughness: 0.95 });
+  const stone = new THREE.MeshStandardMaterial({ color: STONE, roughness: 0.9 });
+  const lidStone = new THREE.MeshStandardMaterial({ color: 0x7f776a, roughness: 0.85 });
 
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(1.0, 0.5, 1.8),
-    new THREE.MeshStandardMaterial({ color: STONE, roughness: 0.9 }),
-  );
-  body.position.y = 0.37;
+  // Two plinth tiers. One box on the floor reads as a crate set down; a step reads as built.
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.13, 2.16), darkStone);
+  base.position.y = 0.065;
+  const step = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.1, 1.98), darkStone);
+  step.position.y = 0.18;
 
-  // Lid, tapered and set slightly askew — something has been working at it from inside.
-  const lid = new THREE.Mesh(
-    new THREE.BoxGeometry(1.08, 0.16, 1.88),
-    new THREE.MeshStandardMaterial({ color: 0x7a7266, roughness: 0.85 }),
-  );
-  lid.position.set(0.04, 0.7, 0);
-  lid.rotation.y = 0.03;
+  // Tapered chest. A four-sided cylinder is a box with a slope on it: turned an eighth turn
+  // its faces square up to the grid, and the scale makes the square cross-section oblong.
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.7, 0.54, 4), stone);
+  body.rotation.y = Math.PI / 4;
+  body.scale.set(0.98, 1, 1.88);
+  body.position.y = 0.5;
 
-  group.add(dais, body, lid);
+  // The inside, so the gap under the shifted lid is darkness and not another slab of granite.
+  const hollow = new THREE.Mesh(
+    new THREE.BoxGeometry(0.84, 0.2, 1.72),
+    new THREE.MeshStandardMaterial({ color: 0x090807, roughness: 1 }),
+  );
+  hollow.position.y = 0.8;
+
+  // Lid and its carving move together, so the whole slab reads as one thing being pushed.
+  const lid = new THREE.Group();
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.16, 1.94), lidStone);
+  const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.07, 1.36), lidStone);
+  ridge.position.y = 0.115;
+  lid.add(slab, ridge);
+
+  // Shoved toward the foot and lifted at one corner. The old version moved it 0.04 and turned
+  // it 0.03 radians, which at this render size is not a disturbed lid, it is a rounding error.
+  lid.position.set(0.1, 0.88, -0.14);
+  lid.rotation.set(0, 0.06, 0.022);
+
+  group.add(base, step, body, hollow, lid);
+
+  // A skull from the dungeon kit, set proud at the head of the lid. Detail at this size has to
+  // be a shape and a value, never a texture: at 480x270 this is one pale blob, and one pale
+  // blob in the right place is the difference between a stone box and a grave.
+  const skull = instanceProp(SKULL_MODEL, 0.15, 0.22);
+  if (skull) {
+    skull.position.set(0, 0.955, 0.66);
+    skull.rotation.y = Math.PI;
+
+    // Repainted rather than used as shipped. The kit's bone is a mid brown that all but
+    // disappears against this stone in a DIM room, and the whole job of this shape is to be
+    // the one light value on the lid. A fresh material, not an edit of the kit's: clone()
+    // shares material references, so tinting in place would repaint every skull ever loaded.
+    const bone = new THREE.MeshStandardMaterial({ color: 0xc4bba4, roughness: 0.85 });
+    skull.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) (child as THREE.Mesh).material = bone;
+    });
+    lid.add(skull);
+  }
   return group;
 }
 
@@ -232,6 +283,9 @@ const MESH_PROPS: Partial<Record<PropType, { path: string; height: number; footp
  */
 const TORCH_MODEL = "ruins/Torch";
 
+/** Carved into the head of the sarcophagus lid. See {@link sarcophagus}. */
+const SKULL_MODEL = "dungeon/Skull";
+
 /** Candela, like {@link FLAME_INTENSITY} — lower, because a room holds many more of them. */
 export const TORCH_INTENSITY = 9;
 
@@ -241,7 +295,7 @@ const TORCH_RANGE = 7;
 
 /** Every model the renderer must preload before the first scene. */
 export function propModelPaths(): string[] {
-  return [...Object.values(MESH_PROPS).map((m) => m.path), TORCH_MODEL];
+  return [...Object.values(MESH_PROPS).map((m) => m.path), TORCH_MODEL, SKULL_MODEL];
 }
 
 /** One wall torch, lit or unlit. Null if its model never loaded. */
