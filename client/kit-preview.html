@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Emberdelve — wall piece preview</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        background: #0b0a10;
+        color: #e8dcc0;
+        font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      header { padding: 14px 18px 6px; }
+      h1 { margin: 0 0 4px; font-size: 15px; letter-spacing: 0.12em; font-weight: 600; }
+      p { margin: 0; color: #8d8676; max-width: 70ch; }
+      #stage { position: relative; }
+      canvas { display: block; }
+      #labels, #runLabels { position: absolute; inset: 0; pointer-events: none; display: grid; }
+      #stage2 { position: relative; }
+      .cell { position: relative; }
+      .cell b { position: absolute; left: 6px; bottom: 16px; font-weight: 600; color: #e8dcc0; }
+      .cell i { position: absolute; left: 6px; bottom: 4px; font-style: normal; color: #7d7667; }
+      .pack-kenney b { color: #9fd0a4; }
+      .pack-dungeon b { color: #d8c48a; }
+      .pack-ruins b { color: #c9a3d8; }
+      .pack-free b { color: #d89a8a; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>WALL PIECES</h1>
+      <p>
+        Each piece scaled by its own pack's module, so one game square is one unit everywhere —
+        a piece that looks twice as wide really does span two squares. Rendered without the
+        game's pixelation pass, so detail here is finer than it will be in play.
+      </p>
+    </header>
+    <div id="stage">
+      <canvas id="c"></canvas>
+      <div id="labels"></div>
+    </div>
+    <header style="padding-top:22px">
+      <h1>MIXED RUNS</h1>
+      <p>
+        The same stretch of wall built three ways, inner faces aligned so the packs' different
+        depths sit behind the surface where the camera never looks.
+      </p>
+    </header>
+    <div id="stage2">
+      <canvas id="c2"></canvas>
+      <div id="runLabels"></div>
+    </div>
+    <script type="module" src="/kit-preview.ts"></script>
+  </body>
+</html>
