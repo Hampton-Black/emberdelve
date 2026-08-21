@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { instanceProp } from "./assets";
+import { instanceProp, WALL_FACE } from "./assets";
 import type { Prop, PropType } from "../types";
 
 /**
@@ -200,14 +200,16 @@ function rubble(): THREE.Object3D {
  * dark rectangle reads as something painted on the wall; the same rectangle behind an inch of
  * jamb and lintel reads as a hole, because the frame casts and catches light on its edges.
  *
- * <p>Local +Z is into the wall. An alcove's square sits half a unit inside the wall plane and
- * the wall slab is a quarter deep, so the stone face it mounts on is at z = 0.25.
+ * <p>Local +Z is into the wall, and the face it mounts on is {@link WALL_FACE} away — half a
+ * square in to the wall plane, less half the wall's depth. That figure belongs to the wall kit
+ * rather than to this file, which is why it is imported: hard-coding it here is what left the
+ * alcove floating when the perimeter changed kits.
  */
 function alcove(): THREE.Object3D {
   const group = new THREE.Group();
 
   /** The inner face of the wall, in this prop's local space. */
-  const FACE = 0.25;
+  const FACE = WALL_FACE;
   const LAMP = 0xd9b271;
 
   const frameMat = new THREE.MeshStandardMaterial({ color: STONE, roughness: 0.95 });

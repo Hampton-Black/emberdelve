@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /**
  * Kenney's Modular Dungeon Kit is authored on a 4-unit module grid (template-floor.glb
@@ -56,6 +57,117 @@ export function toWorld(
     0,
     -(gy - height / 2 + 0.5), // +y is north, which is -Z away from the camera
   );
+}
+
+// ---- Wall pieces ----
+
+/**
+ * How deep a wall stands, in squares, and how far its inner face is from the centre of the
+ * square in front of it.
+ *
+ * <p>Anything that mounts on a wall needs the second number, and it moves when the wall kit
+ * does: Kenney's slab is 0.50 deep and the ruins wall is 0.14, which shifted the face by most
+ * of a fifth of a square when the perimeter was swapped over. The alcove was built against the
+ * old figure and came away from the stone the moment the walls changed.
+ */
+export const WALL_DEPTH = 0.14;
+export const WALL_FACE = 0.5 - WALL_DEPTH / 2;
+
+/**
+ * A kit piece flattened for instancing, keeping every material it was authored with.
+ *
+ * <p>{@link loadKitPiece} takes the first mesh and the first material, which is fine for
+ * Kenney's walls — one mesh, one material. The Quaternius pieces are one mesh split into a
+ * primitive per material (`ruins/Wall` has two, `Window_Bars` three, `dungeon/Arch_Door`
+ * four), and glTF loads each primitive as its own mesh, so taking the first would throw away
+ * the highlight courses, the ironwork, and most of a door.
+ */
+export interface WallPiece {
+  geometry: THREE.BufferGeometry;
+  materials: THREE.Material[];
+}
+
+/**
+ * Loads a wall piece and merges its primitives into one grouped geometry.
+ *
+ * <p>Merging with groups is what keeps this a single draw call per variant. A room's perimeter
+ * is forty to sixty segments; one `InstancedMesh` per variant with a material array draws each
+ * variant once, where a cloned object per segment would cost a call apiece.
+ *
+ * @param fitHeight when set, scale so the piece stands exactly this tall instead of using its
+ *                  own module — how the two-square dungeon arches are brought down to the
+ *                  height of a one-square wall
+ */
+export async function loadWallPiece(
+  path: string,
+  module: number,
+  fitHeight?: number,
+): Promise<WallPiece> {
+  const gltf = await loader.loadAsync(`/assets/kits/${path}.glb`);
+  gltf.scene.updateWorldMatrix(true, true);
+
+  const geometries: THREE.BufferGeometry[] = [];
+  const materials: THREE.Material[] = [];
+  gltf.scene.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    // Bake the node transform in: FBX and glTF exporters both park scale and rotation on
+    // nodes, and a merged geometry has no nodes left to carry it.
+    const geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    geometries.push(geometry);
+    materials.push((Array.isArray(mesh.material) ? mesh.material[0] : mesh.material).clone());
+  });
+
+  if (geometries.length === 0) throw new Error(`No mesh in wall piece: ${path}`);
+
+  const merged = mergeGeometries(geometries, true);
+  if (!merged) throw new Error(`Could not merge wall piece: ${path}`);
+
+  let scale = 1 / module;
+  if (fitHeight !== undefined) {
+    merged.computeBoundingBox();
+    const native = merged.boundingBox!.max.y - merged.boundingBox!.min.y;
+    scale = fitHeight / Math.max(native, 1e-6);
+  }
+  merged.scale(scale, scale, scale);
+
+  return { geometry: merged, materials };
+}
+
+/**
+ * Repaints one piece's stone to match another's, by material name.
+ *
+ * <p>The dungeon kit's stone runs warm (#6d604f) and the ruins kit's neutral (#636459), at
+ * near-identical brightness — so a run mixing them stripes rather than blends. Both kits are
+ * untextured flat colour, which is the only reason this is a colour assignment and not a
+ * texture job. The source palette is read off a loaded piece rather than written down here:
+ * a hard-coded hex would have to guess at the renderer's colour space, and a copied
+ * {@link THREE.Color} cannot.
+ */
+export function retintStone(target: WallPiece, palette: Map<string, THREE.Color>): void {
+  for (const material of target.materials) {
+    const named = material as THREE.MeshStandardMaterial;
+    const replacement =
+      palette.get(STONE_ALIASES[named.name] ?? "") ?? palette.get(named.name);
+    if (replacement) named.color.copy(replacement);
+  }
+}
+
+/** Which of the dungeon kit's stone materials stands in for which of the ruins kit's. */
+const STONE_ALIASES: Record<string, string> = {
+  Wall_Dark: "Main",
+  Wall_Medium: "Main",
+  Wall_Highlights: "Highlights",
+};
+
+/** The named colours a piece was authored with, for feeding {@link retintStone}. */
+export function paletteOf(piece: WallPiece): Map<string, THREE.Color> {
+  const palette = new Map<string, THREE.Color>();
+  for (const material of piece.materials) {
+    const named = material as THREE.MeshStandardMaterial;
+    if (named.color) palette.set(named.name, named.color.clone());
+  }
+  return palette;
 }
 
 // ---- Props ----

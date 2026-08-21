@@ -11,7 +11,17 @@ import type {
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPixelatedPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { loadCharacter, loadKitPiece, loadPropModel, toWorld, type KitPiece } from "./assets";
+import {
+  loadCharacter,
+  loadKitPiece,
+  loadPropModel,
+  loadWallPiece,
+  paletteOf,
+  retintStone,
+  toWorld,
+  type KitPiece,
+  type WallPiece,
+} from "./assets";
 import { buildProp, buildWallTorch, propModelPaths, FLAME_INTENSITY } from "./props";
 import { characterPaths, moveSeconds, Token } from "./tokens";
 
@@ -84,8 +94,56 @@ const TORCH_SPACING: Record<LightingPreset, number> = {
   DARK: 0,
 };
 
-/** One wall segment in this many gets the detailed face. */
-const DETAIL_WALL_EVERY = 4;
+/**
+ * The perimeter's repertoire, and how often each turn up.
+ *
+ * <p>Ruins carries the run: it is the only kit with a real family of wall pieces, and the
+ * pillars and rubble already standing in the room come from it, so the architecture finally
+ * agrees with itself. The two dungeon pieces are here for the things ruins has no equivalent
+ * of — a plank door and a portcullis. Both read as a sealed way out, which is what a crypt
+ * wants; an open arch would promise a passage that M1 has no rooms on the other side of.
+ *
+ * <p>`fit` brings a piece to the height of a plain wall. Only the arches need it: they are
+ * authored two squares tall against the ruins wall's one.
+ */
+interface WallVariant {
+  path: string;
+  weight: number;
+  /** Scale to this height in squares instead of using the kit's own module. */
+  fit?: number;
+  /** Repaint the piece's stone to the base wall's palette. */
+  retint?: boolean;
+  /** A second piece drawn at the same segment — the bars that fill an archway. */
+  fills?: string;
+}
+
+/** Units per square in both Quaternius kits. See assets/kits/props/LICENSES.md. */
+const QUATERNIUS_MODULE = 2;
+
+/** How tall a wall stands, in squares. Ruins walls are authored at exactly this. */
+const WALL_UNIT = 1;
+
+const WALL_VARIANTS: WallVariant[] = [
+  { path: "props/ruins/Wall", weight: 24 },
+  { path: "props/ruins/Wall_Hole", weight: 3 },
+  { path: "props/ruins/Window_Bars", weight: 3 },
+  { path: "props/dungeon/Arch", weight: 2, fit: WALL_UNIT, retint: true,
+    fills: "props/dungeon/Arch_bars" },
+  { path: "props/dungeon/Arch", weight: 2, fit: WALL_UNIT, retint: true,
+    fills: "props/dungeon/Arch_Door" },
+];
+
+/**
+ * What stands in an archway, scaled to sit inside it.
+ *
+ * <p>Neither is a wall segment on its own. Brought to the height of a wall the door is 0.76
+ * wide and the bars 0.73, against a segment one square across — on their own they would leave
+ * a slot of open background down each side. The stone arch is the segment; these fill it.
+ */
+const WALL_FILLERS: Array<{ path: string; fit: number }> = [
+  { path: "props/dungeon/Arch_bars", fit: WALL_UNIT * 0.82 },
+  { path: "props/dungeon/Arch_Door", fit: WALL_UNIT * 0.82 },
+];
 
 /** Overlay colours. Where you may go, who you may hit, and what is under the cursor. */
 const MOVE_TINT = 0x5c86c4;
@@ -150,7 +208,7 @@ export class Renderer {
   private readonly focusFrom = new THREE.Vector3();
   /** Whatever {@link resize} last handed the pixelation pass. Needed to snap the camera to it. */
   private pixelSize = 3;
-  private kit: { floor: KitPiece; wall: KitPiece; wallDetail: KitPiece } | null = null;
+  private kit: { floor: KitPiece; walls: Map<string, WallPiece> } | null = null;
   private dims = { width: 12, height: 12 };
   private frameHandle = 0;
   private disposed = false;
@@ -455,10 +513,8 @@ export class Renderer {
   async init(): Promise<void> {
     // Characters are preloaded here rather than on demand so addEntity stays synchronous —
     // a diff must be able to put a token on the board on the frame it lands.
-    const [floor, wall, wallDetail] = await Promise.all([
+    const [floor] = await Promise.all([
       loadKitPiece("template-floor"),
-      loadKitPiece("template-wall"),
-      loadKitPiece("template-wall-detail-a"),
       ...characterPaths().map((path) =>
         // A missing character degrades to the placeholder figure rather than killing the scene.
         loadCharacter(path).catch((error) => {
@@ -472,7 +528,26 @@ export class Renderer {
         }),
       ),
     ]);
-    this.kit = { floor, wall, wallDetail };
+    // The wall repertoire, then the retint. The base wall's own palette is the reference,
+    // so the dungeon arch is matched to whatever ruins was authored with rather than to a
+    // colour written down here.
+    const pieces = await Promise.all(
+      WALL_VARIANTS.map((v) => loadWallPiece(v.path, QUATERNIUS_MODULE, v.fit)),
+    );
+    const basePalette = paletteOf(pieces[0]);
+    WALL_VARIANTS.forEach((variant, i) => {
+      if (variant.retint) retintStone(pieces[i], basePalette);
+    });
+
+    const walls = new Map<string, WallPiece>();
+    WALL_VARIANTS.forEach((variant, i) => walls.set(variant.path, pieces[i]));
+
+    const fillers = await Promise.all(
+      WALL_FILLERS.map((f) => loadWallPiece(f.path, QUATERNIUS_MODULE, f.fit)),
+    );
+    WALL_FILLERS.forEach((filler, i) => walls.set(filler.path, fillers[i]));
+
+    this.kit = { floor, walls };
   }
 
   // ---- Scene construction ----
@@ -568,7 +643,7 @@ export class Renderer {
    * the generator's seed — the room id is the only stable thing it has.
    */
   private buildWalls(state: SceneState): void {
-    const { wall, wallDetail } = this.kit!;
+    const { walls } = this.kit!;
     const { width, height } = state;
     const halfW = width / 2;
     const halfH = height / 2;
@@ -586,24 +661,38 @@ export class Renderer {
       placements.push({ x: halfW, z, ry: -Math.PI / 2 }); // east
     }
 
-    const plain: typeof placements = [];
-    const detail: typeof placements = [];
+    const total = WALL_VARIANTS.reduce((sum, v) => sum + v.weight, 0);
+    const runs = new Map<string, Array<{ x: number; z: number; ry: number }>>();
+    const push = (path: string, p: { x: number; z: number; ry: number }) => {
+      const run = runs.get(path);
+      if (run) run.push(p);
+      else runs.set(path, [p]);
+    };
+
     placements.forEach((p, i) => {
-      (hash32(`${state.roomId}:wall:${i}`) % DETAIL_WALL_EVERY === 0 ? detail : plain).push(p);
+      // Hashed from the room id, not Math.random: a room has to rebuild identically on a
+      // reconnect, and the client is never told the generator's seed.
+      let roll = hash32(`${state.roomId}:wall:${i}`) % total;
+      const variant =
+        WALL_VARIANTS.find((v) => (roll -= v.weight) < 0) ?? WALL_VARIANTS[0];
+      push(variant.path, p);
+      if (variant.fills) push(variant.fills, p);
     });
 
-    this.addWallRun(wall, plain, "walls");
-    this.addWallRun(wallDetail, detail, "walls-detail");
+    for (const [path, run] of runs) {
+      const piece = walls.get(path);
+      if (piece) this.addWallRun(piece, run, `walls:${path}`);
+    }
   }
 
   private addWallRun(
-    piece: KitPiece,
+    piece: WallPiece,
     placements: Array<{ x: number; z: number; ry: number }>,
     name: string,
   ): void {
     if (placements.length === 0) return;
 
-    const mesh = new THREE.InstancedMesh(piece.geometry, piece.material, placements.length);
+    const mesh = new THREE.InstancedMesh(piece.geometry, piece.materials, placements.length);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
