@@ -1,13 +1,17 @@
 import * as THREE from "three";
+import { instanceProp } from "./assets";
 import type { Prop, PropType } from "../types";
 
 /**
- * Procedural prop meshes.
+ * Prop meshes: real models where a pack has one, procedural primitives where none does.
  *
  * <p>Kenney's Modular Dungeon Kit is architecture only — corridors, rooms, gates, stairs. It
- * ships no sarcophagus, brazier or pillar, so the six props in shortcut #12 are composed from
- * primitives here. At the 480x270 render target these read fine; swap in real meshes by
- * replacing a builder, not by touching the scene schema.
+ * ships no sarcophagus, brazier or pillar, so all six props started as primitives composed
+ * here. The Quaternius packs (see `assets/kits/props/LICENSES.md`) cover three of them
+ * properly, and those three now load real geometry; the rest still build from primitives.
+ *
+ * <p>The seam is `MESH_PROPS`. Promoting a prop is one table entry, and demoting it — because
+ * a model reads badly at 480x270, say — is deleting one. Neither touches the scene schema.
  */
 
 const STONE = 0x6b6459;
@@ -195,8 +199,36 @@ const BUILDERS: Record<PropType, Builder> = {
   DOOR: door,
 };
 
+/**
+ * Prop types that load a real model instead of building one.
+ *
+ * <p>`height` and `footprint` are world units, one unit to a grid square. They are set to the
+ * silhouette each primitive already occupied, so promoting a prop changes what it is made of
+ * and not how much room it takes up — the fight reads the same before and after.
+ *
+ * <p>The three absentees are absent for a reason. No pack ships a **sarcophagus**, which is
+ * the one prop M0's script turns on. A **brazier** is a standing fire bowl and the nearest
+ * models are a ground campfire and a wall torch, neither of which is the same object. An
+ * **alcove** is a recess cut into a wall, so it is architecture rather than a prop, and it
+ * cannot be dropped onto a floor square as a mesh without the wall around it.
+ */
+const MESH_PROPS: Partial<Record<PropType, { path: string; height: number; footprint: number }>> = {
+  PILLAR: { path: "ruins/Column_Round", height: 2.4, footprint: 0.9 },
+  DOOR: { path: "ruins/Doors_RoundArch", height: 2.3, footprint: 1.4 },
+  RUBBLE: { path: "ruins/Bricks", height: 0.5, footprint: 0.85 },
+};
+
+/** Every model the prop table needs, for the renderer to preload before the first scene. */
+export function propModelPaths(): string[] {
+  return Object.values(MESH_PROPS).map((m) => m.path);
+}
+
 export function buildProp(prop: Prop): THREE.Object3D {
-  const object = BUILDERS[prop.type](prop);
+  const mesh = MESH_PROPS[prop.type];
+  // A model that failed to load falls back to its primitive rather than leaving a hole in the
+  // room — the same degradation `Renderer.init` gives a missing character.
+  const object =
+    (mesh && instanceProp(mesh.path, mesh.height, mesh.footprint)) || BUILDERS[prop.type](prop);
   object.rotation.y = THREE.MathUtils.degToRad(prop.rotation);
   object.name = `prop:${prop.id}`;
   object.traverse((child) => {

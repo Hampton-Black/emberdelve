@@ -11,8 +11,8 @@ import type {
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPixelatedPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { loadCharacter, loadKitPiece, toWorld, type KitPiece } from "./assets";
-import { buildProp, FLAME_INTENSITY } from "./props";
+import { loadCharacter, loadKitPiece, loadPropModel, toWorld, type KitPiece } from "./assets";
+import { buildProp, propModelPaths, FLAME_INTENSITY } from "./props";
 import { characterPaths, moveSeconds, Token } from "./tokens";
 
 /**
@@ -438,6 +438,12 @@ export class Renderer {
         // A missing character degrades to the placeholder figure rather than killing the scene.
         loadCharacter(path).catch((error) => {
           console.error(`character '${path}' failed to load`, error);
+        }),
+      ),
+      ...propModelPaths().map((path) =>
+        // Likewise a missing prop model: buildProp falls back to its primitive.
+        loadPropModel(path).catch((error) => {
+          console.error(`prop model '${path}' failed to load`, error);
         }),
       ),
     ]);

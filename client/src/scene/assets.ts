@@ -58,6 +58,68 @@ export function toWorld(
   );
 }
 
+// ---- Props ----
+
+const PROP_BASE = "/assets/kits/props";
+
+const propModels = new Map<string, THREE.Group>();
+
+/**
+ * Loads a prop model once and caches it. `path` is pack-relative, e.g. `ruins/Column_Round`.
+ *
+ * <p>Preloaded rather than fetched on demand for the same reason characters are: `addProp` is
+ * called from a diff and has to put the object on the board on the frame it lands.
+ */
+export async function loadPropModel(path: string): Promise<void> {
+  if (propModels.has(path)) return;
+  const gltf = await loader.loadAsync(`${PROP_BASE}/${path}.glb`);
+  propModels.set(path, gltf.scene);
+}
+
+/**
+ * A fresh copy, scaled to fit a square and standing on the floor.
+ *
+ * <p>Scale is derived from the model's own bounding box rather than hard-coded, so swapping
+ * `ruins/Column_Round` for `dungeon/Column` is a one-line change and not a re-measurement —
+ * the same argument `tokens.ts` makes for character heights. It matters more here than there:
+ * the four prop packs disagree about scale (see `LICENSES.md`), and a literal factor tuned
+ * against one of them is wrong for the other three.
+ *
+ * <p>`footprint` caps width and depth so a prop cannot spill into a neighbouring square. The
+ * spatial validator guarantees one prop per square, and a mesh that overhangs makes that
+ * guarantee look like a bug.
+ */
+export function instanceProp(
+  path: string,
+  height: number,
+  footprint: number,
+): THREE.Object3D | null {
+  const model = propModels.get(path);
+  if (!model) return null;
+
+  const copy = model.clone(true);
+  const bounds = new THREE.Box3().setFromObject(copy);
+  const size = bounds.getSize(new THREE.Vector3());
+
+  const scale = Math.min(
+    height / Math.max(size.y, 1e-6),
+    footprint / Math.max(size.x, size.z, 1e-6),
+  );
+  copy.scale.setScalar(scale);
+
+  // Centre on the square and sit the base on the floor. The renderer owns the group's own
+  // position, so the offset goes on the child — writing it to the group would be overwritten.
+  copy.position.set(
+    -((bounds.min.x + bounds.max.x) / 2) * scale,
+    -bounds.min.y * scale,
+    -((bounds.min.z + bounds.max.z) / 2) * scale,
+  );
+
+  const group = new THREE.Group();
+  group.add(copy);
+  return group;
+}
+
 // ---- Characters ----
 
 const CHARACTER_BASE = "/assets/kits/characters";
