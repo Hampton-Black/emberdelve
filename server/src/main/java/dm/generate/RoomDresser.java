@@ -67,8 +67,11 @@ public final class RoomDresser {
 
     /** What the model is allowed to know: shape, surfaces, and the ids it may describe. */
     private static String describe(GeneratedRoom room) {
+        // The prompt tells the model it is given positions "so you know what is near what" —
+        // they have to actually be here, or the prose invents a layout the grid contradicts.
         String props = room.props().stream()
-                .map(p -> "- " + p.id() + " (" + p.type().name().toLowerCase() + ")")
+                .map(p -> "- " + p.id() + " (" + p.type().name().toLowerCase() + ") at "
+                        + p.x() + "," + p.y())
                 .collect(Collectors.joining("\n"));
 
         return """

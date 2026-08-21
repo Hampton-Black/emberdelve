@@ -86,6 +86,28 @@ class RoomDresserTest {
     }
 
     @Test
+    @DisplayName("the dresser is told where each prop stands")
+    void sendsPropPositions() {
+        var target = room();
+        var client = new ScriptedDmClient("""
+                { "name": "The Weeping Vault", "overview": "A burial chamber.",
+                  "sensory": "Dripping.", "props": {} }
+                """);
+
+        new RoomDresser(client, PROMPT).dress(target);
+
+        var user = client.conversations().get(0).stream()
+                .filter(m -> "user".equals(m.role()))
+                .findFirst().orElseThrow().content();
+        for (var prop : target.props()) {
+            var expected = "- " + prop.id() + " (" + prop.type().name().toLowerCase()
+                    + ") at " + prop.x() + "," + prop.y();
+            assertTrue(user.contains(expected),
+                    "the dresser was not told where things stand, missing: " + expected);
+        }
+    }
+
+    @Test
     @DisplayName("an unparseable reply falls back rather than killing the room")
     void fallsBackOnGarbage() {
         var target = room();

@@ -635,9 +635,11 @@ public final class DmService {
             sb.append("Do not mention these unless the player finds them.\n\n");
             for (var prop : hidden) {
                 sb.append("- `").append(prop.id()).append("` at (")
-                        .append(prop.x()).append(",").append(prop.y()).append(") — ")
-                        .append(prop.revealHint())
-                        .append(" Once revealed: ").append(prop.description()).append("\n");
+                        .append(prop.x()).append(",").append(prop.y()).append(")");
+                if (prop.revealHint() != null && !prop.revealHint().isBlank()) {
+                    sb.append(" — ").append(prop.revealHint());
+                }
+                sb.append(" Once revealed: ").append(prop.description()).append("\n");
             }
         }
 
@@ -668,10 +670,10 @@ public final class DmService {
         //
         // The door note is neither: "the north door never opens" is a standing constraint rather
         // than a pending beat, and it is exactly as true on the last turn as on the first.
-        sb.append(engine.repo().find("goblin").isEmpty()
+        appendNote(sb, engine.repo().find("goblin").isEmpty()
                 ? room.dmNotes().theSarcophagus()
-                : room.dmNotes().theSarcophagusOpened()).append("\n\n");
-        sb.append(room.dmNotes().theDoor()).append("\n\n");
+                : room.dmNotes().theSarcophagusOpened());
+        appendNote(sb, room.dmNotes().theDoor());
 
         sb.append("## Entities present\n\n");
         for (var entity : engine.repo().entities()) {
@@ -724,6 +726,18 @@ public final class DmService {
                 .append("\n- mode: ").append(engine.mode()).append("\n");
 
         return sb.toString();
+    }
+
+    /**
+     * A note that was never written produces no output at all — not the word "null", and not
+     * the spacer that would have followed it. Generated rooms carry only {@code overview} and
+     * {@code sensory}; the crypt-specific notes are Java null there, and {@code append} would
+     * otherwise write the literal string into every prompt.
+     */
+    private static void appendNote(StringBuilder sb, String note) {
+        if (note != null && !note.isBlank()) {
+            sb.append(note).append("\n\n");
+        }
     }
 
     /**

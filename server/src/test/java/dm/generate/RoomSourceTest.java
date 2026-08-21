@@ -1,9 +1,16 @@
 package dm.generate;
 
 import dm.ScriptedDmClient;
+import dm.ai.DmService;
+import dm.ai.TurnSink;
 import dm.content.ContentLoader;
+import dm.model.Diff;
+import dm.model.NarrationSegment;
+import dm.model.RollResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -75,5 +82,64 @@ class RoomSourceTest {
         assertEquals(1, scene.entities().size());
         assertFalse(room.isObstructed(scene.entities().get(0).x(), scene.entities().get(0).y()),
                 "the fighter started inside something solid");
+    }
+
+    @Test
+    @DisplayName("a generated room never hands the word 'null' to the DM")
+    void generatedRoomPromptContainsNoNulls() {
+        // A generated room has no crypt-specific notes — theSarcophagus, theSarcophagusOpened
+        // and theDoor are Java null — and StringBuilder.append((String) null) writes the word
+        // "null" into the prompt. Every turn. Twice.
+        var dresser = new RoomDresser(new ScriptedDmClient("""
+                { "name": "The Weeping Vault", "overview": "A burial chamber.",
+                  "sensory": "Dripping.", "props": {} }
+                """), CONTENT.prompt("dress-room"));
+        var room = RoomSource.generated(CONTENT, dresser, "crypt", 21);
+
+        var repo = new dm.repo.InMemoryGameRepository();
+        var engine = new dm.engine.GameEngine(CONTENT, repo, new dm.engine.RandomDiceRoller(),
+                room);
+        engine.start();
+
+        // A non-blank prose reply keeps the reconcile phase running, so all three prompt
+        // assemblies — mechanics, prose, reconcile — are exercised in one turn.
+        var tools = new ScriptedDmClient();
+        var prose = new ScriptedDmClient("The room answers in dripping silence.");
+        var dm = new DmService(tools, prose, engine,
+                CONTENT.prompt("dm-tools"), CONTENT.prompt("dm"), CONTENT.prompt("dm-reconcile"));
+
+        dm.handleFreeText("fighter", "I hold the lantern up and look around", new NoopSink());
+
+        for (var client : List.of(tools, prose)) {
+            for (var conversation : client.conversations()) {
+                for (var message : conversation) {
+                    assertTrue(message.content() == null || !message.content().contains("null"),
+                            "the DM was handed the word 'null': " + message.content());
+                }
+            }
+        }
+    }
+
+    private static final class NoopSink implements TurnSink {
+        @Override
+        public void narration(NarrationSegment segment) {
+        }
+
+        @Override
+        public void diffs(List<Diff> diffs) {
+        }
+
+        @Override
+        public void roll(RollResult result) {
+        }
+
+        @Override
+        public void complete() {
+        }
+
+        @Override
+        public void error(Throwable error) {
+            fail(error);
+        }
     }
 }

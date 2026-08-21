@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import dm.ai.DmClient;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
@@ -16,14 +17,21 @@ import java.util.List;
 public final class ScriptedDmClient implements DmClient {
 
     private final Deque<String> replies = new ArrayDeque<>();
+    private final List<List<ChatMessage>> conversations = new ArrayList<>();
 
     public ScriptedDmClient(String... responses) {
         replies.addAll(List.of(responses));
     }
 
+    /** Every conversation this client was handed, in the order they arrived. */
+    public List<List<ChatMessage>> conversations() {
+        return List.copyOf(conversations);
+    }
+
     @Override
     public TurnResult streamTurn(List<ChatMessage> conversation, JsonNode tools,
                                  DmListener listener) {
+        conversations.add(List.copyOf(conversation));
         String reply = replies.isEmpty() ? "" : replies.poll();
         listener.onTextDelta(reply);
         return new TurnResult(reply, List.of());
