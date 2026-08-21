@@ -10,8 +10,8 @@ them does not agree on which axis is up.
 
 | Folder | Source | Author | License | Models | Module |
 |---|---|---|---|---|---|
-| `dungeon/` | Updated Modular Dungeon (May 2019) | Quaternius | CC0 1.0 | 48 | 4 units = 1 square |
-| `ruins/` | Ultimate Modular Ruins Pack (Aug 2021) | Quaternius | CC0 1.0 | 92 | 4 units = 1 square |
+| `dungeon/` | Updated Modular Dungeon (May 2019) | Quaternius | CC0 1.0 | 48 | 2 units = 1 square |
+| `ruins/` | Ultimate Modular Ruins Pack (Aug 2021) | Quaternius | CC0 1.0 | 92 | 2 units = 1 square |
 | `fantasy/` | Fantasy Props MegaKit \[Standard] | Quaternius | CC0 1.0 | 94 | 1 unit = 1 metre |
 | `freesample/` | `FreeSample.zip` | **unknown** | **UNKNOWN — see below** | 11 | 2.5 units, **Z-up** |
 
@@ -31,9 +31,21 @@ nothing outside it references these models.
 `assets.ts` bakes `KIT_SCALE = 0.25` into kit geometry because Kenney's Modular Dungeon Kit is
 authored on a 4-unit module. Measured against that:
 
-- **`dungeon/` and `ruins/` share Kenney's module exactly.** Quaternius `Wall_ArchRound` is
-  4.00 x 3.99, Kenney `template-wall` is 4.00 x 4.15. These drop in at `KIT_SCALE` unchanged,
-  which is why they were the two packs wired first.
+- **`dungeon/` and `ruins/` are a two-unit module — half Kenney's.** Their modular pieces
+  measure 2.00 square: `dungeon/Floor_Modular` is 2.00 x 2.00, `dungeon/Wall_Modular` 2.00 x
+  2.01, `ruins/Floor_Standard` 1.99 x 1.98, `ruins/Wall` 2.00 x 2.00. Placing one of these on
+  the module grid needs a factor of 0.5, not `KIT_SCALE`.
+
+  This entry first claimed they matched Kenney's four-unit module, measured off
+  `ruins/Wall_ArchRound` at 4.00 x 3.99. That piece is a double — the pack's own how-to says
+  arches and curves "use the space of two walls" — so it measured two modules and read as one.
+  Nothing broke on it: the props wired in `props.ts` are fitted to an explicit height and
+  footprint rather than scaled by the module, so they never depended on the figure. But it
+  rules the Quaternius walls out as substitutes for Kenney's, which are also four times the
+  depth (1.99 against 0.29).
+- **Kenney's own `template-wall-detail-a` is the one true drop-in**, at 4.00 x 4.23 x 1.99
+  against `template-wall`'s 4.00 x 4.15 x 1.99. `Renderer.buildWalls` uses it as a second wall
+  face.
 - **`fantasy/` is authored in metres.** A barrel is 0.90 tall and a large table is 0.81 —
   real furniture dimensions, not module dimensions. Scaling these by `KIT_SCALE` would make
   them doll furniture. They need their own factor.

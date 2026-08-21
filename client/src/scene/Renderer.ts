@@ -84,6 +84,9 @@ const TORCH_SPACING: Record<LightingPreset, number> = {
   DARK: 0,
 };
 
+/** One wall segment in this many gets the detailed face. */
+const DETAIL_WALL_EVERY = 4;
+
 /** Overlay colours. Where you may go, who you may hit, and what is under the cursor. */
 const MOVE_TINT = 0x5c86c4;
 const TARGET_TINT = 0xc0453c;
@@ -147,7 +150,7 @@ export class Renderer {
   private readonly focusFrom = new THREE.Vector3();
   /** Whatever {@link resize} last handed the pixelation pass. Needed to snap the camera to it. */
   private pixelSize = 3;
-  private kit: { floor: KitPiece; wall: KitPiece } | null = null;
+  private kit: { floor: KitPiece; wall: KitPiece; wallDetail: KitPiece } | null = null;
   private dims = { width: 12, height: 12 };
   private frameHandle = 0;
   private disposed = false;
@@ -452,9 +455,10 @@ export class Renderer {
   async init(): Promise<void> {
     // Characters are preloaded here rather than on demand so addEntity stays synchronous —
     // a diff must be able to put a token on the board on the frame it lands.
-    const [floor, wall] = await Promise.all([
+    const [floor, wall, wallDetail] = await Promise.all([
       loadKitPiece("template-floor"),
       loadKitPiece("template-wall"),
+      loadKitPiece("template-wall-detail-a"),
       ...characterPaths().map((path) =>
         // A missing character degrades to the placeholder figure rather than killing the scene.
         loadCharacter(path).catch((error) => {
@@ -468,7 +472,7 @@ export class Renderer {
         }),
       ),
     ]);
-    this.kit = { floor, wall };
+    this.kit = { floor, wall, wallDetail };
   }
 
   // ---- Scene construction ----
@@ -547,8 +551,24 @@ export class Renderer {
    * unrotated tile sits just outside a +z-facing edge — which is why each side gets a
    * different Y rotation rather than a position offset.
    */
+  /**
+   * The room's perimeter, in two faces rather than one.
+   *
+   * <p>Every segment used to be the same slab, which at this size reads as a repeating panel
+   * with a seam every square — the DM kept narrating frescoes and carvings onto a wall that had
+   * none. A second face breaks the repeat without adding a single new idea to the scene schema.
+   *
+   * <p>Only Kenney's own variants are eligible. The Quaternius packs look like they should fit,
+   * and their columns and arches do, but their walls are a two-unit module against Kenney's
+   * four and a fifth of the depth — a thin ruin panel butted against a chunky dungeon block.
+   * `template-wall-detail-a` is the same footprint and the same depth, so it drops in.
+   *
+   * <p>Which segment gets which face is hashed from the room id, not drawn from Math.random.
+   * The same room has to come back the same way on a reconnect, and the client is never told
+   * the generator's seed — the room id is the only stable thing it has.
+   */
   private buildWalls(state: SceneState): void {
-    const { wall } = this.kit!;
+    const { wall, wallDetail } = this.kit!;
     const { width, height } = state;
     const halfW = width / 2;
     const halfH = height / 2;
@@ -566,7 +586,24 @@ export class Renderer {
       placements.push({ x: halfW, z, ry: -Math.PI / 2 }); // east
     }
 
-    const mesh = new THREE.InstancedMesh(wall.geometry, wall.material, placements.length);
+    const plain: typeof placements = [];
+    const detail: typeof placements = [];
+    placements.forEach((p, i) => {
+      (hash32(`${state.roomId}:wall:${i}`) % DETAIL_WALL_EVERY === 0 ? detail : plain).push(p);
+    });
+
+    this.addWallRun(wall, plain, "walls");
+    this.addWallRun(wallDetail, detail, "walls-detail");
+  }
+
+  private addWallRun(
+    piece: KitPiece,
+    placements: Array<{ x: number; z: number; ry: number }>,
+    name: string,
+  ): void {
+    if (placements.length === 0) return;
+
+    const mesh = new THREE.InstancedMesh(piece.geometry, piece.material, placements.length);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
@@ -581,7 +618,7 @@ export class Renderer {
     });
 
     mesh.instanceMatrix.needsUpdate = true;
-    mesh.name = "walls";
+    mesh.name = name;
     this.room.add(mesh);
   }
 
@@ -945,4 +982,17 @@ function easeOutCubic(t: number): number {
 
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/**
+ * FNV-1a. Any stable hash would do; what matters is that it is stable — a room must rebuild
+ * identically on a reconnect, and `Math.random` would reshuffle its walls mid-session.
+ */
+function hash32(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
 }
