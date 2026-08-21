@@ -82,6 +82,21 @@ const WALL_UNIT = 1;
 const ROOM_MARGIN = 0.7;
 
 /**
+ * How far the exploration camera may push past the floor's edge to keep the party in shot.
+ *
+ * <p>Without it the frame must be filled with floor at all times, which sounds strict and is
+ * really a rule that quietly cancels the follow: the wider the view, the less room the focus
+ * has to move, and at the current exploration zoom the travel works out at a third of a square
+ * in a 13x15 room and exactly nothing in an 11x15 one. The camera sat on the room's centre and
+ * the party walked around inside a still frame.
+ *
+ * <p>What actually sits just past the floor is the wall, which is scenery rather than void, so
+ * spending a little of it buys the follow back. Combat is unaffected — it asks for the room's
+ * centre, and this only ever widens a range the centre is already inside.
+ */
+const FOLLOW_SLACK = 1.4;
+
+/**
  * The furthest the combat camera may pull back.
  *
  * <p>Framing the whole floor is the right instinct and the wrong rule in a tall, narrow canvas.
@@ -464,10 +479,14 @@ export class Renderer {
       const high = Math.max(...spans);
       const at = focus.dot(axis);
 
+      // A room that already fits is centred; there is nothing to follow into.
       const want =
         high - low <= half * 2
           ? (low + high) / 2
-          : Math.min(Math.max(at, low + half), high - half);
+          : Math.min(
+              Math.max(at, low + half - FOLLOW_SLACK),
+              high - half + FOLLOW_SLACK,
+            );
       clamped.addScaledVector(axis, want - at);
     }
     return clamped;
