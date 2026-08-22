@@ -175,21 +175,28 @@ const WALL_VARIANTS: WallVariant[] = [
  * wall's exact hex, and a room built from both reads as one continuous surface with a fold in it
  * where the wall starts.
  *
- * <p>The second only shows up once the room is lit, and it is the one that matters. The torches
- * burn green, and diffuse shading multiplies the light by the surface, so a floor with no strong
- * hue of its own returns the lamp's hue and nothing else. An earlier pass here painted the floor a
- * cool `0x3b4148`, which under this light lands within six degrees of the torch and reflects a
- * third of what the old floor did — the largest surface in frame stopped having a colour and
- * became a mirror for the light, and the whole picture collapsed into one green.
+ * <p>The second only shows up once the room is lit, and it is the one that matters. Diffuse
+ * shading multiplies the light by the surface, so a floor sharing the lamp's hue stops having a
+ * colour of its own and becomes a mirror for it — and the floor is the largest surface in frame,
+ * so when it goes, the whole picture goes with it. **This value is therefore chosen against
+ * {@code EMBER} in `props.ts`, and has to be re-picked if the flame colour ever moves.** It has
+ * been wrong in both directions already: a cool slate under the old green torches sat six degrees
+ * off the light and collapsed, and the burnt orange that replaced it did exactly the same thing
+ * the moment the torches turned orange.
  *
- * <p>So the floor is warm, and these are not arbitrary numbers: `0xbb7554` is the burnt orange
- * Kenney's `template-floor` sampled out of its atlas, which is what this floor was for every
- * build before the tiles changed. Against the green it resolves to a khaki around fifty degrees
- * off the light — the floor keeps a colour of its own, the green stays something the torches are
- * doing rather than something the room is made of, and the wall's olive still reads as different
- * rock above it.
+ * <p>Against an orange flame the answer is a cool stone, because orange is its complement rather
+ * than its neighbour. Two things fall out of that. Where the torches reach, the blue channel is
+ * multiplied by about a quarter and the floor resolves to a warm neutral a clear step darker than
+ * the wall's olive — so the wall reads as the surface catching the light and the floor as the
+ * ground below it. Where they do not, the cold ambient and the cold key are all that is left and
+ * the floor goes properly blue, which is what puts warm light and cool shadow in the same frame
+ * instead of one hue everywhere.
+ *
+ * <p>Separated from the wall by value rather than by hue, deliberately. A saturated key light
+ * flattens hue differences — it is doing the same multiplication to the wall — but it cannot
+ * flatten a difference in how much light comes back.
  */
-export const FLOOR_STONE: Record<string, number> = { Main: 0xbb7554, Highlights: 0xd08f6b };
+export const FLOOR_STONE: Record<string, number> = { Main: 0x424950, Highlights: 0x545c64 };
 
 /**
  * The floor, per {@link FloorType} — and the first time that field has been drawn at all.

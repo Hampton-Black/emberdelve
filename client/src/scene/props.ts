@@ -17,7 +17,21 @@ import type { Prop, PropType } from "../types";
 const STONE = 0x6b6459;
 const STONE_DARK = 0x4a453d;
 const IRON = 0x2e2b28;
-const EMBER = 0x63d18a; // the braziers burn green
+/**
+ * Firelight, and the hotter core it comes off.
+ *
+ * <p>The braziers used to burn green, which was a deliberate bit of witchfire and turned out to be
+ * fighting the room. Diffuse shading multiplies the light by the surface, so the lamp's hue lands
+ * on every lit thing in frame — and when that hue has no complement anywhere in the palette, the
+ * picture stops reading as stone that is lit and starts reading as stone that has been tinted. A
+ * crypt lit by torches should look like a crypt lit by torches.
+ *
+ * <p>Two colours rather than one, because fire is not one colour. What is thrown into the room is
+ * orange; the few pixels of actual flame are near white, which is what makes them read as the
+ * source rather than as an orange dot. At 480x270 that core is all the fire there is.
+ */
+const EMBER = 0xff9a3d;
+const FLAME_CORE = 0xffd489;
 
 /** Candela, not a 0-1 factor. Point lights decay physically, so this is deliberately large. */
 export const FLAME_INTENSITY = 26;
@@ -142,8 +156,8 @@ function brazier(): THREE.Object3D {
   const coals = new THREE.Mesh(
     new THREE.SphereGeometry(0.2, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2),
     new THREE.MeshStandardMaterial({
-      color: EMBER,
-      emissive: EMBER,
+      color: FLAME_CORE,
+      emissive: FLAME_CORE,
       emissiveIntensity: 0.85,
       roughness: 1,
     }),
@@ -421,8 +435,8 @@ export function buildWallTorch(lit: boolean): THREE.Object3D | null {
     const flame = new THREE.Mesh(
       new THREE.SphereGeometry(0.075, 8, 6),
       new THREE.MeshStandardMaterial({
-        color: EMBER,
-        emissive: EMBER,
+        color: FLAME_CORE,
+        emissive: FLAME_CORE,
         emissiveIntensity: 1.1,
         roughness: 1,
       }),
