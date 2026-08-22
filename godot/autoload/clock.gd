@@ -31,6 +31,15 @@ var _draining := false
 var _generation := 0
 
 
+func _ready() -> void:
+	# Chosen from what the server says it can do, not guessed at here: whether a real voice
+	# exists is a fact about the server's configuration. The OS synthesiser is always built,
+	# because it is also the per-line fallback.
+	Net.hello.connect(func(_demo: bool, has_voice: bool, _dm: bool) -> void:
+		var os_voice := OsVoice.new()
+		use_backend(HttpVoice.new(os_voice, self) if has_voice else os_voice))
+
+
 func use_backend(backend: VoiceBackend) -> void:
 	_backend = backend
 

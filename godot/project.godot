@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [audio]
 
+buses/default_bus_layout="res://default_bus_layout.tres"
 general/text_to_speech=true
 
 [autoload]

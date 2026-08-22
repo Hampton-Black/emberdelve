@@ -1,0 +1,67 @@
+class_name OsVoice
+extends VoiceBackend
+
+## The machine's own synthesiser. Always built, because it is also the per-line fallback.
+##
+## Two Godot facts underneath this. `DisplayServer.tts_*` does nothing at all unless
+## Project Settings > Audio > General > Text to Speech is on; it is off by default and the
+## failure is silence, not an error. And the completion callback is [b]global[/b], not per
+## utterance — one callback for the whole process, carrying an id — so the "exactly one
+## finished per speak" contract needs the id tracked here rather than captured per call.
+
+var _utterance_id := 0
+var _in_flight := -1
+var _voices: Array = []
+
+
+func _init() -> void:
+	if not DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH):
+		push_warning("[voice] no OS text-to-speech on this platform")
+		return
+	_voices = DisplayServer.tts_get_voices()
+	DisplayServer.tts_set_utterance_callback(
+		DisplayServer.TTS_UTTERANCE_ENDED, _on_utterance_done)
+	DisplayServer.tts_set_utterance_callback(
+		DisplayServer.TTS_UTTERANCE_CANCELED, _on_utterance_done)
+
+
+func speak(line: Dictionary) -> void:
+	if _voices.is_empty():
+		finished.emit.call_deferred()
+		return
+
+	var cast := Casting.for_speaker(String(line["speakerId"]))
+	_utterance_id += 1
+	_in_flight = _utterance_id
+	DisplayServer.tts_speak(
+		String(line["text"]),
+		_pick(cast["prefer"]),
+		50,                          # volume
+		float(cast["pitch"]),
+		float(cast["rate"]),
+		_utterance_id,
+		true)                        # interrupt: one line at a time, always
+
+
+func stop() -> void:
+	# Settles the in-flight line via the CANCELED callback. Without that the queue would wait
+	# forever for a line that was cut.
+	DisplayServer.tts_stop()
+
+
+func _on_utterance_done(id: int) -> void:
+	if id != _in_flight:
+		return
+	_in_flight = -1
+	finished.emit()
+
+
+func _pick(prefer: Array) -> String:
+	for wanted in prefer:
+		for voice in _voices:
+			if String(voice["name"]).begins_with(String(wanted)):
+				return String(voice["id"])
+	for voice in _voices:
+		if String(voice["language"]).begins_with("en"):
+			return String(voice["id"])
+	return String(_voices[0]["id"])

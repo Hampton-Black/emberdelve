@@ -45,6 +45,14 @@ func before_each() -> void:
 	Clock.set_enabled(true)
 
 
+func after_each() -> void:
+	# Same settle as before_each, at script end: Task 9's hello handler swaps Clock's backend,
+	# and a HeldVoice still in the air would be freed before its deferred finished flushes.
+	Clock.silence_now()
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+
 func _note(what: String) -> Callable:
 	return func() -> void: log.append(what)
 
