@@ -20,6 +20,10 @@ func speak(_line: Dictionary) -> void:
 func stop() -> void:
 	pass
 
+## Free whatever this backend put on its host. Called on a backend swap, after [method stop].
+func teardown() -> void:
+	pass
+
 ## Start preparing a line that is coming but is not being spoken yet. A hint, not an
 ## instruction; a backend with nothing to prepare leaves this alone.
 func prime(_line: Dictionary) -> void:

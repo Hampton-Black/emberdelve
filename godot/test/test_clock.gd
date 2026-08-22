@@ -165,3 +165,21 @@ func test_exactly_one_line_is_primed_ahead() -> void:
 	Clock.speak({"speakerId": "narrator", "text": "three"}, _note("three"))
 	await wait_frames(2)
 	assert_eq(voice.primed, ["two"])
+
+
+func test_swapping_the_backend_settles_the_old_one_and_the_drain_survives() -> void:
+	# A reconnect hello swaps the backend with a line in the air. The old backend must be
+	# stopped — settling its line — or the drain waits on a finished that can never come:
+	# a freed RefCounted's deferred emission never reaches the await.
+	Clock.speak({"speakerId": "narrator", "text": "in the air"}, _note("in the air"))
+	await wait_process_frames(2)
+	var old := voice
+	var replacement := HeldVoice.new()
+	Clock.use_backend(replacement)
+	voice = replacement
+	assert_eq(old.stopped, 1, "the swap stops the old backend, which settles its line")
+	await wait_process_frames(2)
+	Clock.speak({"speakerId": "narrator", "text": "after swap"}, _note("after swap"))
+	await wait_process_frames(3)
+	assert_has(replacement.spoken, "after swap",
+		"the drain survived the swap and still speaks on the new backend")

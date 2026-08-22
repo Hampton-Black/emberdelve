@@ -22,6 +22,10 @@ extends Node
 var _backend: VoiceBackend = null
 var _enabled := true
 
+## Backends swapped out while their deferred `finished` was still pending. Held for two
+## frames: a RefCounted freed before the flush takes the drain's await with it.
+var _retiring: Array[VoiceBackend] = []
+
 ## Each entry: { "line": Dictionary or null, "reveal": Callable, "hold_ms": int }
 var _pending: Array[Dictionary] = []
 var _draining := false
@@ -36,12 +40,37 @@ func _ready() -> void:
 	# exists is a fact about the server's configuration. The OS synthesiser is always built,
 	# because it is also the per-line fallback.
 	Net.hello.connect(func(_demo: bool, has_voice: bool, _dm: bool) -> void:
+		# Settle before building: a new OsVoice overwrites the process-wide TTS utterance
+		# callback, which would strand the old one's line in the air.
+		_settle_backend()
 		var os_voice := OsVoice.new()
 		use_backend(HttpVoice.new(os_voice, self) if has_voice else os_voice))
 
 
 func use_backend(backend: VoiceBackend) -> void:
+	_settle_backend()
 	_backend = backend
+
+
+## Swap safety, in order: stop settles the old backend's line in the air — with that, the
+## drain parked on `await finished` resumes — then its nodes come off the tree, and only
+## then may the new backend go in.
+func _settle_backend() -> void:
+	if _backend == null:
+		return
+	var old := _backend
+	_backend = null
+	old.stop()
+	old.teardown()
+	_retire(old)
+
+
+## Keep a swapped-out backend referenced until its deferred `finished` has flushed.
+func _retire(backend: VoiceBackend) -> void:
+	_retiring.append(backend)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_retiring.erase(backend)
 
 
 func set_enabled(on: bool) -> void:

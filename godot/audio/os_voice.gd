@@ -23,6 +23,15 @@ func _init() -> void:
 		DisplayServer.TTS_UTTERANCE_ENDED, _on_utterance_done)
 	DisplayServer.tts_set_utterance_callback(
 		DisplayServer.TTS_UTTERANCE_CANCELED, _on_utterance_done)
+	# An error settles the line exactly like an end or a cancel — the contract's third
+	# settling event, and the TypeScript wires `utterance.onerror` to the same finish.
+	# Godot 4.7.2 has no TTS_UTTERANCE_ERROR constant — its fourth utterance event is
+	# BOUNDARY, word boundaries, which must never settle a line — so the error event is
+	# registered where the engine has it, by name.
+	if ClassDB.class_has_integer_constant("DisplayServer", "TTS_UTTERANCE_ERROR"):
+		DisplayServer.tts_set_utterance_callback(
+			ClassDB.class_get_integer_constant("DisplayServer", "TTS_UTTERANCE_ERROR"),
+			_on_utterance_done)
 
 
 func speak(line: Dictionary) -> void:
