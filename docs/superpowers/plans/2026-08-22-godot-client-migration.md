@@ -538,7 +538,11 @@ the `.godot` cache and the UID files, and gets `config/features` right for the r
   The Godot project is part of the project, not a sibling of it, and Task 22 deletes `client/`
   in a commit that has to sit next to this one in the same history.
 - **Renderer: Forward+.** Not Mobile, not Compatibility. See below.
-- **Version control metadata:** None. This repo already has a `.gitignore`.
+- **Version control metadata: Git.** It does *not* run `git init` or nest a repository — it only
+  writes a `.gitignore` and a `.gitattributes` into `godot/`. Take it for the `.gitattributes`:
+  `* text=auto eol=lf` keeps `.tscn` and `.tres` from churning their line endings, and those are
+  text files the editor rewrites constantly. Cheaper now than retrofitting once CRLF is in the
+  history, which matters given §12 has Windows on the roadmap.
 
 **Why Forward+, and why it is not a free choice.** Task 16 has to rebuild the edge detection
 that `RenderPixelatedPass` was doing (`Renderer.ts:358`), and that shader reads
@@ -562,15 +566,18 @@ where the *DM* runs, not the client.
 cd godot && git clone --depth 1 --branch v9.3.0 https://github.com/bitwes/Gut.git /tmp/gut && mkdir -p addons && cp -R /tmp/gut/addons/gut addons/gut && rm -rf /tmp/gut && mkdir -p autoload test
 ```
 
-- [ ] **Step 3: Ignore the editor's own artefacts**
+- [ ] **Step 3: Extend the generated `.gitignore`**
 
-Create `godot/.gitignore`:
+Step 1 wrote `godot/.gitignore` with `.godot/` and `/android/` already in it. Add two more:
 
 ```
-.godot/
 *.translation
 export_presets.cfg
 ```
+
+`export_presets.cfg` is ignored on principle rather than need — distribution is deferred (§12) so
+it will not exist yet, but it is the file that ends up holding signing identities and keystore
+passwords, and spec §2 says keys never reach git.
 
 - [ ] **Step 4: Apply the project settings**
 
