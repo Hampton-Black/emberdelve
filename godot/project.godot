@@ -30,8 +30,9 @@ Sfx="*res://audio/sfx.gd"
 
 [display]
 
-window/size/viewport_width=1280
-window/size/viewport_height=720
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/initial_position_type=1
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
@@ -47,3 +48,4 @@ enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
 textures/canvas_textures/default_texture_filter=0
 rendering_device/driver.windows="d3d12"
+environment/defaults/default_clear_color=Color(0.145, 0.125, 0.106, 1)

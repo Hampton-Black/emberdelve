@@ -46,6 +46,22 @@ func _throw_at(tray: Control, started_at: int, result: Dictionary = {}) -> void:
 
 # ---- Idle vs throwing
 
+func test_the_tray_pins_to_the_bottom_right() -> void:
+	# The browser sat the tray on the stage's centre line. The Godot log already owns
+	# the bottom-left, so centre puts the throw on top of the chat.
+	var tray := _tray()
+	await wait_frames(1)
+	assert_eq(tray.anchor_left, 1.0)
+	assert_eq(tray.anchor_right, 1.0)
+	assert_eq(tray.anchor_top, 1.0)
+	assert_eq(tray.anchor_bottom, 1.0)
+	var max_w := Tumble.TRAY_WIDTH * Tumble.DISPLAY_SCALE
+	var pad: float = tray.BOTTOM_PAD
+	assert_almost_eq(tray.offset_right, -pad, 0.01)
+	assert_almost_eq(tray.offset_left, -pad - max_w, 0.01)
+	assert_almost_eq(tray.offset_bottom, -pad, 0.01)
+
+
 func test_the_tray_stays_idle_with_no_active_roll() -> void:
 	var tray := _tray()
 	await wait_frames(1)
@@ -65,12 +81,24 @@ func test_a_thrown_roll_enables_processing() -> void:
 # dismiss floors at reveal_at + 250 so the tray never leaves before the total is readable,
 # and HOLD_MS / COMBAT_HOLD_MS are only the backstop when nobody has dismissed.
 
-func test_exploration_hold_is_the_backstop_when_nothing_dismisses() -> void:
+func test_exploration_hold_covers_the_dm_when_a_turn_is_in_flight() -> void:
 	var tray := _tray()
 	await wait_frames(1)
 	Table.mode = "EXPLORATION"
+	Table.awaiting_dm = true
 	Table.dice_dismiss_at = null
 	assert_eq(tray.dismiss_ms(_skill_check(), 1_000), Tumble.HOLD_MS)
+
+
+func test_a_roll_with_no_narration_coming_leaves_once_it_has_been_read() -> void:
+	# Debug d20, or a throw after the DM has finished. The nine-second hold exists to cover
+	# the prose wait; with nobody speaking it is the tray overstaying.
+	var tray := _tray()
+	await wait_frames(1)
+	Table.mode = "EXPLORATION"
+	Table.awaiting_dm = false
+	Table.dice_dismiss_at = null
+	assert_eq(tray.dismiss_ms(_skill_check(), 1_000), Tumble.COMBAT_HOLD_MS)
 
 
 func test_combat_hold_is_the_backstop_when_nothing_dismisses() -> void:
@@ -102,6 +130,7 @@ func test_combat_does_not_use_the_exploration_hold() -> void:
 	var elapsed := Tumble.COMBAT_HOLD_MS + Tumble.FADE_OUT_MS + 200
 
 	Table.mode = "EXPLORATION"
+	Table.awaiting_dm = true
 	Table.dice_dismiss_at = null
 	_throw_at(tray, now - elapsed)
 	assert_not_null(Table.active_roll, "exploration still holds")

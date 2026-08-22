@@ -10,7 +10,8 @@ extends Control
 ## pixelation: at this size the readout is mostly text, and upscaled 8px monospace is unreadable
 ## mush.
 
-# 1.4rem under the TS tray. Godot has no rem; 16px root is the same number the browser used.
+# Inset from the overlay's bottom-right. The log already owns the bottom-left, so the
+# browser's centre-line placement would throw on top of the chat.
 const BOTTOM_PAD := 22.0
 const READOUT_X := 98.0
 
@@ -66,9 +67,9 @@ func _fit() -> void:
 		max_w = minf(max_w, parent_ctrl.size.x * 0.94)
 	var h := Tumble.TRAY_HEIGHT * (max_w / Tumble.TRAY_WIDTH)
 	custom_minimum_size = Vector2(max_w, h)
-	# Bottom-centre: the scene's anchors put origin at the overlay's bottom middle.
-	offset_left = -max_w * 0.5
-	offset_right = max_w * 0.5
+	set_anchors_preset(PRESET_BOTTOM_RIGHT)
+	offset_left = -BOTTOM_PAD - max_w
+	offset_right = -BOTTOM_PAD
 	offset_top = -BOTTOM_PAD - h
 	offset_bottom = -BOTTOM_PAD
 
@@ -109,11 +110,14 @@ func _idle() -> void:
 ##
 ## Out of combat a roll is a question the DM is about to answer, so the tray waits for the
 ## answer. In a fight the blow is the answer, so the swing dismisses the tray exactly as
-## narration does. COMBAT_HOLD_MS is only the backstop for rolls with no swing behind them.
+## narration does. COMBAT_HOLD_MS is the backstop for rolls with no swing — and for throws
+## that have no narration coming at all (debug d20, a roll after the DM has finished).
+## HOLD_MS is only the cover for a turn still waiting on the first word.
 ## An explicit dismiss still cannot leave before the total has been readable for a beat —
 ## DiceTray.tsx floors at [method Tumble.reveal_at] + 250, never a min against the backstop.
 func dismiss_ms(result: Dictionary, started_at: int) -> int:
-	var backstop := Tumble.COMBAT_HOLD_MS if Table.mode == "COMBAT" else Tumble.HOLD_MS
+	var covering_narration := Table.mode != "COMBAT" and Table.awaiting_dm
+	var backstop := Tumble.HOLD_MS if covering_narration else Tumble.COMBAT_HOLD_MS
 	if Table.dice_dismiss_at == null:
 		return backstop
 	var faces: Array = result["faces"]

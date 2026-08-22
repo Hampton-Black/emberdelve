@@ -272,6 +272,28 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 		"the banner is the developer's loop, not a modal")
 	assert_true(chrome.get_node("Overlay/Title").visible)
 
+	var chat: PanelContainer = chrome.get_node("Overlay/Log")
+	var panel := chat.get_theme_stylebox("panel") as StyleBoxFlat
+	assert_not_null(panel, "Log wears a StyleBoxFlat")
+	if panel != null:
+		assert_lt(panel.bg_color.a, 0.35, "the log is a veil over the room, not a wall")
+		assert_gt(panel.bg_color.a, 0.15)
+
+	var record_size := record.get_theme_font_size("normal_font_size")
+	assert_eq(record_size, 13, "chrome type matches the browser log, not the engine default")
+
+	var tray: Control = chrome.get_node("Overlay/DiceTray")
+	assert_eq(tray.anchor_left, 1.0)
+	assert_eq(tray.anchor_right, 1.0)
+	assert_eq(tray.anchor_bottom, 1.0)
+
+
+func test_the_window_opens_larger_than_the_plan_s_720p_default() -> void:
+	# 1280×720 makes the overlay feel like a postage stamp and the default 16px type
+	# huge inside it. A 1080p viewport is the same density with room to see the room.
+	assert_eq(ProjectSettings.get_setting("display/window/size/viewport_width"), 1920)
+	assert_eq(ProjectSettings.get_setting("display/window/size/viewport_height"), 1080)
+
 
 # ---- Defeat: a dead fighter is a death, not a crash
 
