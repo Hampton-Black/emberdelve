@@ -20,13 +20,11 @@ import io.javalin.Javalin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 import java.util.List;
 
 public final class App {
 
     private static final Logger log = LoggerFactory.getLogger(App.class);
-    private static final int PORT = 7070;
 
     /**
      * Rolls the §2 acceptance script needs to land the same way every run: a strong athletics
@@ -36,7 +34,8 @@ public final class App {
             List.of(17, 14, 12, 8, 19, 6, 15, 11, 20, 5, 13, 9);
 
     public static void main(String[] args) {
-        boolean demoMode = Arrays.asList(args).contains("--demo");
+        var cli = Args.parse(args);
+        boolean demoMode = cli.demoMode();
         var config = Config.load();
 
         DiceRoller dice = demoMode ? new ScriptedDiceRoller(DEMO_SCRIPT) : new RandomDiceRoller();
@@ -46,15 +45,8 @@ public final class App {
 
         // --generate <seed> boots into a procedurally generated room instead of the crypt.
         // The crypt stays the default: it is the room every M0 measurement was taken in.
-        Long generateSeed = null;
-        for (int i = 0; i < args.length - 1; i++) {
-            if ("--generate".equals(args[i])) {
-                generateSeed = Long.parseLong(args[i + 1]);
-            }
-        }
-
         RoomDefinition room;
-        if (generateSeed == null) {
+        if (cli.generateSeed() == null) {
             room = RoomSource.authored(content, "crypt");
         } else if (config.has("VENICE_API_KEY")) {
             // The dress pass reads as writing, but what it must actually emit is a JSON object
@@ -66,15 +58,15 @@ public final class App {
             room = RoomSource.generated(content, new RoomDresser(
                     new VeniceDmClient(config, config.get("DM_MODEL_TOOLS", "qwen3-next-80b"),
                             java.time.Duration.ofSeconds(30)),
-                    content.prompt("dress-room")), "crypt", generateSeed);
+                    content.prompt("dress-room")), "crypt", cli.generateSeed());
         } else {
             // Undressed but playable — the generator half needs no key, and a room with no prose
             // is more useful than a refusal to boot while tuning layout. The dump is logged here
             // too: this is the path that exists for tuning layout, and it is the one place the
             // grid would otherwise never be seen.
             log.warn("VENICE_API_KEY not set — generating an undressed room.");
-            var generated = new RoomGenerator(content).generate("crypt", generateSeed);
-            log.info("generated room, seed {}:\n{}", generateSeed, RoomDumper.dump(generated));
+            var generated = new RoomGenerator(content).generate("crypt", cli.generateSeed());
+            log.info("generated room, seed {}:\n{}", cli.generateSeed(), RoomDumper.dump(generated));
             room = generated.toRoomDefinition();
         }
 
@@ -154,9 +146,11 @@ public final class App {
             dm.warmCheck();
         }
 
-        app.start(PORT);
-        log.info("Emberdelve on :{} — room '{}', {} entities, dm={}{}",
-                PORT,
+        // Loopback only. This is a local DM, not a network service — and it stays that way
+        // until session scoping and auth exist, which is the multiplayer milestone's work.
+        app.start("127.0.0.1", cli.port());
+        log.info("Emberdelve on 127.0.0.1:{} — room '{}', {} entities, dm={}{}",
+                cli.port(),
                 engine.room().name(),
                 repo.entities().size(),
                 dm == null ? "disabled" : dm.modelId(),
