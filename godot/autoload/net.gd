@@ -28,7 +28,21 @@ var _want_connection := false
 
 
 func _ready() -> void:
+	# A test run must never reach a real server. Autoloads are ready before any test script
+	# runs, so this cannot be a flag a test sets — it has to be read off the command line.
+	# A test that wants the socket calls open() itself.
+	if started_for_tests():
+		return
 	open()
+
+
+## True when this process was started to run the suite. GUT is launched as
+## `-s addons/gut/gut_cmdln.gd`, and the engine leaves that path on the command line.
+static func started_for_tests() -> bool:
+	for arg in OS.get_cmdline_args():
+		if arg.ends_with("gut_cmdln.gd"):
+			return true
+	return false
 
 
 func open() -> void:

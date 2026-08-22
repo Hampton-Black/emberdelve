@@ -29,6 +29,11 @@
 - **Commit messages** are a sentence saying what the commit does, in the repository's existing voice (`git log` for examples). No `feat:` prefixes. **No `Co-Authored-By` trailer.**
 - **Java test command:** `cd server && ./gradlew test`
 - **Godot test command:** `godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit`
+- **The suite never touches a running server.** `Net._ready` skips `open()` when the process was
+  started by `gut_cmdln.gd`, so the tests pass whether or not the Java server is up. Without that
+  guard a live `hello` arrives mid-run and swaps `Clock`'s backend out from under the test's own,
+  and `test_clock.gd` fails for reasons that have nothing to do with `Clock`. A test that wants
+  the socket calls `Net.open()` itself.
 - **Server run command:** `cd server && ./gradlew run --args='--demo'`
 - **Client typecheck (while `client/` lives):** `cd client && npx tsc --noEmit`
 
@@ -52,7 +57,7 @@
 | `godot/project.godot` | Project settings: 4.5.x, autoloads, TTS enabled, window size, nearest-neighbour default filter |
 | `godot/addons/gut/` | Test runner (vendored addon) |
 | `godot/autoload/link.gd` | Where the server is. One setting; `base_url`, `ws_url`, `health_url` derive from it |
-| `godot/autoload/net.gd` | `WebSocketPeer` polled from `_process`. JSON in, one signal per `ServerMessage.type` out |
+| `godot/autoload/net.gd` | `WebSocketPeer` polled from `_process`. JSON in, one signal per `ServerMessage.type` out. Does not dial under `gut_cmdln.gd` |
 | `godot/autoload/table.gd` | Every game fact. Applies a whole diff batch, then emits once |
 | `godot/autoload/clock.gd` | `speak` / `mark` / `hold` / `silence` / `silence_now`. The presentation queue |
 | `godot/dice/tumble.gd` | Pure dice presentation maths, ported from `client/src/dice/tumble.ts` |

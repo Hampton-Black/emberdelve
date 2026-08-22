@@ -26,11 +26,11 @@ class HeldVoice extends VoiceBackend:
 
 
 var voice: HeldVoice
-var log: Array[String]
+var notes: Array[String]
 
 
 func before_each() -> void:
-	log = []
+	notes = []
 	# Settle the previous test before swapping anything out from under it. silence_now() must
 	# reach the voice that still has a line in the air, and that voice must still be referenced
 	# when its deferred `finished` flushes — a RefCounted is freed the moment the last reference
@@ -54,7 +54,7 @@ func after_each() -> void:
 
 
 func _note(what: String) -> Callable:
-	return func() -> void: log.append(what)
+	return func() -> void: notes.append(what)
 
 
 func test_marks_run_in_arrival_order() -> void:
@@ -62,7 +62,7 @@ func test_marks_run_in_arrival_order() -> void:
 	Clock.mark(_note("two"))
 	Clock.mark(_note("three"))
 	await wait_frames(3)
-	assert_eq(log, ["one", "two", "three"])
+	assert_eq(notes, ["one", "two", "three"])
 
 
 func test_a_line_reveals_when_the_voice_reaches_it_not_when_it_arrives() -> void:
@@ -70,19 +70,19 @@ func test_a_line_reveals_when_the_voice_reaches_it_not_when_it_arrives() -> void
 	Clock.speak({"speakerId": "narrator", "text": "second"}, _note("second"))
 	await wait_frames(2)
 	# The first line is still in the air; the second must not have revealed.
-	assert_eq(log, ["first"])
+	assert_eq(notes, ["first"])
 	voice.release()
 	await wait_frames(3)
-	assert_eq(log, ["first", "second"])
+	assert_eq(notes, ["first", "second"])
 
 
 func test_a_hold_keeps_the_floor_for_its_whole_duration() -> void:
 	Clock.hold(300, _note("dice"))
 	Clock.mark(_note("narration"))
 	await wait_frames(3)
-	assert_eq(log, ["dice"], "narration must not arrive while the die is in the air")
+	assert_eq(notes, ["dice"], "narration must not arrive while the die is in the air")
 	await wait_seconds(0.4)
-	assert_eq(log, ["dice", "narration"])
+	assert_eq(notes, ["dice", "narration"])
 
 
 func test_silence_drops_the_queue_but_still_reveals_every_dropped_line() -> void:
@@ -93,7 +93,7 @@ func test_silence_drops_the_queue_but_still_reveals_every_dropped_line() -> void
 	Clock.speak({"speakerId": "narrator", "text": "dropped"}, _note("dropped"))
 	Clock.speak({"speakerId": "narrator", "text": "also dropped"}, _note("also dropped"))
 	Clock.silence()
-	assert_eq(log, ["in the air", "dropped", "also dropped"])
+	assert_eq(notes, ["in the air", "dropped", "also dropped"])
 	assert_eq(voice.spoken, ["in the air"], "dropped lines are revealed, never spoken")
 
 
@@ -134,7 +134,7 @@ func test_with_the_voice_off_lines_still_queue_and_still_reveal() -> void:
 	Clock.mark(_note("two"))
 	Clock.speak({"speakerId": "narrator", "text": "three"}, _note("three"))
 	await wait_frames(4)
-	assert_eq(log, ["one", "two", "three"])
+	assert_eq(notes, ["one", "two", "three"])
 	assert_eq(voice.spoken, [], "nothing is said with the narrator off")
 
 
@@ -144,16 +144,16 @@ func test_holds_are_honoured_with_the_voice_off() -> void:
 	Clock.hold(300, _note("dice"))
 	Clock.mark(_note("after"))
 	await wait_frames(3)
-	assert_eq(log, ["dice"])
+	assert_eq(notes, ["dice"])
 	await wait_seconds(0.4)
-	assert_eq(log, ["dice", "after"])
+	assert_eq(notes, ["dice", "after"])
 
 
 func test_an_empty_line_is_a_marker_not_a_silence_to_sit_through() -> void:
 	Clock.speak({"speakerId": "narrator", "text": "   "}, _note("blank"))
 	Clock.mark(_note("after"))
 	await wait_frames(3)
-	assert_eq(log, ["blank", "after"])
+	assert_eq(notes, ["blank", "after"])
 	assert_eq(voice.spoken, [])
 
 

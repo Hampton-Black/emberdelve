@@ -44,7 +44,12 @@ func _ready() -> void:
 		# callback, which would strand the old one's line in the air.
 		_settle_backend()
 		var os_voice := OsVoice.new()
-		use_backend(HttpVoice.new(os_voice, self) if has_voice else os_voice))
+		# Declared as the seam and assigned in a branch, not a ternary: the analyser types a
+		# ternary's arms against each other, and HttpVoice and OsVoice are siblings.
+		var backend: VoiceBackend = os_voice
+		if has_voice:
+			backend = HttpVoice.new(os_voice, self)
+		use_backend(backend))
 
 
 func use_backend(backend: VoiceBackend) -> void:

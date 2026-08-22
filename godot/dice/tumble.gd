@@ -212,6 +212,7 @@ static func _tone_of(outcome: String) -> String:
 ## A stable pseudo-random face for a given die at a given instant. Stable matters: derived from
 ## the clock rather than randi() so a dropped frame does not make the dice stutter.
 static func _tumbling_face(index: int, elapsed: int, sides: int) -> int:
+	@warning_ignore("integer_division")
 	var step := elapsed / 52  # ~19 changes a second: blurred, but still dice
 	return 1 + (_hash(index * 8191 + step) % sides)
 
