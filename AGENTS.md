@@ -621,6 +621,8 @@ cd server && ./gradlew run          # server on :7070
 cd server && ./gradlew test         # dice, attack resolution, combat legality
 cd server && ./gradlew run --args='--demo'   # scripted dice, reproducible
 cd client && npm run dev            # vite on :5173
+cd godot && godot .                 # the Godot editor
+cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit   # godot tests
 ```
 
 ## Secrets
