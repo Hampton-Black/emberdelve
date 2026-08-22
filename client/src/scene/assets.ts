@@ -3,47 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
-/**
- * Kenney's Modular Dungeon Kit is authored on a 4-unit module grid (template-floor.glb
- * measures exactly 4 x 0 x 4, origin-centred). Scaling by 1/4 makes one game square equal
- * one world unit, which keeps every grid calculation in the renderer integer-friendly.
- */
-export const KIT_SCALE = 0.25;
-
-const KIT_BASE = "/assets/kits/dungeon";
-
 const loader = new GLTFLoader();
-
-/** Geometry + material pulled out of a kit model, ready to instance. */
-export interface KitPiece {
-  geometry: THREE.BufferGeometry;
-  material: THREE.Material;
-}
-
-/**
- * Loads a kit model and flattens it to a single geometry/material pair.
- *
- * <p>Instancing matters here: a 12x12 floor is 144 tiles, and 144 separate meshes is 144 draw
- * calls for something that is one repeated rock. Merging to a single InstancedMesh keeps it at one.
- */
-export async function loadKitPiece(name: string): Promise<KitPiece> {
-  const gltf = await loader.loadAsync(`${KIT_BASE}/${name}.glb`);
-
-  let found: THREE.Mesh | null = null;
-  gltf.scene.traverse((child) => {
-    if (!found && (child as THREE.Mesh).isMesh) found = child as THREE.Mesh;
-  });
-
-  if (!found) throw new Error(`No mesh in kit model: ${name}`);
-  const mesh = found as THREE.Mesh;
-
-  // Bake the kit scale into the geometry so instance matrices stay pure translation/rotation.
-  const geometry = mesh.geometry.clone();
-  geometry.scale(KIT_SCALE, KIT_SCALE, KIT_SCALE);
-
-  const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-  return { geometry, material: material.clone() };
-}
 
 /** Grid square -> world position, with the room centred on the origin. */
 export function toWorld(
@@ -76,8 +36,8 @@ export const WALL_FACE = 0.5 - WALL_DEPTH / 2;
 /**
  * A kit piece flattened for instancing, keeping every material it was authored with.
  *
- * <p>{@link loadKitPiece} takes the first mesh and the first material, which is fine for
- * Kenney's walls — one mesh, one material. The Quaternius pieces are one mesh split into a
+ * <p>Taking the first mesh and the first material would do for Kenney's walls — one mesh, one
+ * material. The Quaternius pieces are one mesh split into a
  * primitive per material (`ruins/Wall` has two, `Window_Bars` three, `dungeon/Arch_Door`
  * four), and glTF loads each primitive as its own mesh, so taking the first would throw away
  * the highlight courses, the ironwork, and most of a door.
@@ -135,6 +95,27 @@ export async function loadWallPiece(
 }
 
 /**
+ * Loads a floor tile and drops it so the surface you walk on is exactly y = 0.
+ *
+ * <p>Everything else in the renderer takes y = 0 as the floor and always has, because Kenney's
+ * `template-floor` is a plane with no thickness sitting exactly there. The ruins tiles are real
+ * slabs — around a sixth of a square thick, and authored straddling the origin so their top face
+ * lands a little above it. Left alone that is a tile whose surface is above the ground plane the
+ * picker ray hits, above the y the props and tokens stand at, and within a hundredth of a unit of
+ * the movement overlay, which is close enough to z-fight and at 480px a z-fight is a strobe.
+ *
+ * <p>Baked into the geometry rather than fixed with a group offset, for the same reason the kit
+ * scale is: instance matrices stay pure translation and rotation, and nothing downstream has to
+ * know the floor is made of slabs now.
+ */
+export async function loadFloorPiece(path: string, module: number): Promise<WallPiece> {
+  const piece = await loadWallPiece(path, module);
+  piece.geometry.computeBoundingBox();
+  piece.geometry.translate(0, -piece.geometry.boundingBox!.max.y, 0);
+  return piece;
+}
+
+/**
  * Repaints one piece's stone to match another's, by material name.
  *
  * <p>The dungeon kit's stone runs warm (#6d604f) and the ruins kit's neutral (#636459), at
@@ -153,6 +134,27 @@ export function retintStone(target: WallPiece, palette: Map<string, THREE.Color>
   }
 }
 
+/**
+ * Repaints a piece's stone to colours named here rather than copied from another piece.
+ *
+ * <p>{@link retintStone} matches one kit to another and is the right tool when the target is a
+ * colour something else already is. The floor is the opposite problem: it has to be a colour
+ * nothing else in the room is. Ruins floor and ruins wall are the same stone down to the hex, so
+ * a room built from both is one continuous grey sheet with a fold in it where the wall starts.
+ *
+ * <p>Both kits are untextured flat colour, which is the only reason this is four numbers and not
+ * a texture job.
+ */
+export function paintStone(piece: WallPiece, colours: Record<string, number>): void {
+  for (const material of piece.materials) {
+    const named = material as THREE.MeshStandardMaterial;
+    const colour = colours[named.name];
+    // setHex reads sRGB and converts into the renderer's working space, so these are the hexes
+    // you would type into a colour picker rather than linear values.
+    if (colour !== undefined) named.color.setHex(colour);
+  }
+}
+
 /** Which of the dungeon kit's stone materials stands in for which of the ruins kit's. */
 const STONE_ALIASES: Record<string, string> = {
   Wall_Dark: "Main",
@@ -168,6 +170,23 @@ export function paletteOf(piece: WallPiece): Map<string, THREE.Color> {
     if (named.color) palette.set(named.name, named.color.clone());
   }
   return palette;
+}
+
+/**
+ * FNV-1a. Any stable hash would do; what matters is that it is stable.
+ *
+ * <p>Every choice the client makes for itself — which wall face a segment gets, which tile a
+ * floor square gets, which of a prop's models it is built from — has to come back the same on a
+ * reconnect, and `Math.random` would reshuffle the room mid-session. The room id is the only
+ * stable seed the client has: the generator's own seed never crosses the wire.
+ */
+export function hash32(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
 }
 
 // ---- Props ----

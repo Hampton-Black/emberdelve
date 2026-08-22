@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { instanceProp, WALL_FACE } from "./assets";
+import { hash32, instanceProp, WALL_FACE } from "./assets";
 import type { Prop, PropType } from "../types";
 
 /**
@@ -319,23 +319,57 @@ const BUILDERS: Record<PropType, Builder> = {
   DOOR: door,
 };
 
+/** One model a prop may be built from. Units are world units, one to a grid square. */
+export interface PropModel {
+  path: string;
+  height: number;
+  footprint: number;
+}
+
 /**
- * Prop types that load a real model instead of building one.
+ * Prop types that load real models instead of building one, and the models each may draw from.
  *
- * <p>`height` and `footprint` are world units, one unit to a grid square. They are set to the
- * silhouette each primitive already occupied, so promoting a prop changes what it is made of
- * and not how much room it takes up — the fight reads the same before and after.
+ * <p>`height` and `footprint` are per model rather than per type, because the kit's pieces are
+ * not interchangeable at one size — a snapped-off column brought up to the height of a whole one
+ * is not a broken pillar, it is a thin pillar. Each entry is sized so its silhouette stays inside
+ * the square the validator reserved for it, which is what keeps a promotion invisible to the
+ * fight: the same amount of room is taken up before and after.
  *
- * <p>The three absentees are absent for a reason. No pack ships a **sarcophagus**, which is
- * the one prop M0's script turns on. A **brazier** is a standing fire bowl and the nearest
- * models are a ground campfire and a wall torch, neither of which is the same object. An
- * **alcove** is a recess cut into a wall, so it is architecture rather than a prop, and it
- * cannot be dropped onto a floor square as a mesh without the wall around it.
+ * <p>Which model a given prop gets is hashed from the room and the prop's id, so three pillars in
+ * one room are three different pillars and all three come back the same way on a reconnect.
+ *
+ * <p>Every variant of a type has to be the same noun. The DM is told a prop is RUBBLE and writes
+ * the word "rubble" into the narration, so a broken amphora standing where the map says rubble is
+ * the picture contradicting the narrator — which is the one thing this build is least willing to
+ * spend. That is why the pots and the fallen wall sections are not in here, and why **rubble has
+ * just the one model**: `Bricks` is the only piece in four packs that is unambiguously a pile of
+ * broken stone. Its quarter-turn from the placer is the variety it gets.
+ *
+ * <p>The three absentees are absent for a reason. No pack ships a **sarcophagus**, which is the
+ * one prop M0's script turns on. A **brazier** is a standing fire bowl and the nearest models are
+ * a ground campfire and a wall torch, neither of which is the same object. An **alcove** is a
+ * recess cut into a wall, so it is architecture rather than a prop, and it cannot be dropped onto
+ * a floor square as a mesh without the wall around it.
  */
-const MESH_PROPS: Partial<Record<PropType, { path: string; height: number; footprint: number }>> = {
-  PILLAR: { path: "ruins/Column_Round", height: 1.6, footprint: 0.9 },
-  DOOR: { path: "ruins/Doors_RoundArch", height: 0.9, footprint: 1.4 },
-  RUBBLE: { path: "ruins/Bricks", height: 0.5, footprint: 0.85 },
+export const MESH_PROPS: Partial<Record<PropType, PropModel[]>> = {
+  // Round, square, and one that has lost its top half. The short one keeps the kit's own
+  // proportions — the same 0.4 the whole columns are brought down by — so it reads as the same
+  // stone snapped off rather than as a different, stubbier order of column.
+  PILLAR: [
+    { path: "ruins/Column_Round", height: 1.6, footprint: 0.9 },
+    { path: "ruins/Column_Square", height: 1.6, footprint: 0.9 },
+    { path: "ruins/Column_Round_Short", height: 0.73, footprint: 0.9 },
+  ],
+  // Round and gothic arches, each with a plainer boarded version. All four are a shut door in a
+  // stone surround, which is the only thing a door in this build is allowed to be — there is
+  // nothing on the other side of it in M1.
+  DOOR: [
+    { path: "ruins/Doors_RoundArch", height: 0.9, footprint: 1.4 },
+    { path: "ruins/Doors_GothicArch", height: 0.9, footprint: 1.4 },
+    { path: "ruins/Doors_RoundArch_Covered", height: 0.9, footprint: 1.4 },
+    { path: "ruins/Doors_GothicArch_Covered", height: 0.9, footprint: 1.4 },
+  ],
+  RUBBLE: [{ path: "ruins/Bricks", height: 0.5, footprint: 0.85 }],
 };
 
 /**
@@ -363,7 +397,11 @@ const TORCH_RANGE = 7;
 
 /** Every model the renderer must preload before the first scene. */
 export function propModelPaths(): string[] {
-  return [...Object.values(MESH_PROPS).map((m) => m.path), TORCH_MODEL, SKULL_MODEL];
+  return [
+    ...Object.values(MESH_PROPS).flatMap((models) => models.map((m) => m.path)),
+    TORCH_MODEL,
+    SKULL_MODEL,
+  ];
 }
 
 /** One wall torch, lit or unlit. Null if its model never loaded. */
@@ -403,8 +441,16 @@ export function buildWallTorch(lit: boolean): THREE.Object3D | null {
   return torch;
 }
 
-export function buildProp(prop: Prop): THREE.Object3D {
-  const mesh = MESH_PROPS[prop.type];
+/**
+ * Builds one prop.
+ *
+ * @param roomId seeds the choice of model, together with the prop's own id. Both are needed:
+ *               the prop id alone would give every room's third pillar the same shaft, and the
+ *               room id alone would give one room's pillars all the same one.
+ */
+export function buildProp(prop: Prop, roomId: string): THREE.Object3D {
+  const models = MESH_PROPS[prop.type];
+  const mesh = models?.[hash32(`${roomId}:prop:${prop.id}`) % models.length];
   // A model that failed to load falls back to its primitive rather than leaving a hole in the
   // room — the same degradation `Renderer.init` gives a missing character.
   const object =

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type {
   CombatView,
   EntityView,
+  FloorType,
   LightingPreset,
   Mode,
   Prop,
@@ -12,14 +13,15 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPixelatedPass } from "three/examples/jsm/postprocessing/RenderPixelatedPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import {
+  hash32,
   loadCharacter,
-  loadKitPiece,
+  loadFloorPiece,
   loadPropModel,
+  paintStone,
   loadWallPiece,
   paletteOf,
   retintStone,
   toWorld,
-  type KitPiece,
   type WallPiece,
 } from "./assets";
 import { buildProp, buildWallTorch, propModelPaths, FLAME_INTENSITY } from "./props";
@@ -141,7 +143,7 @@ const TORCH_SPACING: Record<LightingPreset, number> = {
  * <p>`fit` brings a piece to the height of a plain wall. Only the arches need it: they are
  * authored two squares tall against the ruins wall's one.
  */
-interface WallVariant {
+export interface WallVariant {
   path: string;
   weight: number;
   /** Scale to this height in squares instead of using the kit's own module. */
@@ -164,6 +166,75 @@ const WALL_VARIANTS: WallVariant[] = [
   { path: "props/dungeon/Arch", weight: 2, fit: WALL_UNIT, retint: true,
     fills: "props/dungeon/Arch_Door" },
 ];
+
+/**
+ * The floor's own stone, which is deliberately neither the wall's colour nor the light's.
+ *
+ * <p>Two problems, one answer. The first is that the ruins kit is the only one in the repo whose
+ * floor tiles carry a pattern, and it is also the kit the walls come from — so its floors are the
+ * wall's exact hex, and a room built from both reads as one continuous surface with a fold in it
+ * where the wall starts.
+ *
+ * <p>The second only shows up once the room is lit, and it is the one that matters. The torches
+ * burn green, and diffuse shading multiplies the light by the surface, so a floor with no strong
+ * hue of its own returns the lamp's hue and nothing else. An earlier pass here painted the floor a
+ * cool `0x3b4148`, which under this light lands within six degrees of the torch and reflects a
+ * third of what the old floor did — the largest surface in frame stopped having a colour and
+ * became a mirror for the light, and the whole picture collapsed into one green.
+ *
+ * <p>So the floor is warm, and these are not arbitrary numbers: `0xbb7554` is the burnt orange
+ * Kenney's `template-floor` sampled out of its atlas, which is what this floor was for every
+ * build before the tiles changed. Against the green it resolves to a khaki around fifty degrees
+ * off the light — the floor keeps a colour of its own, the green stays something the torches are
+ * doing rather than something the room is made of, and the wall's olive still reads as different
+ * rock above it.
+ */
+export const FLOOR_STONE: Record<string, number> = { Main: 0xbb7554, Highlights: 0xd08f6b };
+
+/**
+ * The floor, per {@link FloorType} — and the first time that field has been drawn at all.
+ *
+ * <p>`floorType` has been on the wire since M0 and the client has always ignored it: the
+ * generator picked one of three surfaces per room, told the DM which it was, and then laid the
+ * same Kenney slab either way. A room the narrator called tiled came up as plain stone, which is
+ * the DM contradicting the picture rather than describing it.
+ *
+ * <p>Two tiles do all three. `Floor_Squares` is flagged and `Floor_Standard` is bare, and what
+ * separates the types is how much of the flagging is left: TILED is laid and intact, STONE has
+ * worn through in places, CRACKED_STONE has mostly gone. That is a gradient of repair rather than
+ * three unrelated patterns, which is both what the names say and all the kit can honestly
+ * support. Its only other patterned tile is a decorative diamond course, which belongs in a
+ * chapel rather than under a crypt; its only broken ones are holes in the ground, and a hole
+ * would be a lie — nothing on the server knows a square is impassable, so a token would stand in
+ * mid-air over it.
+ *
+ * <p>Every mix keeps some of the other tile, for the reason the walls have more than one face: a
+ * fifteen-square floor of one repeated tile reads as graph paper, and the eye finds the repeat
+ * immediately when every seam lines up.
+ */
+export const FLOOR_VARIANTS: Record<FloorType, WallVariant[]> = {
+  // Flagged, with squares here and there worn back to bare rock.
+  STONE: [
+    { path: "props/ruins/Floor_Squares", weight: 8 },
+    { path: "props/ruins/Floor_Standard", weight: 3 },
+  ],
+  // The same floor with most of the flagging gone.
+  CRACKED_STONE: [
+    { path: "props/ruins/Floor_Standard", weight: 7 },
+    { path: "props/ruins/Floor_Squares", weight: 5 },
+  ],
+  // Laid, and still laid. The bare tile is rare enough to read as one missing flag rather than
+  // as wear — without it the pattern is mechanical, and with much more of it this is STONE.
+  TILED: [
+    { path: "props/ruins/Floor_Squares", weight: 14 },
+    { path: "props/ruins/Floor_Standard", weight: 1 },
+  ],
+};
+
+/** Every floor tile, deduplicated — the three presets share most of their repertoire. */
+function floorPaths(): string[] {
+  return [...new Set(Object.values(FLOOR_VARIANTS).flatMap((v) => v.map((f) => f.path)))];
+}
 
 /**
  * What stands in an archway, scaled to sit inside it.
@@ -240,8 +311,15 @@ export class Renderer {
   private readonly focusFrom = new THREE.Vector3();
   /** Whatever {@link resize} last handed the pixelation pass. Needed to snap the camera to it. */
   private pixelSize = 3;
-  private kit: { floor: KitPiece; walls: Map<string, WallPiece> } | null = null;
+  private kit: { floors: Map<string, WallPiece>; walls: Map<string, WallPiece> } | null = null;
   private dims = { width: 12, height: 12 };
+  /**
+   * The room being drawn. Kept because it is the only stable seed the client has for the
+   * choices it makes itself — which wall face, which floor tile, which of a prop's models —
+   * and those have to survive a reconnect unchanged. The generator's seed never crosses the
+   * wire, and `Math.random` would reshuffle the room mid-session.
+   */
+  private roomId = "";
   private frameHandle = 0;
   private disposed = false;
 
@@ -551,8 +629,7 @@ export class Renderer {
   async init(): Promise<void> {
     // Characters are preloaded here rather than on demand so addEntity stays synchronous —
     // a diff must be able to put a token on the board on the frame it lands.
-    const [floor] = await Promise.all([
-      loadKitPiece("template-floor"),
+    await Promise.all([
       ...characterPaths().map((path) =>
         // A missing character degrades to the placeholder figure rather than killing the scene.
         loadCharacter(path).catch((error) => {
@@ -580,12 +657,24 @@ export class Renderer {
     const walls = new Map<string, WallPiece>();
     WALL_VARIANTS.forEach((variant, i) => walls.set(variant.path, pieces[i]));
 
+    // Floors go through their own loader: the ruins tiles are slabs with real thickness, and
+    // the rest of the renderer takes the surface you stand on to be exactly y = 0.
+    const paths = floorPaths();
+    const tiles = await Promise.all(paths.map((path) => loadFloorPiece(path, QUATERNIUS_MODULE)));
+    const floors = new Map<string, WallPiece>();
+    paths.forEach((path, i) => {
+      // Safe to paint in place: loadWallPiece clones every material it hands back, so the walls
+      // keep the stone these tiles were authored with.
+      paintStone(tiles[i], FLOOR_STONE);
+      floors.set(path, tiles[i]);
+    });
+
     const fillers = await Promise.all(
       WALL_FILLERS.map((f) => loadWallPiece(f.path, QUATERNIUS_MODULE, f.fit)),
     );
     WALL_FILLERS.forEach((filler, i) => walls.set(filler.path, fillers[i]));
 
-    this.kit = { floor, walls };
+    this.kit = { floors, walls };
   }
 
   // ---- Scene construction ----
@@ -600,6 +689,7 @@ export class Renderer {
     this.props.clear();
     this.flames.length = 0;
     this.dims = { width: state.width, height: state.height };
+    this.roomId = state.roomId;
 
     this.buildLighting(state.lighting);
     this.buildFloor(state);
@@ -640,23 +730,53 @@ export class Renderer {
     this.room.add(key);
   }
 
+  /**
+   * The floor the room's {@link FloorType} calls for, tile by tile.
+   *
+   * <p>One `InstancedMesh` per tile in the mix rather than per square: a 15x15 room is 225 tiles
+   * and this draws them in two or three calls, which is what it cost when they were all the same
+   * slab. Quarter-turning each tile is free variety on top of the mix — the ruins tiles are
+   * square and their courses are not, so a turned tile is a different tile to look at.
+   */
   private buildFloor(state: SceneState): void {
-    const { floor } = this.kit!;
-    const count = state.width * state.height;
-    const mesh = new THREE.InstancedMesh(floor.geometry, floor.material, count);
-    mesh.receiveShadow = true;
+    const { floors } = this.kit!;
+    const variants = FLOOR_VARIANTS[state.floorType];
+    const total = variants.reduce((sum, v) => sum + v.weight, 0);
 
+    const runs = new Map<string, THREE.Matrix4[]>();
     const matrix = new THREE.Matrix4();
-    let i = 0;
+    const quaternion = new THREE.Quaternion();
+    const axis = new THREE.Vector3(0, 1, 0);
+    const scale = new THREE.Vector3(1, 1, 1);
+
     for (let gy = 0; gy < state.height; gy++) {
       for (let gx = 0; gx < state.width; gx++) {
-        matrix.setPosition(toWorld(gx, gy, state.width, state.height));
-        mesh.setMatrixAt(i++, matrix);
+        const seed = hash32(`${state.roomId}:floor:${gx},${gy}`);
+        let roll = seed % total;
+        const variant = variants.find((v) => (roll -= v.weight) < 0) ?? variants[0];
+
+        // A second, independent draw off the same hash. Reusing `roll` would tie a tile's
+        // rotation to which tile it is, and the rarer tiles would only ever face one way.
+        quaternion.setFromAxisAngle(axis, ((seed >>> 16) % 4) * (Math.PI / 2));
+        matrix.compose(toWorld(gx, gy, state.width, state.height), quaternion, scale);
+
+        const run = runs.get(variant.path);
+        if (run) run.push(matrix.clone());
+        else runs.set(variant.path, [matrix.clone()]);
       }
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.name = "floor";
-    this.room.add(mesh);
+
+    for (const [path, placements] of runs) {
+      const tile = floors.get(path);
+      if (!tile) continue;
+
+      const mesh = new THREE.InstancedMesh(tile.geometry, tile.materials, placements.length);
+      mesh.receiveShadow = true;
+      placements.forEach((m, i) => mesh.setMatrixAt(i, m));
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.name = `floor:${path}`;
+      this.room.add(mesh);
+    }
   }
 
   /**
@@ -809,7 +929,7 @@ export class Renderer {
   addProp(prop: Prop): void {
     if (this.props.has(prop.id)) return;
 
-    const object = buildProp(prop);
+    const object = buildProp(prop, this.roomId);
     object.position.copy(toWorld(prop.x, prop.y, this.dims.width, this.dims.height));
     this.room.add(object);
     this.props.set(prop.id, object);
@@ -1109,17 +1229,4 @@ function easeOutCubic(t: number): number {
 
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-/**
- * FNV-1a. Any stable hash would do; what matters is that it is stable — a room must rebuild
- * identically on a reconnect, and `Math.random` would reshuffle its walls mid-session.
- */
-function hash32(text: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
 }
