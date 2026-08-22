@@ -13,6 +13,7 @@
 - **Spec:** `docs/superpowers/specs/2026-08-21-godot-client-design.md`. Where this plan and the spec disagree, **the spec wins**.
 - **Numbers:** `AGENTS.md` is authoritative for every feel number (dice timing, impact beat, ceremony, token scale, audio layers). If a Godot scene disagrees with those numbers, the numbers win until a played session replaces them.
 - **Godot version: 4.5.x, pinned.** Not "current stable".
+- **Renderer: Forward+.** Task 16's edge shader reads `NORMAL_ROUGHNESS_TEXTURE`, which no other renderer provides.
 - **GDScript only.** No C#, no GDExtension.
 - **Invariant #1 — the server is authoritative.** The client never computes a roll, a hit, a legal move, or a death. Click-to-move tests membership in `legalMoves` from the wire and nothing else.
 - **Invariant #2 — no singleton player.** Address every creature by `actorId` from the wire. Never a literal `"fighter"`, never "the first entity".
@@ -528,11 +529,40 @@ git add server/src/main/java/dm/SessionGuard.java server/src/test/java/dm/Sessio
 - Consumes: nothing.
 - Produces: autoload `Link` with `base_url() -> String`, `ws_url() -> String`, `health_url() -> String`, `tts_url() -> String`. Every later task gets its URLs from here and defines none of its own.
 
-- [ ] **Step 1: Create the project and vendor GUT**
+- [ ] **Step 1: Create the project in the editor**
+
+Use the Godot project manager rather than hand-writing `project.godot` — it generates the icon,
+the `.godot` cache and the UID files, and gets `config/features` right for the renderer chosen.
+
+- **Project Path:** `<repo>/godot` — inside this repository, alongside `client/` and `server/`.
+  The Godot project is part of the project, not a sibling of it, and Task 22 deletes `client/`
+  in a commit that has to sit next to this one in the same history.
+- **Renderer: Forward+.** Not Mobile, not Compatibility. See below.
+- **Version control metadata:** None. This repo already has a `.gitignore`.
+
+**Why Forward+, and why it is not a free choice.** Task 16 has to rebuild the edge detection
+that `RenderPixelatedPass` was doing (`Renderer.ts:358`), and that shader reads
+`NORMAL_ROUGHNESS_TEXTURE` — which **only the Forward+ renderer provides**. Picking Compatibility
+here does not fail at project creation; it fails five tasks later with a shader that will not
+compile, and the fix is to change the renderer and re-check every material.
+
+The other two lose on their own merits as well. Mobile exists for tiled GPUs and this is a
+desktop app. Compatibility caps lights per object, and the crypt runs up to `MAX_TORCH_LIGHTS`
+(10) omnis in a dark room (`Renderer.ts:120`) — Forward+'s clustered lighting is what makes that
+a non-question. Nothing here is performance-driven: one room, two entities, a 480x270 internal
+buffer. `AGENTS.md`: *"Do not optimize anything."*
+
+Compatibility would only be right if a **browser** build were wanted. It is not — spec §3 lists
+"keeping a web client after parity" as out of scope, and the hosted-server option in §12 is about
+where the *DM* runs, not the client.
+
+- [ ] **Step 2: Vendor GUT**
 
 ```bash
-mkdir -p godot/autoload godot/test godot/addons && cd godot && git clone --depth 1 --branch v9.3.0 https://github.com/bitwes/Gut.git /tmp/gut && cp -R /tmp/gut/addons/gut godot_gut_tmp && mv godot_gut_tmp addons/gut && rm -rf /tmp/gut
+cd godot && git clone --depth 1 --branch v9.3.0 https://github.com/bitwes/Gut.git /tmp/gut && mkdir -p addons && cp -R /tmp/gut/addons/gut addons/gut && rm -rf /tmp/gut && mkdir -p autoload test
 ```
+
+- [ ] **Step 3: Ignore the editor's own artefacts**
 
 Create `godot/.gitignore`:
 
@@ -542,16 +572,18 @@ Create `godot/.gitignore`:
 export_presets.cfg
 ```
 
-Create `godot/project.godot`:
+- [ ] **Step 4: Apply the project settings**
+
+Edit `godot/project.godot` so it reads as below. The editor wrote `config/features` and
+`config_version` already — **leave them alone**; for Forward+ the features array is just the
+version, with no renderer tag (a `"GL Compatibility"` entry there means the wrong renderer was
+picked in Step 1).
 
 ```ini
-config_version=5
-
 [application]
 
 config/name="Emberdelve"
 run/main_scene="res://chrome/chrome.tscn"
-config/features=PackedStringArray("4.5", "GL Compatibility")
 
 [audio]
 
@@ -579,11 +611,13 @@ enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 textures/canvas_textures/default_texture_filter=0
 ```
 
-`audio/general/text_to_speech=true` is not optional — `DisplayServer.tts_*` silently does nothing without it, and it is off by default. `default_texture_filter=0` is nearest-neighbour.
+`audio/general/text_to_speech=true` is not optional — `DisplayServer.tts_*` silently does nothing
+without it, and it is off by default. `default_texture_filter=0` is nearest-neighbour.
 
-`run/main_scene` and three of the four autoloads point at files that do not exist yet. That is fine — the project will not run until Task 14, and every task between here and there adds one of them.
+`run/main_scene` and four of the five autoloads point at files that do not exist yet. That is
+fine — the project will not run until Task 14, and every task between here and there adds one.
 
-- [ ] **Step 2: Write the failing test**
+- [ ] **Step 5: Write the failing test**
 
 Create `godot/test/test_link.gd`:
 
@@ -613,7 +647,7 @@ func test_the_live_urls_all_come_off_one_base() -> void:
 	assert_eq(Link.ws_url(), Link.ws_from(base))
 ```
 
-- [ ] **Step 3: Run it and watch it fail**
+- [ ] **Step 6: Run it and watch it fail**
 
 ```bash
 cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit
@@ -621,7 +655,7 @@ cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gex
 
 Expected: FAIL — the autoload script `res://autoload/link.gd` does not exist.
 
-- [ ] **Step 4: Write `Link`**
+- [ ] **Step 7: Write `Link`**
 
 Create `godot/autoload/link.gd`:
 
@@ -687,9 +721,9 @@ func tts_url() -> String:
 	return base_url() + "/tts"
 ```
 
-- [ ] **Step 5: Stub the three autoloads that do not exist yet**
+- [ ] **Step 8: Stub the four autoloads that do not exist yet**
 
-GUT cannot load the project while `project.godot` names missing autoloads. Create three placeholders that later tasks replace wholesale.
+GUT cannot load the project while `project.godot` names missing autoloads. Create four placeholders that later tasks replace wholesale.
 
 `godot/autoload/net.gd`:
 
@@ -719,7 +753,7 @@ extends Node
 # Replaced in Task 10.
 ```
 
-- [ ] **Step 6: Run the test and watch it pass**
+- [ ] **Step 9: Run the test and watch it pass**
 
 ```bash
 cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit
@@ -727,7 +761,7 @@ cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gex
 
 Expected: PASS, 0 failures.
 
-- [ ] **Step 7: Record the commands**
+- [ ] **Step 10: Record the commands**
 
 In `AGENTS.md`, in the `## Commands` fenced block, add two lines under the existing ones:
 
@@ -736,7 +770,7 @@ cd godot && godot .                 # the Godot editor
 cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit   # godot tests
 ```
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
 git add godot AGENTS.md && git commit -m "Start the Godot project with one place that knows where the server is"
