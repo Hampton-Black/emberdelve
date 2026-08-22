@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://chrome/chrome.gd" id="1_chrome"]
 [ext_resource type="Script" path="res://chrome/transcript.gd" id="2_transcript"]
@@ -6,6 +6,8 @@
 [ext_resource type="Script" path="res://chrome/toast.gd" id="4_toast"]
 [ext_resource type="Script" path="res://chrome/title.gd" id="5_title"]
 [ext_resource type="Script" path="res://chrome/dice_tray.gd" id="6_tray"]
+[ext_resource type="Script" path="res://chrome/combat_bar.gd" id="7_bar"]
+[ext_resource type="Script" path="res://chrome/defeat.gd" id="8_defeat"]
 
 [sub_resource type="StyleBoxFlat" id="LogStyle"]
 bg_color = Color(0.04, 0.04, 0.05, 0.72)
@@ -13,6 +15,22 @@ content_margin_left = 14.0
 content_margin_top = 12.0
 content_margin_right = 14.0
 content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="RestartStyle"]
+bg_color = Color(0.078, 0.071, 0.098, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.267, 0.235, 0.2, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+content_margin_left = 34.0
+content_margin_top = 9.0
+content_margin_right = 34.0
+content_margin_bottom = 9.0
 
 [node name="Chrome" type="CanvasLayer"]
 script = ExtResource("1_chrome")
@@ -159,3 +177,75 @@ theme_override_colors/font_color = Color(0.31, 0.29, 0.267, 1)
 theme_override_font_sizes/font_size = 10
 text = "Sound on. The DM speaks aloud."
 horizontal_alignment = 1
+
+[node name="CombatBar" type="Control" parent="Overlay"]
+visible = false
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 42.0
+grow_horizontal = 2
+mouse_filter = 0
+script = ExtResource("7_bar")
+
+[node name="Defeat" type="Control" parent="Overlay"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("8_defeat")
+
+[node name="Veil" type="ColorRect" parent="Overlay/Defeat"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.016, 0.012, 0.024, 0.94)
+
+[node name="Line" type="Label" parent="Overlay/Defeat"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -48.0
+offset_right = 220.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.561, 0.522, 0.471, 1)
+theme_override_font_sizes/font_size = 19
+text = "The crypt keeps him."
+horizontal_alignment = 1
+
+[node name="Restart" type="Button" parent="Overlay/Defeat"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -110.0
+offset_top = 16.0
+offset_right = 110.0
+offset_bottom = 48.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.663, 0.62, 0.557, 1)
+theme_override_colors/font_hover_color = Color(0.851, 0.804, 0.722, 1)
+theme_override_colors/font_pressed_color = Color(0.663, 0.62, 0.557, 1)
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("RestartStyle")
+theme_override_styles/hover = SubResource("RestartStyle")
+theme_override_styles/pressed = SubResource("RestartStyle")
+text = "DESCEND AGAIN"

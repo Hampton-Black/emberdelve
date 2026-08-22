@@ -34,6 +34,14 @@ var mode := "EXPLORATION"
 ## the server has not been asked to narrate the opening.
 var started := false
 
+## Set while a restart is in flight, so the fresh scene the server sends back is recognised as
+## the end of this session rather than the middle of one.
+var _restarting := false
+
+
+func expect_restart() -> void:
+	_restarting = true
+
 
 func _ready() -> void:
 	Net.hello.connect(func(demo: bool, _voice: bool, has_dm: bool) -> void:
@@ -50,6 +58,7 @@ func _ready() -> void:
 
 
 func reset() -> void:
+	_restarting = false
 	scene = {}
 	mode = "EXPLORATION"
 	started = false
@@ -59,6 +68,13 @@ func reset() -> void:
 ## Mode rides with the scene rather than being left to the diff that changed it: a client that
 ## connects mid-fight gets one message, and it has to be the whole truth.
 func set_scene(state: Dictionary) -> void:
+	if _restarting:
+		_restarting = false
+		# All the way back to the title. The server has just cleared its once-per-session
+		# opening guard and is waiting to be asked again; only `begin` asks, and only the
+		# title sends `begin`. A client that stays `started` here lays out a fresh room
+		# and then sits in silence forever.
+		reset()
 	scene = state
 	mode = String(state.get("mode", "EXPLORATION"))
 	_adopt_combat_from_scene()   # Task 8

@@ -353,6 +353,29 @@ func test_reset_returns_to_the_title() -> void:
 	assert_null(Table.combat_beat)
 
 
+func test_set_scene_recognises_a_restart() -> void:
+	# Flag set → reset called → started cleared. The fresh scene is still laid out; only the
+	# session is thrown away. A client that returned before applying it would sit on an empty
+	# board, and one that kept `started` would never send `begin` again.
+	Table.set_started()
+	Table.say_as_player("something")
+	Table.expect_restart()
+	Table.set_scene(CRYPT.duplicate(true))
+	assert_false(Table.started)
+	assert_false(Table._restarting)
+	assert_eq(Table.transcript, [])
+	assert_null(Table.combat_beat)
+	assert_eq(Table.scene["roomId"], "crypt")
+	assert_eq(Table.entity("fighter")["hp"], 12)
+
+
+func test_an_ordinary_scene_does_not_end_the_session() -> void:
+	Table.set_started()
+	Table.set_scene(CRYPT.duplicate(true))
+	assert_true(Table.started)
+	assert_eq(Table.entity("fighter")["name"], "Roderick")
+
+
 # ---- Fixtures
 
 func _attack(faces: Array, outcome: String) -> Dictionary:
