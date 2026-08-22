@@ -219,6 +219,12 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_not_null(chrome.get_node("Overlay/Defeat"))
 	assert_not_null(chrome.get_node("Overlay/Defeat/Restart"),
 		"the script references $Restart")
+	var debug_bar := chrome.get_node_or_null("Overlay/DebugBar")
+	assert_not_null(debug_bar, "the debug bar is overlay chrome")
+	if debug_bar == null:
+		return
+	assert_true(debug_bar is HBoxContainer)
+	assert_eq(debug_bar.get_child_count(), 8)
 	assert_eq(chrome.get_node("Overlay/Banner").visible, not Table.connected,
 		"the banner is the developer's loop, not a modal")
 	assert_true(chrome.get_node("Overlay/Title").visible)
@@ -416,3 +422,75 @@ func test_health_colour_is_allegiance_and_length_is_hit_points() -> void:
 	assert_almost_eq(bar.hp_fraction(6, 12), 0.5, 0.0001)
 	assert_almost_eq(bar.hp_fraction(0, 7), 0.0, 0.0001)
 	assert_almost_eq(bar.hp_fraction(7, 7), 1.0, 0.0001)
+
+
+# ---- Debug bar: eight buttons, exact wire dictionaries, locked while the DM has the floor
+
+const DEBUG_BUTTONS := [
+	["roll d20", {"type": "debugRoll", "actorId": "fighter", "skill": "PERCEPTION",
+		"difficulty": "MEDIUM"}],
+	["reveal", {"type": "debugReveal", "propId": "alcove"}],
+	["spawn goblin", {"type": "debugSpawnGoblin"}],
+	["start combat", {"type": "debugStartCombat"}],
+	["combat mode", {"type": "debugSetMode", "mode": "COMBAT"}],
+	["explore mode", {"type": "debugSetMode", "mode": "EXPLORATION"}],
+	["re-open", {"type": "debugOpen"}],
+	["resend scene", {"type": "debugScene"}],
+]
+
+
+func _debug_bar() -> HBoxContainer:
+	var script: GDScript = load("res://chrome/debug_bar.gd")
+	assert_not_null(script, "debug_bar.gd")
+	if script == null:
+		return HBoxContainer.new()
+	var node: HBoxContainer = script.new()
+	add_child_autofree(node)
+	return node
+
+
+func test_the_debug_bar_has_eight_buttons_with_the_right_labels() -> void:
+	var bar := _debug_bar()
+	assert_eq(bar.get_child_count(), 8)
+	if bar.get_child_count() != 8:
+		return
+	for i in DEBUG_BUTTONS.size():
+		var button := bar.get_child(i) as Button
+		assert_not_null(button, "button %d" % i)
+		if button == null:
+			continue
+		assert_eq(button.text, DEBUG_BUTTONS[i][0])
+
+
+func test_pressing_a_debug_button_sends_the_exact_dictionary() -> void:
+	var bar := _debug_bar()
+	if bar.get_child_count() != DEBUG_BUTTONS.size():
+		assert_eq(bar.get_child_count(), 8)
+		return
+	for i in DEBUG_BUTTONS.size():
+		Net.outbound.clear()
+		var button := bar.get_child(i) as Button
+		assert_not_null(button, "button %d" % i)
+		if button == null:
+			continue
+		button.pressed.emit()
+		assert_eq(Net.outbound.size(), 1, "button %s" % DEBUG_BUTTONS[i][0])
+		if Net.outbound.is_empty():
+			continue
+		assert_eq(Net.outbound[0], DEBUG_BUTTONS[i][1], "button %s" % DEBUG_BUTTONS[i][0])
+
+
+func test_debug_buttons_are_locked_while_the_dm_has_the_floor() -> void:
+	var bar := _debug_bar()
+	for child in bar.get_children():
+		assert_false((child as Button).disabled, "floor is clear after reset")
+
+	Table.awaiting_dm = true
+	Table.started_changed.emit()
+	for child in bar.get_children():
+		assert_true((child as Button).disabled)
+
+	Table.awaiting_dm = false
+	Table.transcript_changed.emit()
+	for child in bar.get_children():
+		assert_false((child as Button).disabled)

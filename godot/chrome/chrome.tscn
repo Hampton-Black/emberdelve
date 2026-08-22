@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://chrome/chrome.gd" id="1_chrome"]
 [ext_resource type="Script" path="res://chrome/transcript.gd" id="2_transcript"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://chrome/dice_tray.gd" id="6_tray"]
 [ext_resource type="Script" path="res://chrome/combat_bar.gd" id="7_bar"]
 [ext_resource type="Script" path="res://chrome/defeat.gd" id="8_defeat"]
+[ext_resource type="Script" path="res://chrome/debug_bar.gd" id="9_debug"]
 
 [sub_resource type="StyleBoxFlat" id="LogStyle"]
 bg_color = Color(0.04, 0.04, 0.05, 0.72)
@@ -118,6 +119,16 @@ mouse_filter = 2
 theme_override_colors/font_color = Color(0.902, 0.78, 0.55, 1)
 text = "Start the DM:  cd server && ./gradlew run"
 horizontal_alignment = 1
+
+[node name="DebugBar" type="HBoxContainer" parent="Overlay"]
+layout_mode = 1
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 1100.0
+offset_bottom = 36.0
+mouse_filter = 0
+theme_override_constants/separation = 4
+script = ExtResource("9_debug")
 
 [node name="Title" type="Control" parent="Overlay"]
 layout_mode = 1
