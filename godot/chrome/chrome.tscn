@@ -1,0 +1,145 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://chrome/chrome.gd" id="1_chrome"]
+[ext_resource type="Script" path="res://chrome/transcript.gd" id="2_transcript"]
+[ext_resource type="Script" path="res://chrome/input_box.gd" id="3_input"]
+[ext_resource type="Script" path="res://chrome/toast.gd" id="4_toast"]
+[ext_resource type="Script" path="res://chrome/title.gd" id="5_title"]
+
+[sub_resource type="StyleBoxFlat" id="LogStyle"]
+bg_color = Color(0.04, 0.04, 0.05, 0.72)
+content_margin_left = 14.0
+content_margin_top = 12.0
+content_margin_right = 14.0
+content_margin_bottom = 10.0
+
+[node name="Chrome" type="CanvasLayer"]
+script = ExtResource("1_chrome")
+
+[node name="World" type="SubViewportContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+stretch = true
+
+[node name="Overlay" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Log" type="PanelContainer" parent="Overlay"]
+layout_mode = 1
+anchor_top = 0.62
+anchor_right = 0.42
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_bottom = -16.0
+theme_override_styles/panel = SubResource("LogStyle")
+
+[node name="VBox" type="VBoxContainer" parent="Overlay/Log"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Transcript" type="RichTextLabel" parent="Overlay/Log/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+focus_mode = 2
+bbcode_enabled = true
+scroll_following = true
+selection_enabled = true
+script = ExtResource("2_transcript")
+
+[node name="InputBox" type="LineEdit" parent="Overlay/Log/VBox"]
+layout_mode = 2
+placeholder_text = "What do you do?"
+script = ExtResource("3_input")
+
+[node name="Toast" type="Label" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 40.0
+offset_bottom = 68.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.85, 0.55, 0.5, 1)
+horizontal_alignment = 1
+script = ExtResource("4_toast")
+
+[node name="Banner" type="Label" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 8.0
+offset_bottom = 36.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.902, 0.78, 0.55, 1)
+text = "Start the DM:  cd server && ./gradlew run"
+horizontal_alignment = 1
+
+[node name="Title" type="Control" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("5_title")
+
+[node name="Veil" type="ColorRect" parent="Overlay/Title"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.024, 0.024, 0.039, 0.92)
+
+[node name="Plate" type="VBoxContainer" parent="Overlay/Title"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -90.0
+offset_right = 280.0
+offset_bottom = 90.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 16
+
+[node name="Name" type="Label" parent="Overlay/Title/Plate"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.902, 0.851, 0.761, 1)
+theme_override_font_sizes/font_size = 34
+text = "EMBERDELVE"
+horizontal_alignment = 1
+
+[node name="Line" type="Label" parent="Overlay/Title/Plate"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.663, 0.62, 0.557, 1)
+theme_override_font_sizes/font_size = 14
+text = "Something has been working at the lid from the inside."
+horizontal_alignment = 1
+
+[node name="Hint" type="Label" parent="Overlay/Title/Plate"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.31, 0.29, 0.267, 1)
+theme_override_font_sizes/font_size = 10
+text = "Sound on. The DM speaks aloud."
+horizontal_alignment = 1

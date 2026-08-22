@@ -106,7 +106,14 @@ func dispatch(message: Dictionary) -> void:
 			pass
 
 
+## Every payload handed to [method send], oldest first. Chrome tests watch this
+## because send() itself is silent when the socket is closed and a different
+## silent when it is open — neither is a thing the overlay should have to know.
+var outbound: Array[Dictionary] = []
+
+
 func send(message: Dictionary) -> void:
+	outbound.append(message)
 	if _socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		push_warning("[net] dropped message, socket not open: " + str(message))
 		return
