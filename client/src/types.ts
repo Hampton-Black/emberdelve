@@ -142,7 +142,7 @@ export type TranscriptEntry =
 // ---- Wire envelopes ----
 
 export type ServerMessage =
-  | { type: "hello"; demoMode: boolean; voice: boolean }
+  | { type: "hello"; demoMode: boolean; voice: boolean; dm: boolean }
   | { type: "scene"; scene: SceneState }
   | { type: "diffs"; diffs: Diff[] }
   | { type: "narration"; segment: NarrationSegment }

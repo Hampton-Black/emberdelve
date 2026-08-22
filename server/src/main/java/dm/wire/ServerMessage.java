@@ -33,7 +33,7 @@ public sealed interface ServerMessage {
      *              synthesis to fall back on, and the difference is night and day, so it is
      *              worth the client knowing which one it is about to use.
      */
-    record Hello(boolean demoMode, boolean voice) implements ServerMessage {}
+    record Hello(boolean demoMode, boolean voice, boolean dm) implements ServerMessage {}
 
     record Scene(SceneState scene) implements ServerMessage {}
 

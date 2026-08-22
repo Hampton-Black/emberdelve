@@ -56,6 +56,7 @@ public final class WsHandler {
     private final DmService dm;
     private final boolean demoMode;
     private final boolean voice;
+    private final SessionGuard guard = new SessionGuard();
 
     public WsHandler(GameEngine engine, DmService dm, boolean demoMode, boolean voice) {
         this.engine = engine;
@@ -66,9 +67,16 @@ public final class WsHandler {
 
     public void register(WsConfig ws) {
         ws.onConnect(ctx -> {
+            if (!guard.claim(ctx.sessionId())) {
+                // Not an error the client should retry. Say which one is already attached to,
+                // because the usual cause is a browser tab left open beside the Godot editor.
+                log.warn("refusing a second client: {}", ctx.sessionId());
+                ctx.closeSession(4001, "Another client is already at this table.");
+                return;
+            }
             ctx.enableAutomaticPings();
             log.info("client connected: {}", ctx.sessionId());
-            send(ctx, new ServerMessage.Hello(demoMode, voice));
+            send(ctx, new ServerMessage.Hello(demoMode, voice, dm != null));
             send(ctx, new ServerMessage.Scene(engine.scene()));
             // Deliberately does NOT open the scene. See the `begin` case below.
         });
@@ -83,7 +91,10 @@ public final class WsHandler {
             }
         });
 
-        ws.onClose(ctx -> log.info("client disconnected: {}", ctx.sessionId()));
+        ws.onClose(ctx -> {
+            guard.release(ctx.sessionId());
+            log.info("client disconnected: {}", ctx.sessionId());
+        });
 
         ws.onError(ctx -> log.error("ws error", ctx.error()));
     }
