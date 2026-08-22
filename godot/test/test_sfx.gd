@@ -31,6 +31,9 @@ func test_the_sting_api_plays_without_errors_on_the_world_and_dice_buses() -> vo
 	sfx.swing(false)
 	sfx.swing(true)
 	sfx.fell()
+	# The rattle sample runs 1.5s; the tray cuts it at the wind-up so it does not
+	# overlap the throw. Default null leaves every other caller unchanged.
+	sfx.play("shake", 0.55, 1.0, 0.0, 0.24)
 
 	var world := 0
 	var dice := 0

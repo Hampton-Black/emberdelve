@@ -208,6 +208,10 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_true(record.scroll_following)
 	assert_true(record.selection_enabled)
 	assert_not_null(chrome.get_node("Overlay/Log/VBox/InputBox"))
+	assert_not_null(chrome.get_node_or_null("Overlay/DiceTray"),
+		"the tray is overlay chrome — a d20 at 480px is a smudge")
+	assert_eq(chrome.get_node("World").get_node_or_null("DiceTray"), null,
+		"not inside the pixelated World")
 	assert_not_null(chrome.get_node("Overlay/Toast"))
 	assert_not_null(chrome.get_node("Overlay/Banner"))
 	assert_not_null(chrome.get_node("Overlay/Title"))

@@ -1,0 +1,124 @@
+extends GutTest
+
+## Headless pins for the tray's state machine. `_draw` is pixels; this file asserts idle vs
+## throwing, the dismiss clock, and that a finished throw lets go of Table.active_roll.
+
+
+func before_each() -> void:
+	Table.reset()
+	Clock.silence_now()
+	await get_tree().process_frame
+	Clock.use_backend(VoiceBackend.new())
+
+
+func after_each() -> void:
+	Clock.silence_now()
+	Table.active_roll = null
+	Table.dice_dismiss_at = null
+	Table.mode = "EXPLORATION"
+
+
+func _tray() -> Control:
+	var script: GDScript = load("res://chrome/dice_tray.gd")
+	assert_not_null(script, "dice_tray.gd")
+	if script == null:
+		return Control.new()
+	var node: Control = script.new()
+	add_child_autofree(node)
+	return node
+
+
+func _skill_check() -> Dictionary:
+	return {
+		"request": {"dice": "1d20", "modifier": 5, "advantage": "NORMAL",
+			"purpose": "SKILL_CHECK", "actorId": "fighter", "targetId": null,
+			"dc": 20, "skill": "ATHLETICS"},
+		"faces": [17], "total": 22, "outcome": "SUCCESS",
+	}
+
+
+func _throw_at(tray: Control, started_at: int, result: Dictionary = {}) -> void:
+	var roll: Dictionary = result if not result.is_empty() else _skill_check()
+	Table.active_roll = {"result": roll, "started_at": started_at}
+	Table.roll_thrown.emit(roll)
+	tray._process(0.0)
+
+
+# ---- Idle vs throwing
+
+func test_the_tray_stays_idle_with_no_active_roll() -> void:
+	var tray := _tray()
+	await wait_frames(1)
+	assert_eq(Table.active_roll, null)
+	assert_false(tray.is_processing(), "nothing to throw, nothing to tick")
+
+
+func test_a_thrown_roll_enables_processing() -> void:
+	var tray := _tray()
+	await wait_frames(1)
+	Table.active_roll = {"result": _skill_check(), "started_at": Time.get_ticks_msec()}
+	Table.roll_thrown.emit(_skill_check())
+	assert_true(tray.is_processing())
+
+
+# ---- Dismiss timing. Transcribed from DiceTray.tsx, not the brief's sketch: an explicit
+# dismiss floors at reveal_at + 250 so the tray never leaves before the total is readable,
+# and HOLD_MS / COMBAT_HOLD_MS are only the backstop when nobody has dismissed.
+
+func test_exploration_hold_is_the_backstop_when_nothing_dismisses() -> void:
+	var tray := _tray()
+	await wait_frames(1)
+	Table.mode = "EXPLORATION"
+	Table.dice_dismiss_at = null
+	assert_eq(tray.dismiss_ms(_skill_check(), 1_000), Tumble.HOLD_MS)
+
+
+func test_combat_hold_is_the_backstop_when_nothing_dismisses() -> void:
+	var tray := _tray()
+	await wait_frames(1)
+	Table.mode = "COMBAT"
+	Table.dice_dismiss_at = null
+	assert_eq(tray.dismiss_ms(_skill_check(), 1_000), Tumble.COMBAT_HOLD_MS)
+
+
+func test_an_explicit_dismiss_cannot_leave_before_the_total_is_readable() -> void:
+	var tray := _tray()
+	await wait_frames(1)
+	var result := _skill_check()
+	var started := 5_000
+	# A dismiss on the first frame would otherwise fade during the throw.
+	Table.dice_dismiss_at = started
+	assert_eq(tray.dismiss_ms(result, started), Tumble.reveal_at(result["faces"].size()) + 250)
+	# Once the total has been readable for a beat, the dismiss clock is the one that counts.
+	Table.dice_dismiss_at = started + 5_000
+	assert_eq(tray.dismiss_ms(result, started), 5_000)
+
+
+func test_combat_does_not_use_the_exploration_hold() -> void:
+	# 4.5s is past the combat backstop+fade and still inside the exploration hold.
+	var tray := _tray()
+	await wait_frames(1)
+	var now := Time.get_ticks_msec()
+	var elapsed := Tumble.COMBAT_HOLD_MS + Tumble.FADE_OUT_MS + 200
+
+	Table.mode = "EXPLORATION"
+	Table.dice_dismiss_at = null
+	_throw_at(tray, now - elapsed)
+	assert_not_null(Table.active_roll, "exploration still holds")
+
+	Table.mode = "COMBAT"
+	tray._process(0.0)
+	assert_eq(Table.active_roll, null, "combat has already left")
+
+
+# ---- Finished lets go
+
+func test_finished_clears_the_active_roll_and_goes_idle() -> void:
+	var tray := _tray()
+	await wait_frames(1)
+	Table.mode = "EXPLORATION"
+	Table.dice_dismiss_at = null
+	var now := Time.get_ticks_msec()
+	_throw_at(tray, now - (Tumble.HOLD_MS + Tumble.FADE_OUT_MS + 1))
+	assert_eq(Table.active_roll, null)
+	assert_false(tray.is_processing())

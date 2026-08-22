@@ -1,10 +1,11 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://chrome/chrome.gd" id="1_chrome"]
 [ext_resource type="Script" path="res://chrome/transcript.gd" id="2_transcript"]
 [ext_resource type="Script" path="res://chrome/input_box.gd" id="3_input"]
 [ext_resource type="Script" path="res://chrome/toast.gd" id="4_toast"]
 [ext_resource type="Script" path="res://chrome/title.gd" id="5_title"]
+[ext_resource type="Script" path="res://chrome/dice_tray.gd" id="6_tray"]
 
 [sub_resource type="StyleBoxFlat" id="LogStyle"]
 bg_color = Color(0.04, 0.04, 0.05, 0.72)
@@ -60,6 +61,21 @@ script = ExtResource("2_transcript")
 layout_mode = 2
 placeholder_text = "What do you do?"
 script = ExtResource("3_input")
+
+[node name="DiceTray" type="Control" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -348.0
+offset_top = -250.0
+offset_right = 348.0
+offset_bottom = -22.0
+grow_horizontal = 2
+mouse_filter = 2
+script = ExtResource("6_tray")
 
 [node name="Toast" type="Label" parent="Overlay"]
 layout_mode = 1

@@ -112,9 +112,13 @@ func _load_bank() -> void:
 
 ## One clip from the family. [param family] is the TS name, not Node.name — that property
 ## would shadow if this were called [code]name[/code].
-func play(family: String, gain: float = 1.0, rate: float = 1.0, delay: float = 0.0) -> void:
+##
+## [param duration] is seconds to keep the clip, or null to play it out. The rattle sample
+## runs 1.5s; the tray cuts it at the wind-up so it is not still going when the dice land.
+func play(family: String, gain: float = 1.0, rate: float = 1.0, delay: float = 0.0,
+		duration: Variant = null) -> void:
 	if delay > 0.0:
-		_after(delay, func() -> void: play(family, gain, rate, 0.0))
+		_after(delay, func() -> void: play(family, gain, rate, 0.0, duration))
 		return
 	var loaded: Array = _clips.get(family, [])
 	if loaded.is_empty():
@@ -124,7 +128,7 @@ func play(family: String, gain: float = 1.0, rate: float = 1.0, delay: float = 0
 		return
 	var bus := "Dice" if DICE_FAMILIES.has(family) else "World"
 	# The same sample replayed identically sounds canned by the third roll.
-	_fire(stream, gain, rate * (0.9 + randf() * 0.2), bus)
+	_fire(stream, gain, rate * (0.9 + randf() * 0.2), bus, duration)
 
 
 func _drop(which: String, delay: float = 0.0) -> void:
@@ -149,13 +153,38 @@ func _after(seconds: float, then: Callable) -> void:
 			CONNECT_ONE_SHOT)
 
 
-func _fire(stream: AudioStream, gain: float, pitch: float, bus: String) -> void:
+func _fire(stream: AudioStream, gain: float, pitch: float, bus: String,
+		duration: Variant = null) -> void:
 	var player := _take(bus)
+	_cancel_cut(player)
 	player.stop()
 	player.stream = stream
 	player.volume_db = linear_to_db(maxf(gain * MASTER, 0.0001))
 	player.pitch_scale = maxf(pitch, 0.01)
 	player.play()
+	if duration != null:
+		_cut(player, float(duration))
+
+
+func _cancel_cut(player: AudioStreamPlayer) -> void:
+	if not player.has_meta("cut"):
+		return
+	var tween: Tween = player.get_meta("cut")
+	if tween != null:
+		tween.kill()
+	player.remove_meta("cut")
+
+
+func _cut(player: AudioStreamPlayer, seconds: float) -> void:
+	# Ramped, not cut: stopping a sample mid-waveform is an audible click. Mirrors sfx.ts.
+	var ramp := minf(0.06, maxf(seconds, 0.0))
+	var hold := maxf(seconds - ramp, 0.0)
+	var tween := create_tween()
+	if hold > 0.0:
+		tween.tween_interval(hold)
+	tween.tween_property(player, "volume_db", linear_to_db(0.0001), ramp)
+	tween.tween_callback(player.stop)
+	player.set_meta("cut", tween)
 
 
 func _take(bus: String) -> AudioStreamPlayer:
