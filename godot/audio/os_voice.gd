@@ -53,9 +53,16 @@ func speak(line: Dictionary) -> void:
 
 
 func stop() -> void:
-	# Settles the in-flight line via the CANCELED callback. Without that the queue would wait
-	# forever for a line that was cut.
+	# Settle directly rather than trusting the CANCELED callback: it is process-wide and
+	# delivered asynchronously, and a backend swap re-registers it to the new instance
+	# microseconds later, so a line settled only there would never settle at all. Deferred,
+	# so a swap's drain resumes after the new backend is installed. The callback is now the
+	# backstop — a late CANCELED is ignored by the id check. The TypeScript's stop() calls
+	# `settle?.()` directly for the same reason.
 	DisplayServer.tts_stop()
+	if _in_flight != -1:
+		_in_flight = -1
+		finished.emit.call_deferred()
 
 
 func _on_utterance_done(id: int) -> void:
