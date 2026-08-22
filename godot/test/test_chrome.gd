@@ -124,8 +124,31 @@ func test_the_box_is_locked_while_the_dm_has_the_floor() -> void:
 	assert_eq(Net.outbound.size(), 0)
 
 
+func test_the_box_is_locked_while_disconnected() -> void:
+	Table.connected = false
+	Table.started = true
+	Table.awaiting_dm = false
+	var box := _input_box()
+	assert_false(box.editable)
+	box.text_submitted.emit("a turn while the socket is down")
+	assert_eq(Table.transcript.size(), 0)
+	assert_eq(Net.outbound.size(), 0)
+
+
+func test_the_box_relocks_when_the_server_returns() -> void:
+	Table.connected = false
+	Table.started = true
+	Table.awaiting_dm = false
+	var box := _input_box()
+	assert_false(box.editable)
+	Net.connected.emit()
+	assert_true(Table.connected)
+	assert_true(box.editable)
+
+
 func test_enter_echoes_locally_then_sends_free_text() -> void:
 	var box := _input_box()
+	Table.connected = true
 	Table.started = true
 	Table.awaiting_dm = false
 	Table.started_changed.emit()
@@ -154,7 +177,26 @@ func test_enter_echoes_locally_then_sends_free_text() -> void:
 
 # ---- Title: take the floor, then ask for the opening
 
+func test_a_title_click_is_refused_while_disconnected() -> void:
+	Table.connected = false
+	var title := _title()
+	assert_true(title.visible)
+	assert_lt(title.modulate.a, 1.0)
+
+	var click := InputEventMouseButton.new()
+	click.pressed = true
+	title.gui_input.emit(click)
+
+	assert_false(Table.started)
+	assert_eq(Net.outbound.size(), 0)
+	assert_true(title.visible)
+
+	Net.connected.emit()
+	assert_eq(title.modulate.a, 1.0)
+
+
 func test_a_title_click_takes_the_floor_then_asks_the_server_to_begin() -> void:
+	Table.connected = true
 	var title := _title()
 	assert_true(title.visible)
 	assert_false(Table.started)
@@ -179,6 +221,7 @@ func test_a_title_click_takes_the_floor_then_asks_the_server_to_begin() -> void:
 
 
 func test_a_second_click_does_not_begin_again() -> void:
+	Table.connected = true
 	var title := _title()
 	var click := InputEventMouseButton.new()
 	click.pressed = true

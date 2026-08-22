@@ -86,7 +86,9 @@ func _process(_delta: float) -> void:
 
 	var elapsed := Time.get_ticks_msec() - started_at
 	var visual := Tumble.sample(result, elapsed, dismiss_ms(result, started_at))
-	if visual["finished"]:
+	# sample() reports finished at elapsed 0 because opacity is 0. That is the start of a
+	# throw, not the end.
+	if visual["finished"] and elapsed > 0:
 		Table.active_roll = null
 		_idle()
 		return

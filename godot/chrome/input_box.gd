@@ -10,12 +10,14 @@ func _ready() -> void:
 	text_submitted.connect(_send)
 	Table.transcript_changed.connect(_relock)
 	Table.started_changed.connect(_relock)
+	Net.connected.connect(_relock)
+	Net.disconnected.connect(func(_reason: String) -> void: _relock())
 	_relock()
 
 
 func _send(typed: String) -> void:
 	var line := typed.strip_edges()
-	if line.is_empty() or Table.awaiting_dm:
+	if line.is_empty() or not Table.connected or Table.awaiting_dm:
 		return
 	clear()
 	# Local echo first, so the keypress is acknowledged inside 100ms with no model in the path.
@@ -24,5 +26,5 @@ func _send(typed: String) -> void:
 
 
 func _relock() -> void:
-	editable = Table.started and not Table.awaiting_dm
+	editable = Table.connected and Table.started and not Table.awaiting_dm
 	placeholder_text = "The DM is speaking." if Table.awaiting_dm else "What do you do?"

@@ -113,6 +113,17 @@ func test_combat_does_not_use_the_exploration_hold() -> void:
 
 # ---- Finished lets go
 
+func test_elapsed_zero_does_not_clear_a_brand_new_roll() -> void:
+	# sample() reports finished at elapsed <= 0 because opacity is 0. That is the
+	# start of a throw, not the end. started_at in the future forces elapsed < 0
+	# so this does not depend on landing in the same millisecond as the clock.
+	var tray := _tray()
+	await wait_frames(1)
+	_throw_at(tray, Time.get_ticks_msec() + 50)
+	assert_not_null(Table.active_roll)
+	assert_true(tray.is_processing())
+
+
 func test_finished_clears_the_active_roll_and_goes_idle() -> void:
 	var tray := _tray()
 	await wait_frames(1)

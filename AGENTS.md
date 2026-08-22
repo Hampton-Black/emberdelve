@@ -580,7 +580,7 @@ a sting is layers a tenth of a second apart and timers smear them together.
 | Move | 4 | footfalls spread across the slide, capped at four |
 | Prop revealed | 2 | a catch, then a short scrape |
 | Sarcophagus opens | 5 | stone grinding, the catch letting go, the slab landing, a sub under it |
-| **Combat begins** | 6 | two struck booms, a drawn blade, then the dice |
+| **Combat begins** | 4 | three drums and a sub |
 | Attack, miss | 4 | three dice, then the blade through air |
 | Attack, hit | 6 | + chop and a metal ring, 220ms later |
 | Killing blow | 9 | + body, cloth and a sub, 430ms later |

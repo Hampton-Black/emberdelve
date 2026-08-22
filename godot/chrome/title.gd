@@ -14,14 +14,26 @@ extends Control
 
 func _ready() -> void:
 	Table.started_changed.connect(func() -> void: visible = not Table.started)
+	# Table mirrors `connected` but has no signal of its own; Net is what actually flips.
+	Net.connected.connect(_refresh)
+	Net.disconnected.connect(func(_reason: String) -> void: _refresh())
 	gui_input.connect(_on_click)
 	visible = not Table.started
+	_refresh()
+
+
+func _refresh() -> void:
+	# The TS button is `disabled={!connected}` and the browser dims it. There is no button
+	# here — the whole overlay is the click — so the title itself goes dim until the socket is up.
+	modulate.a = 1.0 if Table.connected else 0.45
 
 
 func _on_click(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.pressed):
 		return
-	if Table.started:
+	# A click with the socket down would hide the title forever and drop `begin` on the floor;
+	# the opening is once-per-session, so that silence is the rest of the game.
+	if Table.started or not Table.connected:
 		return
 	# Order matters and is the whole mechanism: take the floor, then ask for the opening. The
 	# DM has it from this moment, not from the moment its first token lands — those are about
