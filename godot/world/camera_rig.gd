@@ -3,7 +3,7 @@ extends Camera3D
 
 ## Four fixed isometric corners, 90 degrees apart, snapped. Never free orbit.
 ##
-## Free orbit would break the look: the pixelation pass and the whole isometric read only hold
+## Free orbit would break the look: the isometric read and grid picking only hold
 ## at these four angles, because they are the angles that resolve tile edges onto the same
 ## screen-space slopes every frame.
 ##
@@ -223,6 +223,8 @@ func _apply_camera() -> void:
 ## camera can only ever move in exact pixel steps, which is what keeps the art still underneath
 ## it.
 func _snap_focus(focus: Vector3) -> Vector3:
+	if not World.PIXEL_LOOK:
+		return focus
 	var rows := maxf(1.0, roundf(get_viewport().size.y))
 	var unit := (half_height * 2.0) / rows
 	var right := global_transform.basis.x

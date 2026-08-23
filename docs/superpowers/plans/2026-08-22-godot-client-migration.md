@@ -13,7 +13,8 @@
 - **Spec:** `docs/superpowers/specs/2026-08-21-godot-client-design.md`. Where this plan and the spec disagree, **the spec wins**.
 - **Numbers:** `AGENTS.md` is authoritative for every feel number (dice timing, impact beat, ceremony, token scale, audio layers). If a Godot scene disagrees with those numbers, the numbers win until a played session replaces them.
 - **Godot version: 4.5.x, pinned.** Not "current stable".
-- **Renderer: Forward+.** Task 16's edge shader reads `NORMAL_ROUGHNESS_TEXTURE`, which no other renderer provides.
+- **Look (locked 2026-08-23):** stylized isometric 3D at native resolution. `World.PIXEL_LOOK` is `false`. Task 15 as written shipped a 480px nearest-neighbour pipeline; play rejected it for KayKit. Do not restore it. True 2D isometric sprites are out of scope for this client.
+- **Renderer: Forward+.** Task 16's edge shader reads `NORMAL_ROUGHNESS_TEXTURE`. That shader is unused while `PIXEL_LOOK` is false; do not re-enable it to chase a pixel look.
 - **GDScript only.** No C#, no GDExtension.
 - **Invariant #1 — the server is authoritative.** The client never computes a roll, a hit, a legal move, or a death. Click-to-move tests membership in `legalMoves` from the wire and nothing else.
 - **Invariant #2 — no singleton player.** Address every creature by `actorId` from the wire. Never a literal `"fighter"`, never "the first entity".
@@ -3674,6 +3675,8 @@ Phase B builds the crypt under the chrome that already works. Nothing in Phase A
 ---
 
 ### Task 15: The pixel pipeline and the camera
+
+> **Look lock, 2026-08-23.** This task shipped the 480px (later 960px) nearest-neighbour world and the camera pixel-snap. Play rejected that look for KayKit. The locked look is native-resolution stylized 3D (`PIXEL_LOOK = false`). Keep the four isometric corners and the chrome-over-world composite. Do not re-enable the pixel buffer without a new spec.
 
 **Files:**
 - Create: `godot/world/world.tscn`, `godot/world/world.gd`

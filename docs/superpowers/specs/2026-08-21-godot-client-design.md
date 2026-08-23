@@ -1,6 +1,6 @@
 # Godot desktop client
 
-**Status:** Design approved, revised 2026-08-22 after review, pre-implementation
+**Status:** Design approved, revised 2026-08-22 after review. **Look locked 2026-08-23:** stylized isometric 3D at native resolution (see §2 *Look*). The 480px nearest-neighbour pipeline in earlier drafts is rejected.
 **Companion to:** `docs/m0-evaluation.md` (the feel that must survive), `docs/m0-build-plan.md`
 (invariants), `AGENTS.md` (presentation numbers), `docs/ai-dm-system-design.md` (long-range stack)
 **Supersedes:** `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` §8b
@@ -43,7 +43,7 @@ The Java server stays the DM. Godot becomes the table.
 | Chrome | WoW-style overlay on the 3D view. One stream (prose + rolls). No fade while a line is being spoken |
 | Dice | Predetermined faces from the server. 2D tray, not RigidBody. `tumble.ts` math ports as numbers |
 | Clock source | `Time.get_ticks_msec()`, everywhere `performance.now()` appears today. Named once so three modules do not pick three |
-| Pixel look | The 3D world renders into a `SubViewport` at 480px wide, nearest-neighbour. Chrome is composited **at native resolution on top**. Never project-wide stretch — that pixelates the type |
+| Look | **Stylized isometric 3D at native window resolution.** KayKit-class meshes, linear filtering, real lights. No downsample, no nearest-neighbour upscale, no edge-detect pass pretending to be pixel art. Chrome still composites on top of the world viewport, never through a project-wide stretch. Four isometric corners, 90° snap — that constraint is picking and the isometric read, not a pixel grid. Tried and rejected in play: 480px then 960px nearest-neighbour over KayKit (smear, muddy silhouettes). True 2D isometric sprites are a different game (new atlas per creature, Q/E costs 4× environment art) and are not this client |
 | Voice | `POST /tts` first; OS TTS (`DisplayServer.tts_*`) per line on failure. No Web Speech |
 | Secrets | Stay in Java. Godot never reads `.env` or API keys |
 | Bind | The server listens on `127.0.0.1` only |
@@ -76,7 +76,7 @@ The Java server stays the DM. Godot becomes the table.
 │  Net ────── JSON WebSocket, ClientMessage / ServerMessage         │
 │  Table ──── scene, transcript, rolls, awaiting_dm  (the store)    │
 │  Clock ──── speak / mark / hold / silence / silence_now           │
-│  World ──── crypt scene, tokens, camera, pixel viewport           │
+│  World ──── crypt scene, tokens, camera, native 3D viewport       │
 │  Chrome ─── WoW overlay, dice tray, combat bar, title, defeat     │
 │  Voice ──── POST /tts, else OS TTS                                │
 │  SFX ────── Godot buses, measured layers from AGENTS.md           │
@@ -287,15 +287,16 @@ are present and which light group is on.
 
 Constraints that survive the port:
 
-- Internal render width 480, nearest-neighbour upscale (pixel read).
+- Native window resolution, linear texture filtering. The world `SubViewport` follows the window; it is not a 480px or 960px pixel buffer.
 - Four isometric corners, 90° snap (Q/E). No free orbit. Orthographic `Camera3D`, elevation
   `atan(1/√2)` = 35.264° below horizontal, 45° around Y — the numbers in `Renderer.ts:379`.
 - Exploration vs combat framing as in `Renderer.ts` (`EXPLORATION_HALF_HEIGHT` 5.4,
   `COMBAT_MAX_HALF_HEIGHT` 10, `FOLLOW_SECONDS` 0.34, `FRAMING_SECONDS` 1.1). Camera facing is
   view state, not Table.
-- Kenney kits: **one folder per kit** (colormap paths). Graveyard vs mini do not share a
-  directory.
-- Tokens: clips `idle`, `walk`, `attack-melee-right`, `die`. Oversized vs the 1.0 square.
+- KayKit: **one folder per kit**. Adventurers vs Skeletons vs Dungeon do not share a
+  directory (atlas paths).
+- Tokens: clips `Idle_A`, `Walking_A`, `1H_Melee_Attack_Chop`, `Death_A`. Height is tuned so
+  a standing figure sits under the wall (~0.8 on the fighter), not oversized for a 480px smear.
   Faint self-lit so they read in a dark crypt. `IMPACT_SECONDS = 0.22` gates HP drain and the
   death clip. Godot's glTF import gives every instance its own `AnimationPlayer`, so the
   `SkeletonUtils.clone` problem in `tokens.ts` simply does not exist here.
@@ -304,14 +305,17 @@ Constraints that survive the port:
 
 Three things §7 originally treated as free and are not:
 
-**The pixel pipeline is three decisions, not one.** `RenderPixelatedPass` is doing edge detection
-as well as downsampling — `normalEdgeStrength` 0.5, `depthEdgeStrength` 0.25 (`Renderer.ts:358`).
-A bare `SubViewport` gives the resolution and none of the outline, and the room will read flatter
-without anyone knowing why; that edge pass has to be written as a screen shader over the
-viewport's depth and normal buffers. The chrome must composite **on top of** the viewport at
-native resolution, never through it. And `snapFocus` (`Renderer.ts:406`) quantises the camera to
-whole low-resolution pixels — without it every camera follow resamples the entire frame and the
-art shimmers. It is load-bearing, not polish.
+**The pixel pipeline was three decisions, and play rejected all three for this kit.** A 480px
+then 960px nearest-neighbour `SubViewport`, a depth/normal edge shader, and camera focus snapped
+to low-res pixels were ported from `RenderPixelatedPass` / `snapFocus` because Kenney-style
+meshes downsampled into a pixel read. KayKit is authored as stylized 3D. Downsampling it fights
+the meshes (smeared silhouettes, crawling edges). The locked look is the assets at native
+resolution with linear filtering. The chrome still composites **on top of** the world viewport at
+native resolution, never through a project-wide stretch. Camera focus is not quantised to a
+pixel grid. `World.PIXEL_LOOK` in code is the abandoned path, default `false` — do not flip it
+without a new spec. True 2D isometric sprites (FFT / the Gemini mock) are a different medium:
+new drawings per facing and per creature, and Q/E is free in 3D and expensive in 2D. Not this
+client. An AI DM generates variety; kitbashed meshes scale, sprite sheets do not.
 
 **The lighting numbers do not port, and that is the one exception to §4.** `FLAME_INTENSITY` is
 26 *candela* under Three.js physical decay; Godot's `OmniLight3D` is energy, range and an
@@ -382,8 +386,8 @@ never mounts."* And if the face is being forced anyway, the simulation is decora
 the price of a nondeterministic settle time, a physics dependency pinned to a Godot minor
 version, and every measured number above.
 
-There is also nowhere good to draw it: inside the 480px viewport a d20 is a smudge for the same
-reason a to-scale human is, and outside it is a third render path.
+There is also nowhere good to draw it: a 3D die in the world is a third render path, and the
+measured tray is 2D overlay chrome. Keep it there.
 
 `tumble.gd` is pure and unit-tested, so this stays cheap to revisit — the tray is a presentation
 swap behind `sample()`. **Re-entry condition:** after the parity gate, if the tray reads as flat
@@ -557,7 +561,7 @@ godot/                  # Godot 4.5.x project (GDScript)
     net.gd              # WebSocketPeer, polled; one signal per ServerMessage
     table.gd            # the store. One signal per diff batch
     clock.gd            # the presentation queue. The load-bearing port
-  world/                # crypt.tscn, camera, pixel SubViewport + edge shader
+  world/                # crypt.tscn, camera, native 3D SubViewport
     props/              # one .tscn per PropType, behind prop_table.tres
     tokens/             # kit imports, one folder per kit (colormaps)
   chrome/               # overlay chat, dice tray, combat bar, title, defeat, debug bar

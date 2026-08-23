@@ -1,6 +1,6 @@
 # AI Dungeon Master — Initial System Design
 
-**Status:** Design locked, pre-implementation
+**Status:** Design locked, pre-implementation. **Look amended 2026-08-23:** stylized isometric 3D at native resolution — see Renderer below and `docs/superpowers/specs/2026-08-21-godot-client-design.md`. The 480px nearest-neighbour target in this document is superseded. The client that draws it is Godot, not Three.js; 3D kit content (not 2D sprites) remains the variety strategy.
 **Scope:** Personal single-player toy, architected so multiplayer is a feature and not a rewrite
 
 ---
@@ -9,7 +9,9 @@
 
 A solo-playable D&D-style RPG where an LLM acts as Dungeon Master. The player controls a party of
 four pregenerated characters. Exploration is free-text and narrative; combat is tactical, grid-based,
-and adjudicated by a deterministic rules engine. The world renders as a pixelated isometric 3D scene.
+and adjudicated by a deterministic rules engine. The world renders as a stylized isometric 3D scene
+(native resolution, cartoon-kit meshes — miniatures on a board, not a fake-pixel downsample and not
+hand-drawn 2D isometric sprites).
 Narration is spoken via TTS, with a persistent narrator voice and distinct voices for recurring NPCs.
 
 **What it is not:** not a VTT, not a product, not multiplayer (yet), not a chat interface with pictures.
@@ -31,7 +33,7 @@ asset. Every mechanical effect goes through a validated tool call against server
 | Job runner | **Postgres `jobs` table + worker** | One async job exists (synthesis). River if it needs to be proper. |
 | Transport | **Single websocket** | Server pushes state diffs; client sends actions. HTTP only for assets and campaign list. |
 | Frontend chrome | **React + Zustand** | Training-data density buys agentic coding quality on the least familiar layer. |
-| Renderer | **Three.js, orthographic camera, low-res render target upscaled nearest-neighbor** | Z-buffer solves depth sorting. 3D content scales far better than sprites for an infinite-variety game. |
+| Renderer | **Orthographic isometric 3D at native resolution** (Godot client; originally Three.js). KayKit-class meshes, linear filtering. No low-res nearest-neighbour pass | Z-buffer solves depth sorting. 3D kit content scales far better than sprites for an infinite-variety game — the reason this is not 2D isometric pixel art |
 | Schema source of truth | **One IDL (protobuf or JSON Schema)** generating Go-free Java records, TS types, and LLM tool schemas | Single definition, three consumers. Highest-leverage structural decision in the stack. |
 | Ruleset | **Full-SRD-shaped engine, trimmed content** | 4 classes, levels 1–5, ~30 monsters CR 0–3. Engine keeps reaction hooks and concentration from day one. |
 | Combat | **Full tactical grid** | Movement, range, cover, AoE, opportunity attacks. |
@@ -405,8 +407,9 @@ websocket ──► Zustand store ──► React (chrome)
 **Game state never lives in React state.** Both React and Three.js subscribe to the store. The
 renderer lives in a `useRef` and is never re-created by a render. Get this boundary right on day one.
 
-Renderer: orthographic camera, render to ~480×270 target, upscale nearest-neighbor, optional color
-quantization. glTF models via `AnimationMixer`. Performance is a non-issue at a dozen entities.
+Renderer: orthographic isometric camera, native resolution, linear filtering, glTF kits. Do not
+downsample toward a pixel look — that fight was lost in play against KayKit. Performance is a
+non-issue at a dozen entities. The Godot client spec owns the viewport.
 
 Audio: segments arrive tagged, are synthesized in parallel, queued, and played strictly in order.
 Cache by `hash(text, voice_id)` — narration repeats more than you'd expect.

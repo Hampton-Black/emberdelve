@@ -274,10 +274,11 @@ the *rules* still did not.
 
 Two findings worth keeping:
 
-- **The pixelated look is unusually forgiving of generated imagery.** At ~480px internal width a
-  token is 24–40 pixels, and almost anything downsampled that far reads as deliberate pixel art. An
-  inanimate target also needs no rig and can be a billboard rather than a mesh. The art was never
-  the hard part.
+- **A fake-pixel downsample used to hide generated meshes; native 3D does not.** The 480px
+  nearest-neighbour look was unusually forgiving — almost anything that small read as deliberate
+  pixels. That look is rejected (stylized isometric 3D at native resolution). Generated or
+  kitbashed props must read as authored 3D, not as a smear. An inanimate target still needs no
+  rig and can be a billboard. The art is still not the hard part; the rules bound the set.
 - **The rules bound the generation space.** Polymorph's targets are "a beast of CR ≤ X" — a closed
   set. Generated assets for it are not unbounded generation; they are rendering a closed enum with
   large membership, which is invariant #7 applied to art instead of tool arguments. A CR-bounded

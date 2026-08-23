@@ -72,7 +72,7 @@ loop. Judge M0 on steps 1–8.
 
 | Component | M0 form |
 |---|---|
-| Renderer | Three.js, orthographic camera, low-res target upscaled nearest-neighbor |
+| Renderer | Three.js, orthographic camera, low-res target upscaled nearest-neighbor. **Superseded for the Godot client (2026-08-23):** stylized isometric 3D at native resolution — `docs/superpowers/specs/2026-08-21-godot-client-design.md` |
 | Room | One hand-authored room, loaded from a JSON file |
 | Party | **A list containing exactly one** level-1 fighter with fixed stats |
 | Monster | One goblin, fixed stats |

@@ -51,7 +51,7 @@ Resolved in a design review before implementation. Do not silently revisit these
 
 | Area | Decision |
 |---|---|
-| Assets | Kenney CC0. Architecture from Modular Dungeon Kit, tokens from Graveyard Kit (Mini Characters also installed). Props still procedural. |
+| Assets | M0 shipped Kenney CC0 (Modular Dungeon + Graveyard). **Godot table is KayKit:** Adventurers Knight, Skeletons Warrior, Dungeon kit. Not 2D sprites. |
 | LLM provider | **Venice.ai**, OpenAI-compatible, `https://api.venice.ai/api/v1`. One key, one endpoint, 100+ models. |
 | LLM model | Two config strings, never literals: `DM_MODEL_TOOLS` (fast, reliably tool-calling) and `DM_MODEL_PROSE` (best writer). Measured picks and their disqualifications are below. |
 | Narration | **Text channel**, not a tool. Inline `[[speaker]]` markers, validated against live entities. |
@@ -59,7 +59,8 @@ Resolved in a design review before implementation. Do not silently revisit these
 | Build | Gradle + Kotlin DSL. |
 | Determinism | Real DM discretion. `ScriptedDiceRoller` behind `--demo` for reproducible tuning runs. |
 | Combat VO | **Dramatic beats only** — kills, crits, and the goblin's turn. Ordinary hits resolve instantly. |
-| Camera | Four fixed isometric corners, 90° snap (Q/E). Never free orbit — it breaks the pixel look and grid picking. |
+| Camera | Four fixed isometric corners, 90° snap (Q/E). Never free orbit — it breaks the isometric read and grid picking. |
+| Look | **Stylized isometric 3D at native resolution.** KayKit-class meshes, linear filtering, real lights. Not a 480px/960px nearest-neighbour pixel pass, not 2D isometric sprites. `World.PIXEL_LOOK` stays `false`. |
 
 ### Deviations from `docs/m0-build-plan.md` as written
 
@@ -311,18 +312,17 @@ Three things that are not obvious and cost an hour each if forgotten:
 - **Each kit needs its own folder.** Every Kenney GLB references `Textures/colormap.png` by
   *relative* path, and the mini and graveyard kits ship **different** colormaps under that same
   name. Putting both kits in one directory silently renders one of them in the other's palette.
-- **Figures are deliberately oversized** — about 1.25 world units on a 1.0 square. At 480px
-  internal width a to-scale human is ~24 pixels and reads as a smudge. Oversizing the figure
-  relative to its base is what tactical RPGs do, for exactly this reason.
+- **Figures sit under the wall** — KayKit knight ~0.8 world units on a 1.0 square. Oversizing to
+  1.25 was for a 480px pixel buffer where a to-scale human was ~24 pixels and read as a smudge.
+  That buffer is gone. Do not grow figures to “read at 480.” Do not “fix” the dark crypt by
+  raising the ambient; tokens still carry a faint emissive of their albedo.
 - **Characters carry a faint emissive of their own colormap.** The crypt is genuinely dark away
   from the two braziers, which is right for the room and wrong for the figures standing in it.
   This lifts tokens off the floor without touching scene lighting — do not "fix" it by raising
   the ambient.
 
-Current cast: the **keeper** (a gravedigger in a coat and hat) as the fighter, the **zombie** as
-the goblin. `graveyard/` also holds `-skeleton`, `-vampire` and `-ghost`. Kenney's `mini/` set is
-contemporary — police officer, businessman, doctor — and is kept only because it is rig-identical
-and therefore a one-line swap.
+Current M0/Three.js cast: the **keeper** (a gravedigger in a coat and hat) as the fighter, the
+**zombie** as the goblin. Godot current cast: KayKit **Knight** and **Skeleton_Warrior**.
 
 Graveyard models are **node-animated** (`skins: 0`, six part meshes) rather than skinned. Both
 kinds work through the same `AnimationMixer` path and both need `SkeletonUtils.clone` — a plain

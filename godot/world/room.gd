@@ -318,7 +318,7 @@ func _nearest(root: Node) -> void:
 		for i in _surface_count(mesh):
 			var mat := mesh.get_active_material(i)
 			if mat is BaseMaterial3D:
-				(mat as BaseMaterial3D).texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+				(mat as BaseMaterial3D).texture_filter = World.mesh_filter()
 
 
 func _aabb_of(root: Node3D) -> AABB:

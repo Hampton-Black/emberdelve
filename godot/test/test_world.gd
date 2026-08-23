@@ -287,7 +287,10 @@ func test_snap_focus_is_idempotent_on_a_pixel() -> void:
 	assert_almost_eq(once.x, twice.x, 0.0001)
 	assert_almost_eq(once.y, twice.y, 0.0001)
 	assert_almost_eq(once.z, twice.z, 0.0001)
-	assert_ne(once, raw, "a fractional focus is moved onto the pixel grid")
+	if World.PIXEL_LOOK:
+		assert_ne(once, raw, "a fractional focus is moved onto the pixel grid")
+	else:
+		assert_eq(once, raw, "native look does not quantise the camera")
 
 
 # ---- Edge pass: depth + normals, not a second pixelation
@@ -321,6 +324,10 @@ func test_the_world_wears_the_edge_pass_at_three_js_strengths() -> void:
 	if mat == null:
 		return
 	assert_eq(mat.shader, shader)
+	var edges := world.get_node_or_null("Camera3D/Edges") as GeometryInstance3D
+	if edges:
+		assert_eq(edges.visible, World.PIXEL_LOOK,
+			"edge pass is off in the locked native look")
 	var n: Variant = mat.get_shader_parameter("normal_edge_strength")
 	var d: Variant = mat.get_shader_parameter("depth_edge_strength")
 	if n == null or d == null:

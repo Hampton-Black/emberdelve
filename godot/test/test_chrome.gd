@@ -248,15 +248,14 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 
 	var view: SubViewportContainer = chrome.get_node("WorldView")
 	assert_true(view.stretch)
-	assert_eq(view.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
-		"nearest-neighbour on the container so 960px stays 960px")
+	assert_eq(view.texture_filter, CanvasItem.TEXTURE_FILTER_LINEAR,
+		"locked look: linear sample at native resolution")
 
 	var sub: SubViewport = view.get_node("SubViewport")
-	assert_true(sub.snap_2d_transforms_to_pixel)
-	assert_eq(sub.size.x, 960, "the world is 960 wide")
+	assert_false(sub.snap_2d_transforms_to_pixel)
 	var win := chrome.get_viewport().get_visible_rect().size
-	var expected_h := maxi(1, int(round(960.0 * win.y / maxf(win.x, 1.0))))
-	assert_eq(sub.size.y, expected_h, "height follows the window aspect")
+	assert_eq(sub.size.x, int(win.x), "the world follows the window, not a 960px buffer")
+	assert_eq(sub.size.y, int(win.y), "height follows the window")
 
 	var world: Node3D = sub.get_node("World")
 	assert_not_null(world.get_node_or_null("Camera3D"))
@@ -273,9 +272,9 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_true(record.selection_enabled)
 	assert_not_null(chrome.get_node("Overlay/Log/VBox/InputBox"))
 	assert_not_null(chrome.get_node_or_null("Overlay/DiceTray"),
-		"the tray is overlay chrome — a d20 at 960px is still a smudge")
+		"the tray is overlay chrome, not a 3D object")
 	assert_eq(world.get_node_or_null("DiceTray"), null,
-		"not inside the pixelated World")
+		"not inside the World viewport")
 	assert_eq(sub.get_node_or_null("DiceTray"), null)
 	assert_not_null(chrome.get_node("Overlay/Toast"))
 	assert_not_null(chrome.get_node("Overlay/Banner"))

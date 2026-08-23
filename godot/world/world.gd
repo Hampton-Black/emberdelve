@@ -8,9 +8,18 @@ extends Node3D
 ## `toWorld` in `client/src/scene/assets.ts`.
 
 const TARGET_WIDTH := 960
+## Locked look is native 3D (`false`). The `true` path is the abandoned 960px
+## nearest-neighbour pixel table. Do not flip this without a new spec.
+const PIXEL_LOOK := false
 const CameraRigScript := preload("res://world/camera_rig.gd")
 const PROP_TABLE := preload("res://world/prop_table.tres")
 const TOKEN_SCENE := preload("res://world/tokens/token.tscn")
+
+
+static func mesh_filter() -> BaseMaterial3D.TextureFilter:
+	if PIXEL_LOOK:
+		return BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	return BaseMaterial3D.TEXTURE_FILTER_LINEAR
 
 var rig: CameraRigScript
 var _room_id := ""
@@ -27,6 +36,9 @@ func _ready() -> void:
 	Table.strike.connect(_on_strike)
 	_on_scene_changed()
 	_fit_pixel_viewport()
+	var edges := get_node_or_null("Camera3D/Edges") as GeometryInstance3D
+	if edges:
+		edges.visible = PIXEL_LOOK
 
 
 func _process(_delta: float) -> void:
@@ -234,13 +246,28 @@ func _fit_pixel_viewport() -> void:
 	var host := vp.get_parent() as SubViewportContainer
 	if host == null:
 		return
+	var win := host.get_viewport().get_visible_rect().size
+	if win.x < 1.0 or win.y < 1.0:
+		return
+	if not PIXEL_LOOK:
+		# Native window pixels, linear sample, no 960px nearest upsample.
+		if host.anchor_right != 1.0 or host.anchor_bottom != 1.0 \
+				or not host.scale.is_equal_approx(Vector2.ONE):
+			host.set_anchors_preset(Control.PRESET_FULL_RECT)
+			host.offset_left = 0.0
+			host.offset_top = 0.0
+			host.offset_right = 0.0
+			host.offset_bottom = 0.0
+			host.position = Vector2.ZERO
+			host.scale = Vector2.ONE
+		host.stretch = true
+		host.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		vp.snap_2d_transforms_to_pixel = false
+		return
 	# stretch=true copies the container's unscaled size onto the SubViewport and refuses a
 	# manual size. Keep the container TARGET_WIDTH wide and scale it to the window so the world is
 	# pixelated and the overlay chrome, a sibling, is not. 960 is 2× the original 480 target —
 	# nearest-neighbour at 480 made KayKit tokens a smear; 960 is still integer-scaled at 1920.
-	var win := host.get_viewport().get_visible_rect().size
-	if win.x < 1.0 or win.y < 1.0:
-		return
 	var pixel_h := maxi(1, int(round(float(TARGET_WIDTH) * win.y / win.x)))
 	var zoom := win.x / float(TARGET_WIDTH)
 	var pixel := Vector2(float(TARGET_WIDTH), float(pixel_h))
