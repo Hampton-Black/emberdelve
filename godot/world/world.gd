@@ -7,7 +7,7 @@ extends Node3D
 ## on the origin; +y on the grid is north, which is -Z in the world — the same mapping as
 ## `toWorld` in `client/src/scene/assets.ts`.
 
-const TARGET_WIDTH := 480
+const TARGET_WIDTH := 960
 const CameraRigScript := preload("res://world/camera_rig.gd")
 const PROP_TABLE := preload("res://world/prop_table.tres")
 const TOKEN_SCENE := preload("res://world/tokens/token.tscn")
@@ -235,8 +235,9 @@ func _fit_pixel_viewport() -> void:
 	if host == null:
 		return
 	# stretch=true copies the container's unscaled size onto the SubViewport and refuses a
-	# manual size. Keep the container 480 wide and scale it to the window so the world is
-	# pixelated and the overlay chrome, a sibling, is not.
+	# manual size. Keep the container TARGET_WIDTH wide and scale it to the window so the world is
+	# pixelated and the overlay chrome, a sibling, is not. 960 is 2× the original 480 target —
+	# nearest-neighbour at 480 made KayKit tokens a smear; 960 is still integer-scaled at 1920.
 	var win := host.get_viewport().get_visible_rect().size
 	if win.x < 1.0 or win.y < 1.0:
 		return
@@ -254,6 +255,12 @@ func _fit_pixel_viewport() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# SubViewportContainer.gui_input already pushed this event into the
+	# SubViewport *and* Chrome already handled it in Control-local pixels.
+	# Converting again (window → viewport) on the same motion parks the hover
+	# a board-width away while the click — committed first — still looks right.
+	if get_viewport() is SubViewport:
+		return
 	if event is InputEventMouseMotion:
 		_route_pointer(event as InputEventMouse, false)
 		return
@@ -263,7 +270,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_route_pointer(mouse, true)
 
 
-## Window pixels → SubViewport pixels. WorldView is 480 wide and scaled onto
+## Window pixels → SubViewport pixels. WorldView is TARGET_WIDTH wide and scaled onto
 ## the window; feeding the camera the unconverted click lands one tile off.
 static func viewport_from_host(host: SubViewportContainer, window_pos: Vector2) -> Vector2:
 	if host == null:
@@ -321,10 +328,16 @@ func pick_at(viewport_pos: Vector2) -> Dictionary:
 
 
 func _route_pointer(mouse: InputEventMouse, clicked: bool) -> void:
+	handle_pointer(viewport_from_window(mouse.global_position), clicked)
+
+
+## Viewport-local pointer. Chrome forwards WorldView.gui_input here because
+## World._unhandled_input never sees a click that a Control already consumed —
+## the same SubViewport isolation that made Q/E a Chrome concern.
+func handle_pointer(viewport_pos: Vector2, clicked: bool) -> void:
 	var overlay := get_node_or_null("Overlay")
 	if overlay == null or not overlay.has_method("intent") or not overlay.has_method("commit"):
 		return
-	var viewport_pos := viewport_from_window(mouse.global_position)
 	var picked := pick_at(viewport_pos)
 	var action: Dictionary = overlay.intent(
 		String(picked.get("entity_id", "")),
@@ -332,6 +345,7 @@ func _route_pointer(mouse: InputEventMouse, clicked: bool) -> void:
 	)
 	if clicked:
 		overlay.commit(action)
+		overlay.set_hover(action.get("square", null) if not action.is_empty() else null)
 		if get_viewport():
 			get_viewport().set_input_as_handled()
 	else:

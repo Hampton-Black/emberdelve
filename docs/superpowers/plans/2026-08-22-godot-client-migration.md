@@ -4128,11 +4128,11 @@ git add godot/world && git commit -m "Pull the camera back when steel comes out,
 - Modify: `AGENTS.md`
 - Modify: `docs/superpowers/specs/2026-08-21-godot-client-design.md` (status)
 
-**This gate is played, not tested.** Latency numbers in `docs/m0-evaluation.md` stay recorded, not the grade. The grade is the same question M0 asked: does it feel like a Dungeon Master is running the game.
+**This gate is played by a human, not by an agent and not by GUT.** An implementer subagent must not tick these boxes, must not delete `client/`, and must not remove CORS until the human has run one full session and signed the list below. Latency numbers in `docs/m0-evaluation.md` stay recorded, not the grade. The grade is the same question M0 asked: does it feel like a Dungeon Master is running the game.
 
-- [ ] **Step 1: Run the gate**
+- [ ] **Step 1: Human quality gate**
 
-One session, on the real Java server, `--demo` dice, authored crypt, **Godot as the only human-facing client for that run** — close the browser tab; the guard from Task 2 will otherwise refuse it.
+One session, on the real Java server, `--demo` dice, authored crypt, **Godot as the only human-facing client for that run** — close the browser tab; the guard from Task 2 will otherwise refuse it. The person playing ticks each item. A checklist with a scripted agent "yes" is not a pass.
 
 - [ ] 1. The room renders: braziers, sarcophagus, door, fighter token.
 - [ ] 2. Title click sends `begin`; the opening is spoken and appears in the overlay **as it is spoken**.

@@ -34,6 +34,28 @@ func _ready() -> void:
 		$Overlay/Banner.visible = true)
 	$Overlay/Banner.text = "Start the DM:  cd server && ./gradlew run"
 	$Overlay/Banner.visible = not Table.connected
+	# World sits in a SubViewport. Clicks hit this Control. Viewport.gui_input
+	# already made `event.position` local to WorldView — which is SubViewport
+	# pixels, because the container is TARGET_WIDTH wide and only *scaled* up.
+	# Converting `global_position` a second time parks the hover a board away.
+	$WorldView.gui_input.connect(_on_world_gui_input)
+
+
+func _on_world_gui_input(event: InputEvent) -> void:
+	var world := get_node_or_null("WorldView/SubViewport/World")
+	if world == null or not world.has_method("handle_pointer"):
+		return
+	if not (event is InputEventMouse):
+		return
+	# Already Control-local. Do not run viewport_from_window here.
+	var viewport_pos: Vector2 = (event as InputEventMouse).position
+	if event is InputEventMouseMotion:
+		world.handle_pointer(viewport_pos, false)
+		return
+	if event is InputEventMouseButton:
+		var button := event as InputEventMouseButton
+		if button.button_index == MOUSE_BUTTON_LEFT:
+			world.handle_pointer(viewport_pos, button.pressed)
 
 
 func _unhandled_input(event: InputEvent) -> void:

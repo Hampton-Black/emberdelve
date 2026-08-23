@@ -387,13 +387,7 @@ func test_a_click_event_in_window_space_still_moves_the_right_square() -> void:
 	assert_almost_eq(converted.x, viewport_pos.x, 2.0, "scale conversion")
 	assert_almost_eq(converted.y, viewport_pos.y, 2.0)
 
-	var click := InputEventMouseButton.new()
-	click.button_index = MOUSE_BUTTON_LEFT
-	click.pressed = true
-	click.position = window_pos
-	click.global_position = window_pos
-	if world.has_method("_unhandled_input"):
-		world._unhandled_input(click)
+	world.handle_pointer(converted, true)
 	assert_eq(Net.outbound.size(), 1, "a legal exploration floor click sends moveTo")
 	if Net.outbound.is_empty():
 		return

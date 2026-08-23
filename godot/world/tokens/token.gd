@@ -9,7 +9,8 @@ const DRAIN_SECONDS := 0.34
 const BAR_WIDTH := 0.72
 const BAR_HEIGHT := 0.085
 const CROSSFADE_SECONDS := 0.2
-const SELF_LIT := 0.22
+# Just enough to read the figure in the dark between braziers. 0.22 was a floodlight.
+const SELF_LIT := 0.05
 
 const MODELS := {
 	"fighter": {

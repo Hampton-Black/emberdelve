@@ -7,8 +7,8 @@ uniform sampler2D screen_texture : hint_screen_texture, repeat_disable, filter_n
 uniform sampler2D depth_texture : hint_depth_texture, repeat_disable, filter_nearest;
 uniform sampler2D normal_roughness_texture : hint_normal_roughness_texture, repeat_disable, filter_nearest;
 
-uniform float normal_edge_strength : hint_range(0.0, 2.0) = 0.5;
-uniform float depth_edge_strength : hint_range(0.0, 2.0) = 0.25;
+uniform float normal_edge_strength : hint_range(0.0, 2.0) = 0.28;
+uniform float depth_edge_strength : hint_range(0.0, 2.0) = 0.12;
 
 void vertex() {
 	POSITION = vec4(VERTEX.xy, 1.0, 1.0);

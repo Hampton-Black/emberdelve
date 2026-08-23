@@ -249,13 +249,13 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	var view: SubViewportContainer = chrome.get_node("WorldView")
 	assert_true(view.stretch)
 	assert_eq(view.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
-		"nearest-neighbour on the container so 480px stays 480px")
+		"nearest-neighbour on the container so 960px stays 960px")
 
 	var sub: SubViewport = view.get_node("SubViewport")
 	assert_true(sub.snap_2d_transforms_to_pixel)
-	assert_eq(sub.size.x, 480, "the world is 480 wide")
+	assert_eq(sub.size.x, 960, "the world is 960 wide")
 	var win := chrome.get_viewport().get_visible_rect().size
-	var expected_h := maxi(1, int(round(480.0 * win.y / maxf(win.x, 1.0))))
+	var expected_h := maxi(1, int(round(960.0 * win.y / maxf(win.x, 1.0))))
 	assert_eq(sub.size.y, expected_h, "height follows the window aspect")
 
 	var world: Node3D = sub.get_node("World")
@@ -273,7 +273,7 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_true(record.selection_enabled)
 	assert_not_null(chrome.get_node("Overlay/Log/VBox/InputBox"))
 	assert_not_null(chrome.get_node_or_null("Overlay/DiceTray"),
-		"the tray is overlay chrome — a d20 at 480px is a smudge")
+		"the tray is overlay chrome — a d20 at 960px is still a smudge")
 	assert_eq(world.get_node_or_null("DiceTray"), null,
 		"not inside the pixelated World")
 	assert_eq(sub.get_node_or_null("DiceTray"), null)
@@ -592,6 +592,108 @@ func test_pressing_a_debug_button_sends_the_exact_dictionary() -> void:
 		if Net.outbound.is_empty():
 			continue
 		assert_eq(Net.outbound[0], DEBUG_BUTTONS[i][1], "button %s" % DEBUG_BUTTONS[i][0])
+
+
+func test_a_click_on_the_world_view_sends_move_to() -> void:
+	# Production clicks land on WorldView (a Control). World._unhandled_input never
+	# sees them — the same SubViewport isolation that made Chrome forward Q/E.
+	Table.set_started()
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	var title: Control = chrome.get_node_or_null("Overlay/Title")
+	if title != null:
+		title.visible = false
+	var world: Node3D = chrome.get_node("WorldView/SubViewport/World")
+	assert_true(world.has_method("handle_pointer"),
+		"World.handle_pointer is the viewport-local click seam Chrome forwards onto")
+	var cam: Camera3D = world.get_node("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null or not world.has_method("grid_to_world"):
+		return
+	var square := Vector2i(4, 3)
+	var ground: Vector3 = world.grid_to_world(square.x, square.y)
+	var viewport_pos: Vector2 = cam.unproject_position(ground)
+	var view: SubViewportContainer = chrome.get_node("WorldView")
+	var window_pos: Vector2 = view.get_global_transform_with_canvas() * viewport_pos
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = viewport_pos
+	click.global_position = window_pos
+	Net.outbound.clear()
+	view.gui_input.emit(click)
+	assert_eq(Net.outbound.size(), 1, "clicking the board through WorldView sends moveTo")
+	if Net.outbound.is_empty():
+		return
+	assert_eq(Net.outbound[0]["type"], "moveTo")
+	assert_eq(int(Net.outbound[0]["x"]), square.x)
+	assert_eq(int(Net.outbound[0]["y"]), square.y)
+
+
+func test_hover_uses_control_local_position() -> void:
+	# WorldView.gui_input delivers Control-local pixels in event.position.
+	# SubViewportContainer then pushes the same event into the 3D world;
+	# World must not convert it again or the hover sits a board away.
+	Table.set_started()
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	var title: Control = chrome.get_node_or_null("Overlay/Title")
+	if title != null:
+		title.visible = false
+	var view: SubViewportContainer = chrome.get_node("WorldView")
+	var world: Node3D = view.get_node("SubViewport/World")
+	var cam: Camera3D = world.get_node("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+	var square := Vector2i(4, 3)
+	var ground: Vector3 = world.grid_to_world(square.x, square.y)
+	var viewport_pos: Vector2 = cam.unproject_position(ground)
+	var motion := InputEventMouseMotion.new()
+	motion.position = viewport_pos
+	motion.global_position = view.get_global_transform_with_canvas() * viewport_pos
+	view.gui_input.emit(motion)
+	var hover: MeshInstance3D = world.get_node_or_null("Overlay/Hover")
+	assert_not_null(hover, "Overlay/Hover")
+	if hover == null:
+		return
+	assert_true(hover.visible, "hover is showing")
+	assert_eq(world.world_to_grid(hover.position), square,
+		"hover sits on the tile under the cursor")
+
+
+func test_world_inside_a_subviewport_does_not_rehandle_the_pointer() -> void:
+	# Chrome already forwarded the Control-local event. A second pass through
+	# World._unhandled_input would divide by scale again.
+	Table.set_started()
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	var world: Node3D = chrome.get_node("WorldView/SubViewport/World")
+	assert_true(world.get_viewport() is SubViewport)
+	var motion := InputEventMouseMotion.new()
+	motion.position = Vector2(800, 400)
+	motion.global_position = Vector2(800, 400)
+	Net.outbound.clear()
+	world._unhandled_input(motion)
+	world._unhandled_input(InputEventMouseButton.new())
+	var hover: MeshInstance3D = world.get_node_or_null("Overlay/Hover")
+	if hover != null:
+		assert_false(hover.visible, "SubViewport World must not place hover from _unhandled_input")
 
 
 func test_debug_buttons_are_locked_while_the_dm_has_the_floor() -> void:

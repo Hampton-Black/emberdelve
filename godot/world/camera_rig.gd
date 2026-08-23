@@ -218,7 +218,7 @@ func _apply_camera() -> void:
 ## Quantises the focus point to whole low-resolution pixels.
 ##
 ## Nothing about a camera that translates smoothly ever shows this at native resolution. At
-## 480px with nearest-neighbour upscaling, a camera that moves by a fraction of a low-res pixel
+## 960px with nearest-neighbour upscaling, a camera that moves by a fraction of a low-res pixel
 ## resamples the entire frame, and every edge in the room crawls. The focus is snapped so the
 ## camera can only ever move in exact pixel steps, which is what keeps the art still underneath
 ## it.
@@ -244,10 +244,10 @@ func _room_extent() -> Vector2:
 func _vp_size() -> Vector2:
 	var vp := get_viewport()
 	if vp == null:
-		return Vector2(480.0, 270.0)
+		return Vector2(960.0, 540.0)
 	var s := Vector2(vp.size)
 	if s.x < 1.0 or s.y < 1.0:
-		return Vector2(480.0, 270.0)
+		return Vector2(960.0, 540.0)
 	return s
 
 

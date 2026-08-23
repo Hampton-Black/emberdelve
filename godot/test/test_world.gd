@@ -306,8 +306,8 @@ func test_the_edge_shader_loads_and_names_the_two_three_js_strengths() -> void:
 		"tunable in the inspector, not a literal in the body")
 	assert_true(shader.code.contains("uniform float depth_edge_strength"),
 		"tunable in the inspector, not a literal in the body")
-	assert_true(shader.code.contains("normal_edge_strength : hint_range(0.0, 2.0) = 0.5"))
-	assert_true(shader.code.contains("depth_edge_strength : hint_range(0.0, 2.0) = 0.25"))
+	assert_true(shader.code.contains("normal_edge_strength : hint_range(0.0, 2.0) = 0.28"))
+	assert_true(shader.code.contains("depth_edge_strength : hint_range(0.0, 2.0) = 0.12"))
 
 
 func test_the_world_wears_the_edge_pass_at_three_js_strengths() -> void:
@@ -326,11 +326,11 @@ func test_the_world_wears_the_edge_pass_at_three_js_strengths() -> void:
 	if n == null or d == null:
 		# Dummy / headless may not reflect defaults; the scene file is the pin.
 		var scene := FileAccess.get_file_as_string("res://world/world.tscn")
-		assert_true(scene.contains("shader_parameter/normal_edge_strength = 0.5"))
-		assert_true(scene.contains("shader_parameter/depth_edge_strength = 0.25"))
+		assert_true(scene.contains("shader_parameter/normal_edge_strength = 0.28"))
+		assert_true(scene.contains("shader_parameter/depth_edge_strength = 0.12"))
 	else:
-		assert_almost_eq(float(n), 0.5, 0.0001, "Renderer.ts:358 normalEdgeStrength")
-		assert_almost_eq(float(d), 0.25, 0.0001, "Renderer.ts:358 depthEdgeStrength")
+		assert_almost_eq(float(n), 0.28, 0.0001, "playtest: Three.js 0.5 was a smear at 960")
+		assert_almost_eq(float(d), 0.12, 0.0001, "playtest: Three.js 0.25 was a smear at 960")
 
 
 func _edge_material(root: Node, shader: Shader) -> ShaderMaterial:

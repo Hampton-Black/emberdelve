@@ -13,8 +13,8 @@ size = Vector2(2, 2)
 [sub_resource type="ShaderMaterial" id="EdgeMaterial"]
 render_priority = -128
 shader = ExtResource("3_pixel")
-shader_parameter/normal_edge_strength = 0.5
-shader_parameter/depth_edge_strength = 0.25
+shader_parameter/normal_edge_strength = 0.28
+shader_parameter/depth_edge_strength = 0.12
 
 [sub_resource type="Environment" id="EnvTorchlit"]
 background_mode = 1
