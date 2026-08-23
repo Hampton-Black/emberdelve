@@ -46,6 +46,6 @@ enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
 [rendering]
 
-textures/canvas_textures/default_texture_filter=0
+textures/canvas_textures/default_texture_filter=1
 rendering_device/driver.windows="d3d12"
 environment/defaults/default_clear_color=Color(0.145, 0.125, 0.106, 1)

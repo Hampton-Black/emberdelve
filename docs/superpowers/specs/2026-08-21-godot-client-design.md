@@ -33,15 +33,15 @@ The Java server stays the DM. Godot becomes the table.
 
 | Area | Decision |
 |---|---|
-| Engine | Godot **4.5.x**, pinned. Not "current stable" — `AudioStreamMP3.load_from_buffer`, the TTS API and the export templates all moved inside 4.x |
+| Engine | Godot **4.7.x**, pinned (what the parity gate was played on). Not "current stable" — audio, TTS and export APIs have moved inside 4.x |
 | Client language | GDScript only. No C#, no GDExtension for this client |
 | Process model | Two processes, **attach only**. Godot never spawns Java. `cd server && ./gradlew run` in a terminal; Godot connects to it. Spawning, a bundled JRE and PID ownership are deferred with distribution |
 | First ship | A Godot client that passes the §10 parity gate on the developer's own machine. **Distribution is deferred** until a full prototype exists — see §12 |
 | Server address | **One setting**, `EMBERDELVE_SERVER` (default `http://127.0.0.1:7070`). Every URL — `/ws`, `/tts`, `/health` — derives from it. Never a second constant anywhere. This is what keeps a hosted server a config change rather than a rewrite |
-| Protocol | Same JSON WebSocket + `POST /tts` + `GET /health`. One additive field: `Hello.dm`. Godot is another speaker of `client/src/types.ts`, not a new protocol |
+| Protocol | Same JSON WebSocket + `POST /tts` + `GET /health`. One additive field: `Hello.dm`. Godot reads Java records; wire mirrors are GDScript readers under `godot/autoload/`. There is no TypeScript types file |
 | Dual client | Done. Vite/Three.js deleted. Godot is the only table |
 | Chrome | WoW-style overlay on the 3D view. One stream (prose + rolls). No fade while a line is being spoken |
-| Dice | Predetermined faces from the server. 2D tray, not RigidBody. `tumble.ts` math ports as numbers |
+| Dice | Predetermined faces from the server. 2D tray, not RigidBody. `godot/dice/tumble.gd` math |
 | Clock source | `Time.get_ticks_msec()`, everywhere `performance.now()` appears today. Named once so three modules do not pick three |
 | Look | **Stylized isometric 3D at native window resolution.** KayKit-class meshes, linear filtering, real lights. No downsample, no nearest-neighbour upscale, no edge-detect pass pretending to be pixel art. Chrome still composites on top of the world viewport, never through a project-wide stretch. Four isometric corners, 90° snap — that constraint is picking and the isometric read, not a pixel grid. Tried and rejected in play: 480px then 960px nearest-neighbour over KayKit (smear, muddy silhouettes). True 2D isometric sprites are a different game (new atlas per creature, Q/E costs 4× environment art) and are not this client |
 | Voice | `POST /tts` first; OS TTS (`DisplayServer.tts_*`) per line on failure. No Web Speech |
@@ -166,9 +166,8 @@ The DM does not grow tools, rooms, or rules. Java grows exactly four things:
 3. **Refuse a second concurrent WebSocket.** `WsHandler` is one session, one connection, and two
    attached clients silently route narration to whichever one acted last. Close the second with a
    reason; §5 explains why this is code rather than a document.
-4. `Hello` gains `dm: boolean` (Venice is configured), parallel to the existing `voice`. While
-   `client/` lives, add the same field to `client/src/types.ts` in the same commit so the two
-   clients do not drift.
+4. `Hello` gains `dm: boolean` (Venice is configured), parallel to the existing `voice`. The
+   GDScript reader in `godot/autoload/` takes the matching field in the same commit.
 
 Dropped from the original list along with spawning: PID logging for a child that no longer
 exists, and the overlapping-listen hard fail, which was there to diagnose two `.app`s colliding.
@@ -553,7 +552,7 @@ assumes a single party member (invariant #2).
 ## 13. Tree
 
 ```
-godot/                  # Godot 4.5.x project (GDScript)
+godot/                  # Godot 4.7.x project (GDScript)
   project.godot
   autoload/
     link.gd             # where the server is. One setting, every URL derived
