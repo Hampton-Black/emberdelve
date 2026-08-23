@@ -3822,7 +3822,7 @@ git add godot/world && git commit -m "Put the edges back on, which a plain viewp
 **Files:**
 - Create: `godot/world/room.gd`
 - Create: `godot/world/lighting.gd`
-- Create: `godot/world/kits/dungeon/` (copied from `client/public/assets/kits/dungeon/`)
+- Create: `godot/world/kits/ruins/` (copied from `client/public/assets/kits/props/ruins/`)
 
 **Interfaces:**
 - Consumes: `Table.scene` (`width`, `height`, `floorType`, `wallType`, `lighting`), `World.grid_to_world`.
@@ -3830,12 +3830,14 @@ git add godot/world && git commit -m "Put the edges back on, which a plain viewp
 
 Ports the floor and wall halves of `Renderer.ts` and `assets.ts`. `FloorType` is `STONE` / `CRACKED_STONE` / `TILED`; `WallType` is `STONE` / `CARVED`; `LightingPreset` is `TORCHLIT` / `DIM` / `DARK`.
 
-**Each Kenney kit needs its own folder.** Every Kenney GLB references `Textures/colormap.png` by *relative* path, and the mini and graveyard kits ship **different** colormaps under that same name. Putting two kits in one directory silently renders one of them in the other's palette. This applies to Godot's importer exactly as it did to Three.js.
+**The floor and the walls are Quaternius, not Kenney.** `PROP_BASE` is `/assets/kits/props` (`assets.ts:194`), and every piece of architecture resolves under it: `WALL_VARIANTS` is `props/ruins/Wall` / `Wall_Hole` / `Window_Bars` (`Renderer.ts:160`), `FLOOR_VARIANTS` is `props/ruins/Floor_Squares` / `Floor_Standard` (`Renderer.ts:222`), and even `SKULL_MODEL` is `props/dungeon/Skull` (`props.ts:403`). **`client/public/assets/kits/dungeon/` — the Kenney modular dungeon, 39 GLBs — is referenced by nothing and is not ported.** An earlier draft of this task copied it; that was a mistake, and copying it would have imported a kit the room never asks for.
 
-- [ ] **Step 1: Import the dungeon kit**
+**Each kit still needs its own folder.** Every Kenney GLB references `Textures/colormap.png` by *relative* path, and the mini and graveyard character kits ship **different** colormaps under that same name. Putting two kits in one directory silently renders one of them in the other's palette. That bites Task 19 rather than this one, but the rule is the same wherever a kit lands.
+
+- [ ] **Step 1: Import the ruins kit**
 
 ```bash
-mkdir -p godot/world/kits && cp -R client/public/assets/kits/dungeon godot/world/kits/dungeon
+mkdir -p godot/world/kits && cp -R client/public/assets/kits/props/ruins godot/world/kits/ruins
 ```
 
 Open the editor once so Godot generates `.import` files, and set the importer's texture filter to **Nearest** for every texture in the kit. A bilinear colormap at 480px is a smear.
@@ -3908,6 +3910,77 @@ Boot the crypt and compare against the browser client at the same camera corner.
 ```bash
 git add godot/world && git commit -m "Author the props in an editor, which is the point of all this"
 ```
+
+---
+
+### Task 18a: The KayKit swap — trying the room on a different vendor
+
+**Files:**
+- Create: `godot/world/kits/kaykit_dungeon/` (cherry-picked from `KayKit_Dungeon_Pack_1.1_FREE`)
+- Create: `godot/world/kits/kaykit_halloween/` (cherry-picked from `KayKit_HalloweenBits_1.0_FREE`)
+- Modify: `godot/world/room.gd`, `godot/world/prop_table.tres`, `godot/world/props/*.tscn`
+- Modify: `client/public/assets/kits/props/LICENSES.md`
+
+**Interfaces:** none new. This changes what `room.gd` and the prop scenes *load*, never what they expose. `FloorType`, `WallType` and `PropType` are untouched — invariant #10. If this task needs a server enum, it has stopped being an asset swap.
+
+**Do this after Task 18 plays, not instead of it.** Task 22's parity gate compares the Godot client against the Three.js one, and that comparison only carries information while the geometry is the same on both sides. Port on Quaternius first, confirm the room reads, then swap. Otherwise a room that looks wrong has two candidate causes — the port and the assets — and no way to separate them.
+
+- [ ] **Step 1: Import, cherry-picked**
+
+Both packs are CC0 1.0 (Kay Lousberg). Three format facts that differ from the Kenney and Quaternius kits:
+
+- KayKit ships **`.gltf` with a sibling `.bin`**, not a single `.glb`. Copy the pair or the mesh imports empty.
+- **One atlas per pack**, named per pack: `dungeon_texture.png`, `halloweenbits_texture.png`. Because the names differ, the `colormap.png` collision that forces one-folder-per-kit on the Kenney character kits **does not apply between KayKit packs**. Keep them in separate folders anyway, for provenance rather than for correctness.
+- Halloween Bits is 60+ models and most of it is pumpkins, pine trees and fences. **Copy the dozen named below, not the pack.**
+
+Set the importer's texture filter to **Nearest** on both atlases, for the reason in Task 17: a bilinear atlas at 480px is a smear.
+
+- [ ] **Step 2: The floor, per `FloorType`**
+
+`Renderer.ts:209` is the mechanism and it survives the vendor change: *"Two tiles do all three… what separates the types is how much of the flagging is left."* The three types are a **ratio of meshes**, not three textures — and they cannot be three atlases either, because one atlas dresses the whole kit and swapping it would recolour the walls and props too.
+
+Where Quaternius offered two tiles, KayKit offers a genuine wear gradient:
+
+| `FloorType` | laid | worn |
+|---|---|---|
+| `TILED` | `floor_tile_large`, `floor_tile_small_decorated` | `floor_tile_small_broken_A`, rare |
+| `STONE` | `floor_tile_small` | `floor_tile_small_broken_A` / `_B` |
+| `CRACKED_STONE` | `floor_tile_small_broken_A` / `_B` | `floor_dirt_small_A`–`_D`, `floor_tile_large_rocks` |
+
+Keep `Renderer.ts:222`'s weights as the *shape* of each mix, not as numbers to copy: they are tuned to a two-tile instrument and this is a three-tier one. Retune by eye against the rule that already governs them — a floor of one repeated tile reads as graph paper.
+
+- [ ] **Step 3: The walls**
+
+`WALL_VARIANTS` (`Renderer.ts:160`) is `Wall` ×24, `Wall_Hole` ×3, `Window_Bars` ×3. KayKit's equivalents are `wall`, `wall_cracked`, `wall_broken`, `wall_window_open`, `wall_archedwindow_open`. The pack also ships `wall_doorway`, `wall_gated` and `wall_corner`, which means **`WallType.CARVED` can finally differ from `STONE` in geometry** rather than being the same slab under a different name.
+
+- [ ] **Step 4: Measure the module, never guess it**
+
+`assets.ts:86` is `scale = 1 / module`, and `LICENSES.md` already records three different conventions across four packs, one of them Z-up. Measure a `wall` bounding box once, record the result in `LICENSES.md` beside the others, and pass it as `module`. Do not tune a literal scale factor downstream — `assets.ts:216` says why that gets found the hard way.
+
+- [ ] **Step 5: The sarcophagus — the entry that changes Task 18**
+
+`props.ts:52` keeps the sarcophagus as primitives for one stated reason: **no imported pack ships one.** Halloween Bits ships `coffin`, `coffin_decorated` and `crypt`. If any of them reads as a tomb at 480×270, the largest hand-authoring job in Task 18 collapses into one `prop_table.tres` entry — which is precisely what `props.ts:14` says the seam exists for.
+
+**Keep the primitive version until a played session prefers the model.** The four qualities in Task 18 Step 2 are the acceptance test, not the mere existence of a mesh: tiered silhouette, taper toward the top, a **void under the lid** so the gap is black rather than more stone, and the lid shifted, turned and tilted far enough to see. "Something has been working at it from the inside" is on the title screen and has to be legible in the object.
+
+- [ ] **Step 6: The remaining five props**
+
+| `PropType` | candidates |
+|---|---|
+| `SARCOPHAGUS` | halloween `coffin`, `coffin_decorated`, `crypt` |
+| `BRAZIER` | dungeon `torch_lit`, `torch_mounted`; halloween `shrine_candles`, `lantern_standing` |
+| `PILLAR` | dungeon `pillar`, `pillar_decorated`, `column`; halloween `pillar` |
+| `RUBBLE` | dungeon `rubble_half`, `rubble_large`; halloween `bone_A`/`_B`/`_C`, `ribcage`, `skull` |
+| `ALCOVE` | halloween `shrine`, `plaque`, `plaque_candles`; dungeon `wall_shelves` |
+| `DOOR` | dungeon `wall_doorway`, `wall_gated`; halloween `arch_gate` |
+
+Two constraints on that table. **The brazier's fire is lights and colour, not mesh** — `EMBER` `ff9a3d` over a `FLAME_CORE` `ffd489`, and `props.ts:22` records why the green version was wrong. Do not accept a model that bakes its own flame colour into the atlas, because that colour cannot then be argued with. And `blocksMovement()` is derived from `PropType`, not from the mesh (`PropType.java`): `ALCOVE` and `DOOR` are passable, so whatever is chosen for them must read as *set into a wall* rather than as an object standing in the square.
+
+- [ ] **Step 7: Record the provenance, and collect the prize**
+
+Add both packs to `LICENSES.md` with their versions, author and measured module. Then the reason this swap is worth doing at all: if the room ends up entirely on KayKit, **`freesample/` can be deleted** — the folder `LICENSES.md` flags as unknown-license and "do not ship a build containing it". That is a shipping blocker retired, not a change of taste.
+
+**Checkpoint:** the crypt still reads as a crypt; the three `FloorType`s are distinguishable side by side in the debug scene; a floor the DM calls tiled looks tiled. If any of those fail, `git revert` is the whole remedy — nothing outside these kit folders and `prop_table.tres` changed.
 
 ---
 
