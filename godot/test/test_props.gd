@@ -183,7 +183,7 @@ func test_the_sarcophagus_is_a_tomb_not_a_crate() -> void:
 	var skull_mount := lid.get_node_or_null("Skull") as Node3D
 	assert_not_null(skull_mount, "Skull mount on the lid")
 	if skull_mount:
-		assert_gt(skull_mount.get_child_count(), 0, "dungeon/Skull fitted on the lid")
+		assert_gt(skull_mount.get_child_count(), 0, "skull fitted on the lid")
 	var hollow := tomb.get_node_or_null("Hollow") as MeshInstance3D
 	assert_not_null(hollow, "Hollow — the gap under the lid is darkness")
 	if hollow == null:

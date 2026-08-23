@@ -10,18 +10,24 @@ extends Node3D
 
 const MESH_PROPS := {
 	"PILLAR": [
-		{"path": "ruins/Column_Round", "height": 1.6, "footprint": 0.9},
-		{"path": "ruins/Column_Square", "height": 1.6, "footprint": 0.9},
-		{"path": "ruins/Column_Round_Short", "height": 0.73, "footprint": 0.9},
+		{"path": "kaykit_dungeon/pillar", "height": 1.6, "footprint": 0.9},
+		{"path": "kaykit_dungeon/pillar_decorated", "height": 1.6, "footprint": 0.9},
+		{"path": "kaykit_dungeon/column", "height": 0.73, "footprint": 0.9},
+		{"path": "kaykit_halloween/pillar", "height": 1.6, "footprint": 0.9},
 	],
 	"DOOR": [
-		{"path": "ruins/Doors_RoundArch", "height": 0.9, "footprint": 1.4},
-		{"path": "ruins/Doors_GothicArch", "height": 0.9, "footprint": 1.4},
-		{"path": "ruins/Doors_RoundArch_Covered", "height": 0.9, "footprint": 1.4},
-		{"path": "ruins/Doors_GothicArch_Covered", "height": 0.9, "footprint": 1.4},
+		{"path": "kaykit_dungeon/wall_gated", "wall": true},
+		{"path": "kaykit_dungeon/wall_doorway", "wall": true},
+		{"path": "kaykit_halloween/arch_gate", "height": 1.0, "footprint": 1.05, "wall": true},
 	],
 	"RUBBLE": [
-		{"path": "ruins/Bricks", "height": 0.5, "footprint": 0.85},
+		{"path": "kaykit_dungeon/rubble_half", "height": 0.5, "footprint": 0.85},
+		{"path": "kaykit_dungeon/rubble_large", "height": 0.5, "footprint": 0.85},
+		{"path": "kaykit_halloween/bone_A", "height": 0.35, "footprint": 0.7},
+		{"path": "kaykit_halloween/bone_B", "height": 0.35, "footprint": 0.7},
+		{"path": "kaykit_halloween/bone_C", "height": 0.35, "footprint": 0.7},
+		{"path": "kaykit_halloween/ribcage", "height": 0.45, "footprint": 0.75},
+		{"path": "kaykit_halloween/skull", "height": 0.4, "footprint": 0.7},
 	],
 }
 
@@ -35,7 +41,11 @@ func configure(prop: Dictionary, room_id: String) -> void:
 		return
 	var idx: int = Room.hash32("%s:prop:%s" % [room_id, String(prop.get("id", ""))]) % variants.size()
 	var spec: Dictionary = variants[idx]
-	var mesh := make(String(spec["path"]), float(spec["height"]), float(spec["footprint"]))
+	var mesh: Node3D
+	if bool(spec.get("wall", false)):
+		mesh = make_wall(String(spec["path"]), spec)
+	else:
+		mesh = make(String(spec["path"]), float(spec["height"]), float(spec["footprint"]))
 	if mesh == null:
 		return
 	for child in get_children():
@@ -59,7 +69,44 @@ static func make(path: String, height: float, footprint: float) -> Node3D:
 	return host
 
 
+## A wall-set piece: module scale (or an explicit fit), then pushed to the wall face so
+## a passable DOOR reads as set into the stone rather than as a slab in the square.
+static func make_wall(path: String, spec: Dictionary) -> Node3D:
+	var packed: PackedScene = load(res_path(path)) as PackedScene
+	if packed == null:
+		return null
+	var host := Node3D.new()
+	var model: Node = packed.instantiate()
+	host.add_child(model)
+	if spec.has("height"):
+		fit(host, float(spec["height"]), float(spec.get("footprint", 1.0)))
+	else:
+		scale_to_module(host)
+		sit_on_floor(host)
+	host.position.z += Room.WALL_UNIT * 0.5 - Room.WALL_DEPTH * 0.5
+	shadows(host)
+	nearest(host)
+	return host
+
+
+static func scale_to_module(piece: Node3D) -> void:
+	piece.scale = Vector3.ONE * (1.0 / Room.KAYKIT_MODULE)
+
+
+static func sit_on_floor(piece: Node3D) -> void:
+	var box := aabb_of(piece)
+	piece.position = Vector3(
+		-(box.position.x + box.size.x * 0.5),
+		-box.position.y,
+		-(box.position.z + box.size.z * 0.5),
+	)
+
+
 static func res_path(path: String) -> String:
+	if path.begins_with("kaykit_dungeon/"):
+		return "res://world/kits/kaykit_dungeon/%s.gltf" % path.trim_prefix("kaykit_dungeon/")
+	if path.begins_with("kaykit_halloween/"):
+		return "res://world/kits/kaykit_halloween/%s.gltf" % path.trim_prefix("kaykit_halloween/")
 	if path.begins_with("ruins/"):
 		return "res://world/kits/ruins/%s.glb" % path.trim_prefix("ruins/")
 	if path.begins_with("dungeon/"):

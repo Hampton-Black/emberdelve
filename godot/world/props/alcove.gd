@@ -4,8 +4,7 @@ extends Node3D
 ## WALL_FACE — half a square in, less half the wall's depth. That figure belongs to
 ## the wall kit, which is why it is computed here rather than baked.
 
-const WALL_DEPTH := 0.14
-const WALL_FACE := 0.5 - WALL_DEPTH / 2.0
+const WALL_FACE := 0.5 - Room.WALL_DEPTH / 2.0
 const ALCOVE_HEIGHT := 0.73
 
 

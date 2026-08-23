@@ -14,6 +14,8 @@ them does not agree on which axis is up.
 | `ruins/` | Ultimate Modular Ruins Pack (Aug 2021) | Quaternius | CC0 1.0 | 92 | 2 units = 1 square |
 | `fantasy/` | Fantasy Props MegaKit \[Standard] | Quaternius | CC0 1.0 | 94 | 1 unit = 1 metre |
 | `freesample/` | `FreeSample.zip` | **unknown** | **UNKNOWN — see below** | 11 | 2.5 units, **Z-up** |
+| `godot/world/kits/kaykit_dungeon/` | KayKit Dungeon Pack 1.1 FREE | Kay Lousberg | CC0 1.0 | cherry-picked floors, walls, torches, pillars, rubble | **4 units = 1 square** |
+| `godot/world/kits/kaykit_halloween/` | KayKit Halloween Bits 1.0 FREE | Kay Lousberg | CC0 1.0 | cherry-picked coffin/crypt candidates, bones, shrine, plaque, arch_gate | **1 unit ≈ 1 metre**; props fitted from AABB |
 
 ## ⚠️ `freesample/` has no license
 
@@ -46,6 +48,12 @@ authored on a 4-unit module. Measured against that:
 - **Kenney's own `template-wall-detail-a` is the one true drop-in**, at 4.00 x 4.23 x 1.99
   against `template-wall`'s 4.00 x 4.15 x 1.99. `Renderer.buildWalls` uses it as a second wall
   face.
+- **KayKit Dungeon 1.1 is a four-unit module, measured off `wall`.** Godot AABB on the
+  imported `wall.gltf` is 4.000 × 4.000 × 1.000 (width × height × depth). `scale = 1 / 4`.
+  `floor_tile_large` is the same 4-unit cell; `floor_tile_small*` is a 2-unit half-cell in
+  the pack and is brought up to one square from its own XY span, not from a second guessed
+  factor. Halloween Bits is a different convention (a `pillar` is 1.000 wide) and is never
+  scaled by the dungeon module — `instanceProp` fits those from the bounding box.
 - **`fantasy/` is authored in metres.** A barrel is 0.90 tall and a large table is 0.81 —
   real furniture dimensions, not module dimensions. Scaling these by `KIT_SCALE` would make
   them doll furniture. They need their own factor.
@@ -66,6 +74,10 @@ authored on a 4-unit module. Measured against that:
   them by names that do not exist on disk (`M_DungeonCrawler_PropsGrp2_001_diffuseMap` vs
   `BAKE_Props_grp2_DiffuseMap- 4K.png`), so the converter embedded a 1x1 placeholder in every
   model; each GLB was rewritten to point at the shared sheet its material calls for.
+- **KayKit** is one atlas per pack (`dungeon_texture.png`, `halloweenbits_texture.png`),
+  copied next to the `.gltf` + `.bin` pair. Sampler and Godot material filter are **Nearest**
+  — a bilinear atlas at 480px bleeds neighbouring swatches into every edge. The Halloween
+  pack was cherry-picked (fifteen named models), not copied whole.
 
 ## Reproducing the conversion
 
@@ -75,6 +87,9 @@ glTF, and the `.gltf` + `.bin` + shared sheets were copied as-is.
 
 ## What is still missing
 
-No pack here contains a **sarcophagus**, which is the one prop M0's script turns on and the
-only prop the crypt kit marks `unique`. `SARCOPHAGUS` remains procedural in `props.ts`.
-The closest stand-ins are `dungeon/Pedestal` and `dungeon/Pedestal2`, and neither has a lid.
+No pack here contains a **sarcophagus** that passes the four qualities the crypt needs
+(tiered silhouette, taper, a void under the lid, lid shifted/turned/tilted). Halloween Bits
+ships `coffin`, `coffin_decorated` and `crypt`; they were imported as candidates and left off
+the live `prop_table` — see Task 18a. `SARCOPHAGUS` remains the primitive scene. The closest
+stand-ins in the older packs are `dungeon/Pedestal` and `dungeon/Pedestal2`, and neither has a
+lid.

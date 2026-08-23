@@ -4,11 +4,13 @@ extends Node3D
 ## Floor, walls, and the wall-torch lights. Rebuilt only when `roomId` changes (invariant #4).
 ## Tile and segment picks are FNV-1a of the room id, matching `assets.ts` / `Renderer.ts`.
 
-## Measured 2026-08-22 on the imported GLBs (kit units, before `1 / module`):
-## ruins/Wall size (1.998, 2.001, 0.286); Floor_Squares (1.992, 0.116, 1.996);
-## dungeon Arch (4.104, 4.010, 0.993) — two modules, hence `fit` not module scale.
-const QUATERNIUS_MODULE := 2.0
+## Measured 2026-08-22 on the imported KayKit wall.gltf (kit units, before `1 / module`):
+## AABB size (4.000, 4.000, 1.000). One square is the wall's width. Do not replace this
+## with a guessed literal downstream — `scale = 1 / module`. Small floor tiles are a
+## 2-unit half-cell in the pack; they fill a square from their own XY, not from this number.
+const KAYKIT_MODULE := 4.0
 const WALL_UNIT := 1.0
+const WALL_DEPTH := 1.0 / KAYKIT_MODULE
 const MAX_TORCH_LIGHTS := 10
 const WALL_TORCH_Y := 0.42
 const TORCH_HEIGHT := 0.65
@@ -17,57 +19,60 @@ const TORCH_FOOTPRINT := 0.4
 ## middle of a generated room is still a dark floor, not a sunlit one.
 const TORCH_ENERGY := 3.2
 const TORCH_RANGE := 7.0
-const TORCH_INSET := 0.32
+const TORCH_INSET := WALL_DEPTH * 0.5
 const EMBER := Color(1.0, 0.6039216, 0.2392157)
 const FLAME_CORE := Color(1.0, 0.8313726, 0.5372549)
-const FLOOR_STONE := {
-	"Main": Color(0.2588235, 0.2862745, 0.3137255),
-	"Highlights": Color(0.3294118, 0.3607843, 0.3921569),
-}
-const STONE_ALIASES := {
-	"Wall_Dark": "Main",
-	"Wall_Medium": "Main",
-	"Wall_Highlights": "Highlights",
-}
 const TORCH_SPACING := {
 	"TORCHLIT": 3,
 	"DIM": 5,
 	"DARK": 0,
 }
 
-const WALL_VARIANTS: Array[Dictionary] = [
-	{"path": "props/ruins/Wall", "weight": 24},
-	{"path": "props/ruins/Wall_Hole", "weight": 3},
-	{"path": "props/ruins/Window_Bars", "weight": 3},
-	{"path": "props/dungeon/Arch", "weight": 2, "fit": WALL_UNIT, "retint": true,
-		"fills": "props/dungeon/Arch_bars"},
-	{"path": "props/dungeon/Arch", "weight": 2, "fit": WALL_UNIT, "retint": true,
-		"fills": "props/dungeon/Arch_Door"},
+## STONE is mostly a plain slab, with wear as the rare hole. CARVED spends its weight on
+## cracked, broken, windowed and gated faces — the reason wallType is finally read.
+const WALL_VARIANTS_STONE: Array[Dictionary] = [
+	{"path": "kaykit_dungeon/wall", "weight": 24},
+	{"path": "kaykit_dungeon/wall_broken", "weight": 3},
+	{"path": "kaykit_dungeon/wall_cracked", "weight": 3},
 ]
 
-const WALL_FILLERS := {
-	"props/dungeon/Arch_bars": WALL_UNIT * 0.82,
-	"props/dungeon/Arch_Door": WALL_UNIT * 0.82,
-}
+const WALL_VARIANTS_CARVED: Array[Dictionary] = [
+	{"path": "kaykit_dungeon/wall", "weight": 10},
+	{"path": "kaykit_dungeon/wall_cracked", "weight": 8},
+	{"path": "kaykit_dungeon/wall_broken", "weight": 4},
+	{"path": "kaykit_dungeon/wall_window_open", "weight": 5},
+	{"path": "kaykit_dungeon/wall_archedwindow_open", "weight": 5},
+	{"path": "kaykit_dungeon/wall_gated", "weight": 3},
+	{"path": "kaykit_dungeon/wall_doorway", "weight": 2},
+]
 
+## Same gradient Renderer.ts describes — laid vs worn — on KayKit's three-tier tiles.
+## Weights keep that shape (TILED almost all laid, CRACKED mostly gone) rather than the
+## two-tile numbers, which were an instrument this pack does not play.
 const FLOOR_VARIANTS := {
 	"STONE": [
-		{"path": "props/ruins/Floor_Squares", "weight": 8},
-		{"path": "props/ruins/Floor_Standard", "weight": 3},
+		{"path": "kaykit_dungeon/floor_tile_small", "weight": 8},
+		{"path": "kaykit_dungeon/floor_tile_small_broken_A", "weight": 2},
+		{"path": "kaykit_dungeon/floor_tile_small_broken_B", "weight": 1},
 	],
 	"CRACKED_STONE": [
-		{"path": "props/ruins/Floor_Standard", "weight": 7},
-		{"path": "props/ruins/Floor_Squares", "weight": 5},
+		{"path": "kaykit_dungeon/floor_tile_small_broken_A", "weight": 3},
+		{"path": "kaykit_dungeon/floor_tile_small_broken_B", "weight": 2},
+		{"path": "kaykit_dungeon/floor_dirt_small_A", "weight": 2},
+		{"path": "kaykit_dungeon/floor_dirt_small_B", "weight": 1},
+		{"path": "kaykit_dungeon/floor_dirt_small_C", "weight": 1},
+		{"path": "kaykit_dungeon/floor_dirt_small_D", "weight": 1},
+		{"path": "kaykit_dungeon/floor_tile_large_rocks", "weight": 2},
 	],
 	"TILED": [
-		{"path": "props/ruins/Floor_Squares", "weight": 14},
-		{"path": "props/ruins/Floor_Standard", "weight": 1},
+		{"path": "kaykit_dungeon/floor_tile_small_decorated", "weight": 12},
+		{"path": "kaykit_dungeon/floor_tile_large", "weight": 2},
+		{"path": "kaykit_dungeon/floor_tile_small_broken_A", "weight": 1},
 	],
 }
 
 var _room_id := ""
 var _packed: Dictionary = {}
-var _wall_palette: Dictionary = {}
 
 
 func _ready() -> void:
@@ -117,13 +122,11 @@ func _build_floor() -> void:
 		for gx in width:
 			var hashed := hash32("%s:floor:%d,%d" % [_room_id, gx, gy])
 			var variant: Dictionary = _pick(variants, hashed, total)
-			var tile := _instance_piece(String(variant["path"]), {})
+			var tile := _instance_piece(String(variant["path"]), {"fill_square": true})
 			tile.set_meta("floor_variant", String(variant["path"]))
 			tile.name = "floor_%s" % String(variant["path"]).get_file()
-			_paint_stone(tile, FLOOR_STONE)
 			var yaw := float((hashed >> 16) % 4) * (PI / 2.0)
 			tile.rotation.y = yaw
-			tile.scale = Vector3.ONE * (1.0 / QUATERNIUS_MODULE)
 			var box := _aabb_of(tile)
 			var at := _to_world(gx, gy)
 			tile.position = Vector3(at.x, -box.end.y, at.z)
@@ -145,28 +148,20 @@ func _build_walls() -> void:
 		placements.append({"x": -half_w, "z": z, "ry": PI / 2.0})
 		placements.append({"x": half_w, "z": z, "ry": -PI / 2.0})
 
-	var total := _weight_total(WALL_VARIANTS)
+	var wall_type := String(Table.scene.get("wallType", "STONE"))
+	var variants: Array = WALL_VARIANTS_CARVED if wall_type == "CARVED" else WALL_VARIANTS_STONE
+	var total := _weight_total(variants)
 	var holder: Node3D = $Walls
-	if _wall_palette.is_empty():
-		_wall_palette = _palette_of(_instance_piece("props/ruins/Wall", {}))
 
 	for i in placements.size():
 		var hashed := hash32("%s:wall:%d" % [_room_id, i])
-		var variant: Dictionary = _pick(WALL_VARIANTS, hashed, total)
-		_add_wall_segment(holder, variant, placements[i], bool(variant.get("retint", false)))
-		var fills := String(variant.get("fills", ""))
-		if not fills.is_empty():
-			_add_wall_segment(holder, {"path": fills, "fit": WALL_FILLERS.get(fills, WALL_UNIT)},
-				placements[i], false)
+		var variant: Dictionary = _pick(variants, hashed, total)
+		_add_wall_segment(holder, variant, placements[i])
 
 
-func _add_wall_segment(holder: Node3D, variant: Dictionary, placement: Dictionary, retint: bool) -> void:
-	var opts := {}
-	if variant.has("fit"):
-		opts["fit"] = float(variant["fit"])
-	var piece := _instance_piece(String(variant["path"]), opts)
-	if retint and not _wall_palette.is_empty():
-		_retint_stone(piece, _wall_palette)
+func _add_wall_segment(holder: Node3D, variant: Dictionary, placement: Dictionary) -> void:
+	var piece := _instance_piece(String(variant["path"]), {})
+	piece.set_meta("wall_variant", String(variant["path"]))
 	piece.name = "wall_%s" % String(variant["path"]).get_file()
 	piece.position = Vector3(float(placement["x"]), 0.0, float(placement["z"]))
 	piece.rotation.y = float(placement["ry"])
@@ -210,8 +205,8 @@ func _make_wall_torch(mount: Dictionary, lit: bool) -> Node3D:
 	torch.name = "torch"
 	torch.position = Vector3(float(mount["x"]), WALL_TORCH_Y, float(mount["z"]))
 	torch.rotation.y = float(mount["ry"])
-	var model := _instance_piece("props/ruins/Torch", {})
-	_fit_prop(model, TORCH_HEIGHT, TORCH_FOOTPRINT)
+	var model := _instance_piece("kaykit_dungeon/torch_mounted", {"prop": true})
+	_fit_mounted(model, TORCH_HEIGHT, TORCH_FOOTPRINT)
 	torch.add_child(model)
 	if not lit:
 		return torch
@@ -255,10 +250,10 @@ func _instance_piece(path: String, opts: Dictionary) -> Node3D:
 		_bake_into(piece, model as Node3D)
 	else:
 		piece.add_child(model)
-	if opts.has("fit"):
-		_fit_height(piece, float(opts["fit"]))
-	else:
-		piece.scale = Vector3.ONE * (1.0 / QUATERNIUS_MODULE)
+	if bool(opts.get("fill_square", false)):
+		_fill_square(piece)
+	elif not bool(opts.get("prop", false)):
+		piece.scale = Vector3.ONE * (1.0 / KAYKIT_MODULE)
 	_shadows(piece)
 	_nearest(piece)
 	return piece
@@ -270,14 +265,15 @@ func _bake_into(host: Node3D, model: Node3D) -> void:
 	host.add_child(model)
 
 
-func _fit_height(piece: Node3D, fit: float) -> void:
+func _fill_square(piece: Node3D) -> void:
 	piece.scale = Vector3.ONE
 	var box := _aabb_of(piece)
-	var native := box.size.y
-	piece.scale = Vector3.ONE * (fit / maxf(native, 1e-6))
+	var span := maxf(box.size.x, box.size.z)
+	piece.scale = Vector3.ONE * (WALL_UNIT / maxf(span, 1e-6))
 
 
-func _fit_prop(piece: Node3D, height: float, footprint: float) -> void:
+func _fit_mounted(piece: Node3D, height: float, footprint: float) -> void:
+	# Bracket stays on z = 0 (the wall face). Centering xz would bury half the torch.
 	piece.scale = Vector3.ONE
 	piece.position = Vector3.ZERO
 	var box := _aabb_of(piece)
@@ -287,7 +283,7 @@ func _fit_prop(piece: Node3D, height: float, footprint: float) -> void:
 	piece.position = Vector3(
 		-(box.position.x + box.size.x * 0.5) * s,
 		-box.position.y * s,
-		-(box.position.z + box.size.z * 0.5) * s,
+		-box.position.z * s,
 	)
 
 
@@ -295,51 +291,6 @@ func _surface_count(mesh: MeshInstance3D) -> int:
 	if mesh.mesh:
 		return mesh.mesh.get_surface_count()
 	return mesh.get_surface_override_material_count()
-
-
-func _paint_stone(piece: Node, colours: Dictionary) -> void:
-	for mesh in _meshes(piece):
-		for i in _surface_count(mesh):
-			var mat := mesh.get_active_material(i)
-			if mat == null or not (mat is BaseMaterial3D):
-				continue
-			var named := _material_name(mat)
-			if not colours.has(named):
-				continue
-			var painted: BaseMaterial3D = (mat as BaseMaterial3D).duplicate()
-			painted.albedo_color = colours[named]
-			painted.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-			mesh.set_surface_override_material(i, painted)
-
-
-func _retint_stone(piece: Node, palette: Dictionary) -> void:
-	var mapped := {}
-	for named in palette.keys():
-		mapped[named] = palette[named]
-	for alias in STONE_ALIASES.keys():
-		var target: String = STONE_ALIASES[alias]
-		if palette.has(target):
-			mapped[alias] = palette[target]
-	_paint_stone(piece, mapped)
-
-
-func _palette_of(piece: Node) -> Dictionary:
-	var palette := {}
-	for mesh in _meshes(piece):
-		for i in _surface_count(mesh):
-			var mat := mesh.get_active_material(i)
-			if mat is BaseMaterial3D:
-				palette[_material_name(mat)] = (mat as BaseMaterial3D).albedo_color
-	piece.free()
-	return palette
-
-
-func _material_name(mat: Material) -> String:
-	if not mat.resource_name.is_empty():
-		return mat.resource_name
-	if not mat.resource_path.is_empty():
-		return mat.resource_path.get_file().get_basename()
-	return ""
 
 
 func _meshes(root: Node) -> Array[MeshInstance3D]:
@@ -361,8 +312,8 @@ func _shadows(root: Node) -> void:
 
 
 func _nearest(root: Node) -> void:
-	# Kits are mostly vertex colour; vegetation still carries bark/leaf sheets.
-	# Nearest keeps a 480px upsample from smearing those.
+	# KayKit atlases are a grid of flat colour. Linear filtering bleeds neighbouring
+	# swatches into every edge; nearest keeps a 480px upsample as pixels.
 	for mesh in _meshes(root):
 		for i in _surface_count(mesh):
 			var mat := mesh.get_active_material(i)
@@ -403,6 +354,10 @@ func _load_packed(path: String) -> PackedScene:
 
 
 func _res_path(path: String) -> String:
+	if path.begins_with("kaykit_dungeon/"):
+		return "res://world/kits/kaykit_dungeon/%s.gltf" % path.trim_prefix("kaykit_dungeon/")
+	if path.begins_with("kaykit_halloween/"):
+		return "res://world/kits/kaykit_halloween/%s.gltf" % path.trim_prefix("kaykit_halloween/")
 	if path.begins_with("props/ruins/"):
 		return "res://world/kits/ruins/%s.glb" % path.substr("props/ruins/".length())
 	if path.begins_with("props/dungeon/"):
