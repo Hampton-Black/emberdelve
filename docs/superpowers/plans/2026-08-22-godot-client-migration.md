@@ -26,7 +26,7 @@
 - **One clock:** `Time.get_ticks_msec()` everywhere `performance.now()` appears today.
 - **Nulls are nulls:** `RollRequest.targetId`, `dc` and `skill` arrive as JSON `null`. Compare `!= null`. Never rely on GDScript truthiness — `if dc:` is false for a DC of 0.
 - **One setting for the server address:** `EMBERDELVE_SERVER`, default `http://127.0.0.1:7070`. Every URL derives from it. Never a second constant.
-- **Wire mirrors are hand-written.** Any change to a Java record in `dm.model` or `dm.wire` gets the matching change to `client/src/types.ts` **and** the GDScript reader in the same commit, until `client/` is deleted.
+- **Wire mirrors are hand-written.** Any change to a Java record in `dm.model` or `dm.wire` gets the matching GDScript reader in the same commit.
 - **Commit messages** are a sentence saying what the commit does, in the repository's existing voice (`git log` for examples). No `feat:` prefixes. **No `Co-Authored-By` trailer.**
 - **Java test command:** `cd server && ./gradlew test`
 - **Godot test command:** `godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit`
@@ -36,13 +36,12 @@
   and `test_clock.gd` fails for reasons that have nothing to do with `Clock`. A test that wants
   the socket calls `Net.open()` itself.
 - **Server run command:** `cd server && ./gradlew run --args='--demo'`
-- **Client typecheck (while `client/` lives):** `cd client && npx tsc --noEmit`
 
 ## Not in this plan
 
 - **Packaging.** No `.app`, no bundled JRE, no spawning Java, no code signing, no notarization. Spec §12.
 - **Hosting the DM.** Belongs to the multiplayer milestone. Spec §3.
-- **The M1 dungeon-navigation plan.** Paused. `docs/superpowers/plans/2026-08-21-m1-dungeon-navigation.md` is written against Three.js and none of its Java exists yet; its client tasks are re-planned against Godot after the parity gate.
+- **The M1 dungeon-navigation plan.** Unpaused 2026-08-23. Java tasks stand; client tasks must be re-planned against Godot.
 - **New rooms, props, entities, tools or rules.** Invariant #10.
 - **An IDL / codegen for the wire.** Still hand-written mirrors.
 - **Windows or Linux exports.**
@@ -4133,21 +4132,21 @@ git add godot/world && git commit -m "Pull the camera back when steel comes out,
 
 **This gate is played by a human, not by an agent and not by GUT.** An implementer subagent must not tick these boxes, must not delete `client/`, and must not remove CORS until the human has run one full session and signed the list below. Latency numbers in `docs/m0-evaluation.md` stay recorded, not the grade. The grade is the same question M0 asked: does it feel like a Dungeon Master is running the game.
 
-- [ ] **Step 1: Human quality gate**
+- [x] **Step 1: Human quality gate**
 
 One session, on the real Java server, `--demo` dice, authored crypt, **Godot as the only human-facing client for that run** — close the browser tab; the guard from Task 2 will otherwise refuse it. The person playing ticks each item. A checklist with a scripted agent "yes" is not a pass.
 
-- [ ] 1. The room renders: braziers, sarcophagus, door, fighter token.
-- [ ] 2. Title click sends `begin`; the opening is spoken and appears in the overlay **as it is spoken**.
-- [ ] 3. A typed inspect or heave: dice in the tray, then narration, then a visible world change.
-- [ ] 4. Combat: camera pull-back, ceremony, legal-move clicks, a swing that waits for the die, hit points draining on impact, the goblin's turn narrated as one beat.
-- [ ] 5. Death: the body stays, the defeat overlay appears, restart returns to the title, and the click after it narrates a fresh room.
-- [ ] 6. A generated room: `./gradlew run --args='--generate 7'` renders its own `floorType`, `wallType`, lighting and prop variants.
-- [ ] 7. The killing blow sounds like an event, not a clang. Nine layers.
+- [x] 1. The room renders: braziers, sarcophagus, door, fighter token.
+- [x] 2. Title click sends `begin`; the opening is spoken and appears in the overlay **as it is spoken**.
+- [x] 3. A typed inspect or heave: dice in the tray, then narration, then a visible world change.
+- [x] 4. Combat: camera pull-back, ceremony, legal-move clicks, a swing that waits for the die, hit points draining on impact, the goblin's turn narrated as one beat.
+- [x] 5. Death: the body stays, the defeat overlay appears, restart returns to the title, and the click after it narrates a fresh room.
+- [x] 6. A generated room: `./gradlew run --args='--generate 7'` renders its own `floorType`, `wallType`, lighting and prop variants.
+- [x] 7. The killing blow sounds like an event, not a clang. Nine layers.
 
 **If any item fails, stop here.** `client/` stays and remains the known-good table. Fix and re-run the whole list — a gate run in pieces is not a gate.
 
-- [ ] **Step 2: Delete the old client in one commit**
+- [x] **Step 2: Delete the old client in one commit**
 
 Only once every box above is ticked.
 
@@ -4161,13 +4160,13 @@ In `server/src/main/java/dm/App.java`, remove the CORS rule — the Vite origin 
         var app = Javalin.create();
 ```
 
-- [ ] **Step 3: Rewrite the docs that now describe a client that does not exist**
+- [x] **Step 3: Rewrite the docs that now describe a client that does not exist**
 
 In `AGENTS.md`: the opening line ("Java backend, React + Three.js frontend"), invariants 3 and 4 (Zustand and the `useRef` renderer become `Table` and the one `World` scene), the Characters, Voice, Dice and Sound sections' file references, and the Commands block. Do not rewrite the *findings* — every one of them still holds; only the filenames change.
 
 In the spec, set `**Status:** Shipped` and note the gate date.
 
-- [ ] **Step 4: Run everything**
+- [x] **Step 4: Run everything**
 
 ```bash
 cd server && ./gradlew test
@@ -4179,13 +4178,13 @@ cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gex
 
 Expected: both PASS. There is no `npx tsc` any more.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "Make Godot the only table, and take the web client down with it"
 ```
 
-- [ ] **Step 6: Unpause M1**
+- [x] **Step 6: Unpause M1**
 
 `docs/superpowers/plans/2026-08-21-m1-dungeon-navigation.md` is unblocked. Its Java tasks stand as written; its client tasks need re-planning against Godot before anyone starts it. Note that at the top of the plan rather than letting the next reader discover it.
 
@@ -4195,5 +4194,5 @@ git add -A && git commit -m "Make Godot the only table, and take the web client 
 
 - **Distribution.** No `.app`, no JRE, no signing. Spec section 12 records both live options and what each costs. Decide it in front of the working prototype this plan produces.
 - **The hosted DM.** Session scoping and auth are the multiplayer milestone's work. The one thing this plan spends to keep it open is `EMBERDELVE_SERVER`.
-- **Dungeon navigation.** Task 22 Step 6.
+- **Dungeon navigation.** Unpaused; client tasks still need a Godot rewrite.
 - **3D physics dice.** Spec section 7 records the reasoning and the re-entry condition: after the gate, if the tray reads as flat beside the world, in a played session.

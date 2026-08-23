@@ -5,7 +5,7 @@ extends Node3D
 ##
 ## Grid conversion is the contract later tasks hang props and tokens off. The room is centred
 ## on the origin; +y on the grid is north, which is -Z in the world — the same mapping as
-## `toWorld` in `client/src/scene/assets.ts`.
+## `toWorld` in the old Three.js client (`assets.ts`).
 
 const TARGET_WIDTH := 960
 ## Locked look is native 3D (`false`). The `true` path is the abandoned 960px

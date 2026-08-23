@@ -99,10 +99,7 @@ public final class App {
                     + "Copy .env.example to .env to enable the DM.");
         }
 
-        var app = Javalin.create(cfg -> {
-            // The Vite dev server lives on another origin; M0 is localhost-only and unauthenticated.
-            cfg.bundledPlugins.enableCors(cors -> cors.addRule(rule -> rule.anyHost()));
-        });
+        var app = Javalin.create();
 
         app.get("/health", ctx -> ctx.result("ok"));
 

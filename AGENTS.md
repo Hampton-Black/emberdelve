@@ -1,7 +1,7 @@
 # Emberdelve — Agent Rules
 
-AI Dungeon Master. Java backend, React + Three.js frontend.
-**Current milestone: M0 — gate PASSED 2026-08-20.** A two-week vertical slice that existed to
+AI Dungeon Master. Java backend, Godot desktop client.
+**Current milestone: M0 — gate PASSED 2026-08-20.** Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22). A two-week vertical slice that existed to
 answer one question: *does this feel like a Dungeon Master running a game?* It does. The verdict,
 the evidence and the two faults that survived it are in `docs/m0-evaluation.md`.
 
@@ -30,15 +30,15 @@ Each one is expensive to unwind. They are not style preferences.
    death. It renders what it is told.
 2. **No singleton player.** `List<PartyMember>`, always — even though M0 has exactly one member.
    Every action carries an `actorId`.
-3. **Game state never lives in React state.** It lives in the Zustand store. React and Three.js
-   both subscribe. Violating this causes canvas re-creation bugs that are very hard to diagnose.
-4. **The Three.js renderer lives in a `useRef`** and is created exactly once.
+3. **Game state never lives in a Control or Node3D.** It lives in `Table`. Chrome and World
+   both subscribe. Violating this rebuilds the world on a chrome redraw, which is very hard to diagnose.
+4. **The 3D world is one scene, created once.**
 5. **`RollResult.faces` is a `List<Integer>`.** Never collapse it to a total. The UI animates
    individual dice and crits key off the natural d20, not the sum.
 6. **Roll results are logged as events.** Never plan to replay by re-rolling from a seed.
 7. **All LLM-facing enums are closed and validated server-side.** No free-form string from the
    model reaches the engine. Tools use `strict: true`.
-8. **No `localStorage` / `sessionStorage`.** In-memory only.
+8. **No `user://` save of the session.** In-memory only.
 9. **Modern Java only** — records, sealed interfaces, pattern matching, virtual threads.
    No Spring. No `AbstractXFactory`. No mutable POJOs with getters and setters.
 10. **Do not add tools, entity types, props, or rules** beyond what is listed below.
@@ -55,7 +55,7 @@ Resolved in a design review before implementation. Do not silently revisit these
 | LLM provider | **Venice.ai**, OpenAI-compatible, `https://api.venice.ai/api/v1`. One key, one endpoint, 100+ models. |
 | LLM model | Two config strings, never literals: `DM_MODEL_TOOLS` (fast, reliably tool-calling) and `DM_MODEL_PROSE` (best writer). Measured picks and their disqualifications are below. |
 | Narration | **Text channel**, not a tool. Inline `[[speaker]]` markers, validated against live entities. |
-| TTS | ElevenLabs Flash v2.5 behind `TtsClient`. Web Speech API is the working placeholder. |
+| TTS | ElevenLabs Flash v2.5 behind `TtsClient`. OS TTS is the working placeholder. |
 | Build | Gradle + Kotlin DSL. |
 | Determinism | Real DM discretion. `ScriptedDiceRoller` behind `--demo` for reproducible tuning runs. |
 | Combat VO | **Dramatic beats only** — kills, crits, and the goblin's turn. Ordinary hits resolve instantly. |
@@ -302,45 +302,40 @@ Measured end-to-end, `--demo`, "heave the sarcophagus lid open":
 
 ## Characters
 
-Tokens are Kenney character models on a small base, in `client/public/assets/kits/characters/`.
-Every model across these kits carries the **same 32-clip rig** — `idle`, `walk`, `die`,
-`attack-melee-right` and so on — so swapping a character is one line in `MODELS` (`tokens.ts`)
-and nothing else.
+Tokens are KayKit figures on a small base, in `godot/world/kits/characters/`.
+Swapping a character is one entry in `MODELS` (`godot/world/tokens/token.gd`) and nothing else.
 
 Three things that are not obvious and cost an hour each if forgotten:
 
-- **Each kit needs its own folder.** Every Kenney GLB references `Textures/colormap.png` by
-  *relative* path, and the mini and graveyard kits ship **different** colormaps under that same
-  name. Putting both kits in one directory silently renders one of them in the other's palette.
+- **Each kit needs its own folder.** Kit GLBs reference textures by relative path; mixing kits
+  in one directory silently paints one of them with the other's atlas.
 - **Figures sit under the wall** — KayKit knight ~0.8 world units on a 1.0 square. Oversizing to
   1.25 was for a 480px pixel buffer where a to-scale human was ~24 pixels and read as a smudge.
   That buffer is gone. Do not grow figures to “read at 480.” Do not “fix” the dark crypt by
   raising the ambient; tokens still carry a faint emissive of their albedo.
-- **Characters carry a faint emissive of their own colormap.** The crypt is genuinely dark away
+- **Characters carry a faint emissive of their own albedo.** The crypt is genuinely dark away
   from the two braziers, which is right for the room and wrong for the figures standing in it.
   This lifts tokens off the floor without touching scene lighting — do not "fix" it by raising
   the ambient.
 
-Current M0/Three.js cast: the **keeper** (a gravedigger in a coat and hat) as the fighter, the
-**zombie** as the goblin. Godot current cast: KayKit **Knight** and **Skeleton_Warrior**.
+Current cast: KayKit **Knight** as the fighter, **Skeleton_Warrior** as the goblin.
 
-Graveyard models are **node-animated** (`skins: 0`, six part meshes) rather than skinned. Both
-kinds work through the same `AnimationMixer` path and both need `SkeletonUtils.clone` — a plain
-`Object3D.clone()` shares the rig, so two tokens of one model would animate in lockstep.
+KayKit adventurers are skinned; the skeleton kit is the same clip set on a different mesh.
+Godot's glTF import gives every instance its own `AnimationPlayer`, so two tokens of one
+model do not animate in lockstep.
 
-Origins differ between kits — mini models stand on y=0, graveyard models are centred on the hips
-— so `Token` measures the bounding box rather than keeping a table of offsets.
+Origins differ between kits, so `Token` measures the bounding box rather than keeping a table of offsets.
 
 ---
 
 ## Voice
 
-Narration is spoken through an **ordered queue** (`client/src/audio/narration.ts`): one line at a
+Narration is spoken through an **ordered queue** (`godot/autoload/clock.gd`): one line at a
 time, strictly in arrival order, because two sentences talking over each other is the worst thing
 a spoken DM can do. A new turn silences whatever is left from the last one.
 
 Ordering against the dice is not handled there — it is inherited, because the queue is fed from
-the gated path in `store.ts`.
+`Table`, which calls `Clock.hold` for a dramatic roll.
 
 **The voice also paces the transcript.** The model streams a whole turn in about three seconds
 and the voice takes twenty to say it, so text appended on arrival has the player speed-reading
@@ -351,8 +346,8 @@ correct if the voice changes. With voice off, lines reveal on arrival, which is 
 Dropped lines are still revealed. Interrupting stops the *speech*, not the *record* — text that
 vanished from the transcript because nobody got round to saying it would be a bug.
 
-`VoiceBackend` is the seam. Web Speech today (free, local, and the dev default); ElevenLabs Flash
-v2.5 next, synthesised **server-side** because the key must never reach the browser. `speak()`
+`VoiceBackend` is the seam. OS TTS today (free, local, and the dev default); ElevenLabs Flash
+v2.5 next, synthesised **server-side** because the key must never reach the client. `speak()`
 resolves on end, error, or cancel and never rejects — a rejection would stall every line behind it.
 
 Casting is a small closed table matched by name prefix, so it degrades to pitch and rate on a
@@ -530,11 +525,11 @@ The dice are not decoration. They are what makes a ~6s prose latency tolerable: 
 weight happens at ~1s, and the narration lands while the player is still watching it.
 
 - **The server decides, the animation displays.** Tumbling faces are noise; the instant a die
-  settles it shows `result.faces[i]`. `client/src/dice/tumble.ts` is pure and holds this rule
+  settles it shows `result.faces[i]`. `godot/dice/tumble.gd` is pure and holds this rule
   in one line. No physics library — see the design doc §7 on why most of them are the wrong
   direction.
-- **Narration is held until the dice land** (`throughGate` in `store.ts`). Timer-based, not
-  driven by the tray component, so the gate still opens if the tray never mounts. Today the
+- **Narration is held until the dice land** (`Clock.hold` from `Table`). Timer-based, not
+  driven by the tray node, so the gate still opens if the tray never mounts. Today the
   prose model is slow enough that ordering is never in doubt; a faster one would otherwise
   announce the outcome over a die still in the air.
 - **The sidebar log is also gated,** and so are diffs. A record that arrives before the throw
@@ -586,9 +581,8 @@ a sting is layers a tenth of a second apart and timers smear them together.
 | Killing blow | 9 | + body, cloth and a sub, 430ms later |
 
 - **A stinger is a transient over a weight.** The metal hits are the transient; `drop()` in
-  `sfx.ts` synthesises the weight as a falling sine, because nothing in these packs is low or long
-  enough to sit under an impact and it is a dozen lines of Web Audio rather than a hunt for a
-  sample. Without it the combat sting is a loud clang rather than an event.
+  `godot/audio/sfx.gd` is a baked falling-sine wav, because nothing in these packs is low or long
+  enough to sit under an impact. Without it the combat sting is a loud clang rather than an event.
 - **`rate` is doing real work.** `boom` and `thud` are only ever played far below speed — a heavy
   metal hit at a third speed is a struck bell, and the creak at half speed stops being timber and
   becomes stone under its own weight. Several "families" are the same clips at different speeds.
@@ -620,7 +614,6 @@ feel gets tuned without burning a turn or an API key.
 cd server && ./gradlew run          # server on :7070
 cd server && ./gradlew test         # dice, attack resolution, combat legality
 cd server && ./gradlew run --args='--demo'   # scripted dice, reproducible
-cd client && npm run dev            # vite on :5173
 cd godot && godot .                 # the Godot editor
 cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit   # godot tests
 ```

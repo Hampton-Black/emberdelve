@@ -1,6 +1,6 @@
 # Godot desktop client
 
-**Status:** Design approved, revised 2026-08-22 after review. **Look locked 2026-08-23:** stylized isometric 3D at native resolution (see §2 *Look*). The 480px nearest-neighbour pipeline in earlier drafts is rejected.
+**Status:** **Shipped 2026-08-23.** Human parity gate passed (Task 22); `client/` deleted. Look: stylized isometric 3D at native resolution (see §2 *Look*).
 **Companion to:** `docs/m0-evaluation.md` (the feel that must survive), `docs/m0-build-plan.md`
 (invariants), `AGENTS.md` (presentation numbers), `docs/ai-dm-system-design.md` (long-range stack)
 **Supersedes:** `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` §8b
@@ -39,7 +39,7 @@ The Java server stays the DM. Godot becomes the table.
 | First ship | A Godot client that passes the §10 parity gate on the developer's own machine. **Distribution is deferred** until a full prototype exists — see §12 |
 | Server address | **One setting**, `EMBERDELVE_SERVER` (default `http://127.0.0.1:7070`). Every URL — `/ws`, `/tts`, `/health` — derives from it. Never a second constant anywhere. This is what keeps a hosted server a config change rather than a rewrite |
 | Protocol | Same JSON WebSocket + `POST /tts` + `GET /health`. One additive field: `Hello.dm`. Godot is another speaker of `client/src/types.ts`, not a new protocol |
-| Dual client | Vite/Three.js stays until Godot replays the M0 acceptance beats. Then `client/` is deleted in the same change that makes Godot the only client |
+| Dual client | Done. Vite/Three.js deleted. Godot is the only table |
 | Chrome | WoW-style overlay on the 3D view. One stream (prose + rolls). No fade while a line is being spoken |
 | Dice | Predetermined faces from the server. 2D tray, not RigidBody. `tumble.ts` math ports as numbers |
 | Clock source | `Time.get_ticks_msec()`, everywhere `performance.now()` appears today. Named once so three modules do not pick three |
@@ -132,9 +132,8 @@ document. A second concurrent connection is closed with a reason the client can 
 
 ### Bind and CORS
 
-The server binds **`127.0.0.1` only**. It is a local DM, not a network service. CORS `anyHost`
-may remain while Vite exists (the Vite origin is still another localhost port). CORS is removed
-in the same change that deletes `client/`.
+The server binds **`127.0.0.1` only**. It is a local DM, not a network service. CORS was removed
+with `client/` — there is no second origin.
 
 ### Config and secrets
 

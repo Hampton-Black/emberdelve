@@ -1,12 +1,14 @@
 # M1 Dungeon Navigation Implementation Plan
 
+> **Unpaused 2026-08-23** after the Godot parity gate. Java tasks stand as written. **Client tasks in this plan are written against React + Three.js and must be re-planned against Godot before anyone starts them.** Wire mirrors are GDScript readers under `godot/`, not `client/src/types.ts`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Descend three rooms into a freshly seeded dungeon — walk through a door, arrive somewhere else, come back and find it as you left it — with nothing the narrator says contradicting what is on the board.
 
 **Architecture:** A seeded, deterministic layout decides which rooms exist and which are joined. Each room's exits are placed into its walls before its props are, and the spatial validator refuses any arrangement that seals one. Layout is regenerated from the seed and never stored; the dress pass is not reproducible, so it is retained from first visit. `GameRepository` becomes room-scoped, so the goblin you left in room 2 is still in room 2. The client already rebuilds on a new `roomId` — walking onto a door square is what sends it one.
 
-**Tech Stack:** Java 25 (records, sealed interfaces, pattern matching), Jackson 2.18, JUnit 5.12, Gradle Kotlin DSL, React 19 + Three.js on the client. No new dependencies.
+**Tech Stack:** Java 25 (records, sealed interfaces, pattern matching), Jackson 2.18, JUnit 5.12, Gradle Kotlin DSL, Godot 4 client (this plan's client tasks still describe React 19 + Three.js and need a Godot rewrite before they are started). No new dependencies.
 
 ## Global Constraints
 
@@ -14,16 +16,16 @@
 - **Predecessor:** `docs/superpowers/plans/2026-08-20-m1-room-generation.md`, which is complete and merged. This plan is the second half of the same milestone.
 - **Invariant #1 — the server is authoritative.** The client never computes a roll, a hit, a legal move, or a death.
 - **Invariant #2 — no singleton player.** `List<PartyMember>`, always. Every action carries an `actorId`.
-- **Invariant #3 — game state never lives in React state.** It lives in the Zustand store.
+- **Invariant #3 — game state never lives in a Control or Node3D.** It lives in `Table`.
 - **Invariant #7 — all LLM-facing enums are closed and validated server-side.** No free-form string from the model reaches the engine.
 - **Invariant #9 — modern Java only.** Records, sealed interfaces, pattern matching, virtual threads. No Spring, no `AbstractXFactory`, no mutable POJOs with getters and setters.
 - **Spec §6 — generated content is validated for spatial legality, not just enum membership.** A prop in a doorway is a valid enum and an invalid world. This plan extends the rule to two new cases: an exit a prop stands in, and a room the layout leaves unreachable.
 - **Spec §7 — the deterministic/persisted split.** Layout is regenerated from `(seed, coords)` and never stored. The dress pass cannot be regenerated from a seed, so it is retained from the moment it exists. "Retained" means kept in memory behind `GameRepository`/`Dungeon`, not written to a database.
 - **Determinism:** everything except `RoomDresser` is a pure function of the seed. Same seed, same dungeon, forever.
-- **Wire mirrors are hand-written.** Every change to a Java record in `dm.model` or `dm.wire` gets the matching change to `client/src/types.ts` in the same commit.
+- **Wire mirrors are hand-written.** Every change to a Java record in `dm.model` or `dm.wire` gets the matching GDScript reader in the same commit.
 - **Commit messages** are a sentence saying what the commit does, in the repository's existing voice (`git log` for examples). No `feat:` prefixes, no `Co-Authored-By` trailer.
 - **Test command:** `cd server && ./gradlew test`
-- **Client typecheck:** `cd client && npx tsc --noEmit`
+- **Client tests:** `godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit`
 - **Run command:** `cd server && ./gradlew run --args='--generate 7'`
 
 ## Not in this plan
