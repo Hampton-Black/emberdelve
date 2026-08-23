@@ -1,10 +1,11 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://world/world.gd" id="1_world"]
 [ext_resource type="Script" path="res://world/camera_rig.gd" id="2_cam"]
 [ext_resource type="Shader" path="res://world/pixel.gdshader" id="3_pixel"]
 [ext_resource type="Script" path="res://world/room.gd" id="4_room"]
 [ext_resource type="Script" path="res://world/lighting.gd" id="5_light"]
+[ext_resource type="Script" path="res://world/overlay.gd" id="6_overlay"]
 
 [sub_resource type="QuadMesh" id="EdgeQuad"]
 size = Vector2(2, 2)
@@ -94,3 +95,4 @@ environment = SubResource("EnvDark")
 [node name="Tokens" type="Node3D" parent="."]
 
 [node name="Overlay" type="Node3D" parent="."]
+script = ExtResource("6_overlay")

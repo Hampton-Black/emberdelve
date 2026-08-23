@@ -253,6 +253,121 @@ func _fit_pixel_viewport() -> void:
 	host.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_route_pointer(event as InputEventMouse, false)
+		return
+	if event is InputEventMouseButton:
+		var mouse := event as InputEventMouseButton
+		if mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT:
+			_route_pointer(mouse, true)
+
+
+## Window pixels → SubViewport pixels. WorldView is 480 wide and scaled onto
+## the window; feeding the camera the unconverted click lands one tile off.
+static func viewport_from_host(host: SubViewportContainer, window_pos: Vector2) -> Vector2:
+	if host == null:
+		return window_pos
+	return host.get_global_transform_with_canvas().affine_inverse() * window_pos
+
+
+func viewport_from_window(window_pos: Vector2) -> Vector2:
+	var vp := get_viewport()
+	if vp == null or not (vp is SubViewport):
+		return window_pos
+	return viewport_from_host(vp.get_parent() as SubViewportContainer, window_pos)
+
+
+## What is under the pointer: a figure if the ray touches one, otherwise the
+## floor square it lands on. Tokens first — an isometric ray through a figure's
+## head meets the floor a square or two behind it.
+func pick_at(viewport_pos: Vector2) -> Dictionary:
+	var cam := rig
+	if cam == null:
+		cam = get_node_or_null("Camera3D") as CameraRigScript
+	if cam == null:
+		return {"entity_id": "", "square": null}
+	var origin := cam.project_ray_origin(viewport_pos)
+	var dir := cam.project_ray_normal(viewport_pos)
+	if dir.is_zero_approx():
+		return {"entity_id": "", "square": null}
+
+	var best_id := ""
+	var best_t := INF
+	var holder := get_node_or_null("Tokens") as Node3D
+	if holder != null:
+		for child in holder.get_children():
+			var token := child as Token
+			if token == null or token.dead:
+				continue
+			var t := _ray_aabb_t(origin, dir, _token_aabb(token))
+			if t < best_t:
+				best_t = t
+				best_id = String(token.name)
+	if not best_id.is_empty():
+		var entity := Table.entity(best_id)
+		var square: Variant = world_to_grid(holder.get_node(NodePath(best_id)).position)
+		if not entity.is_empty():
+			square = Vector2i(int(entity["x"]), int(entity["y"]))
+		return {"entity_id": best_id, "square": square}
+
+	var hit: Variant = Plane(Vector3.UP, 0.0).intersects_ray(origin, dir)
+	if hit == null:
+		return {"entity_id": "", "square": null}
+	var at := world_to_grid(hit)
+	if at.x < 0 or at.y < 0 or at.x >= _room_width() or at.y >= _room_height():
+		return {"entity_id": "", "square": null}
+	return {"entity_id": "", "square": at}
+
+
+func _route_pointer(mouse: InputEventMouse, clicked: bool) -> void:
+	var overlay := get_node_or_null("Overlay")
+	if overlay == null or not overlay.has_method("intent") or not overlay.has_method("commit"):
+		return
+	var viewport_pos := viewport_from_window(mouse.global_position)
+	var picked := pick_at(viewport_pos)
+	var action: Dictionary = overlay.intent(
+		String(picked.get("entity_id", "")),
+		picked.get("square", null),
+	)
+	if clicked:
+		overlay.commit(action)
+		if get_viewport():
+			get_viewport().set_input_as_handled()
+	else:
+		overlay.set_hover(action.get("square", null) if not action.is_empty() else null)
+
+
+func _token_aabb(token: Token) -> AABB:
+	var p := token.global_position
+	return AABB(Vector3(p.x - 0.4, 0.0, p.z - 0.4), Vector3(0.8, 1.2, 0.8))
+
+
+func _ray_aabb_t(origin: Vector3, dir: Vector3, aabb: AABB) -> float:
+	var min_p := aabb.position
+	var max_p := aabb.end
+	var tmin := 0.0
+	var tmax := 500.0
+	for i in 3:
+		var o: float = origin[i]
+		var d: float = dir[i]
+		if absf(d) < 1e-8:
+			if o < min_p[i] or o > max_p[i]:
+				return INF
+			continue
+		var t1: float = (min_p[i] - o) / d
+		var t2: float = (max_p[i] - o) / d
+		if t1 > t2:
+			var tmp := t1
+			t1 = t2
+			t2 = tmp
+		tmin = maxf(tmin, t1)
+		tmax = minf(tmax, t2)
+		if tmin > tmax:
+			return INF
+	return tmin
+
+
 func _room_width() -> int:
 	return int(Table.scene.get("width", 12))
 
