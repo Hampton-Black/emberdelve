@@ -34,3 +34,20 @@ func _ready() -> void:
 		$Overlay/Banner.visible = true)
 	$Overlay/Banner.text = "Start the DM:  cd server && ./gradlew run"
 	$Overlay/Banner.visible = not Table.connected
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Q/E live on the window viewport so the LineEdit can keep them when it has focus.
+	# The camera itself sits inside a SubViewport and would otherwise never see a key.
+	if not (event is InputEventKey):
+		return
+	var key := event as InputEventKey
+	if not key.pressed or key.echo:
+		return
+	if key.keycode != KEY_Q and key.keycode != KEY_E:
+		return
+	var world := get_node_or_null("WorldView/SubViewport/World")
+	if world == null or world.rig == null:
+		return
+	world.rig.handle_rotate_keys(key)
+	get_viewport().set_input_as_handled()

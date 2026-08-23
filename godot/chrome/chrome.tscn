@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://chrome/chrome.gd" id="1_chrome"]
 [ext_resource type="Script" path="res://chrome/transcript.gd" id="2_transcript"]
@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://chrome/combat_bar.gd" id="7_bar"]
 [ext_resource type="Script" path="res://chrome/defeat.gd" id="8_defeat"]
 [ext_resource type="Script" path="res://chrome/debug_bar.gd" id="9_debug"]
+[ext_resource type="PackedScene" path="res://world/world.tscn" id="10_world"]
 
 [sub_resource type="StyleBoxFlat" id="LogStyle"]
 bg_color = Color(0.04, 0.04, 0.05, 0.28)
@@ -86,7 +87,8 @@ content_margin_bottom = 9.0
 [node name="Chrome" type="CanvasLayer"]
 script = ExtResource("1_chrome")
 
-[node name="World" type="SubViewportContainer" parent="."]
+[node name="WorldView" type="SubViewportContainer" parent="."]
+texture_filter = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -94,6 +96,15 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 0
 stretch = true
+
+[node name="SubViewport" type="SubViewport" parent="WorldView"]
+own_world_3d = true
+handle_input_locally = true
+size = Vector2i(480, 270)
+render_target_update_mode = 4
+snap_2d_transforms_to_pixel = true
+
+[node name="World" parent="WorldView/SubViewport" instance=ExtResource("10_world")]
 
 [node name="Overlay" type="Control" parent="."]
 layout_mode = 3

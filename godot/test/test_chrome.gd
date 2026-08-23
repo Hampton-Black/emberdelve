@@ -241,10 +241,31 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 		return
 	var chrome: Node = packed.instantiate()
 	add_child_autofree(chrome)
+	await wait_process_frames(2)
 
-	var world: SubViewportContainer = chrome.get_node("World")
-	assert_true(world.stretch)
-	assert_eq(world.get_child_count(), 0, "Task 15 owns the viewport")
+	assert_eq(chrome.get_node_or_null("World"), null,
+		"one World — the Node3D inside the SubViewport, not a second container")
+
+	var view: SubViewportContainer = chrome.get_node("WorldView")
+	assert_true(view.stretch)
+	assert_eq(view.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
+		"nearest-neighbour on the container so 480px stays 480px")
+
+	var sub: SubViewport = view.get_node("SubViewport")
+	assert_true(sub.snap_2d_transforms_to_pixel)
+	assert_eq(sub.size.x, 480, "the world is 480 wide")
+	var win := chrome.get_viewport().get_visible_rect().size
+	var expected_h := maxi(1, int(round(480.0 * win.y / maxf(win.x, 1.0))))
+	assert_eq(sub.size.y, expected_h, "height follows the window aspect")
+
+	var world: Node3D = sub.get_node("World")
+	assert_not_null(world.get_node_or_null("Camera3D"))
+	assert_not_null(world.get_node_or_null("Room"), "Task 17 hangs the room here")
+	assert_not_null(world.get_node_or_null("Props"), "Task 18 hangs props here")
+	assert_not_null(world.get_node_or_null("Tokens"), "Task 19 hangs tokens here")
+	assert_not_null(world.get_node_or_null("Overlay"), "Task 20 hangs the click overlay here")
+	var cam: Camera3D = world.get_node("Camera3D")
+	assert_eq(cam.projection, Camera3D.PROJECTION_ORTHOGONAL)
 
 	var record: RichTextLabel = chrome.get_node("Overlay/Log/VBox/Transcript")
 	assert_true(record.bbcode_enabled)
@@ -253,8 +274,9 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_not_null(chrome.get_node("Overlay/Log/VBox/InputBox"))
 	assert_not_null(chrome.get_node_or_null("Overlay/DiceTray"),
 		"the tray is overlay chrome — a d20 at 480px is a smudge")
-	assert_eq(chrome.get_node("World").get_node_or_null("DiceTray"), null,
+	assert_eq(world.get_node_or_null("DiceTray"), null,
 		"not inside the pixelated World")
+	assert_eq(sub.get_node_or_null("DiceTray"), null)
 	assert_not_null(chrome.get_node("Overlay/Toast"))
 	assert_not_null(chrome.get_node("Overlay/Banner"))
 	assert_not_null(chrome.get_node("Overlay/Title"))
