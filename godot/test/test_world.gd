@@ -74,6 +74,16 @@ func _rig() -> Camera3D:
 	return node
 
 
+func _world_tree() -> Node3D:
+	var packed: PackedScene = load("res://world/world.tscn")
+	assert_not_null(packed, "world.tscn")
+	if packed == null:
+		return Node3D.new()
+	var node: Node3D = packed.instantiate()
+	add_child_autofree(node)
+	return node
+
+
 func test_rotate_by_steps_one_of_four_corners() -> void:
 	var rig := _rig()
 	if not rig.has_method("rotate_by"):
@@ -105,6 +115,43 @@ func test_q_and_e_step_the_corner_from_unhandled_input() -> void:
 	e.pressed = true
 	rig._unhandled_input(e)
 	assert_eq(rig.corner, 0, "E turns clockwise, back to the start")
+
+
+func test_a_first_scene_settles_the_camera() -> void:
+	# Hello / a new roomId: snap onto the scene's own framing. Easing here would pull back
+	# from exploration on a reconnect that landed mid-fight.
+	Table.reset()
+	var world := _world_tree()
+	if world.rig == null:
+		assert_not_null(world.rig, "Camera3D")
+		return
+	var fighting := CRYPT.duplicate(true)
+	fighting["mode"] = "COMBAT"
+	Table.set_scene(fighting)
+	var target: Dictionary = world.rig._framing_target()
+	assert_eq(world.rig._framing_t, 1.0, "hello snaps; easing would leave the tween in flight")
+	assert_almost_eq(world.rig.half_height, target["half_height"], 0.0001)
+	assert_gt(world.rig.half_height, 5.4, "a combat hello opens on the tactical view")
+	assert_almost_eq(world.rig._focus.x, target["focus"].x, 0.0001)
+	assert_almost_eq(world.rig._focus.y, target["focus"].y, 0.0001)
+	assert_almost_eq(world.rig._focus.z, target["focus"].z, 0.0001)
+
+
+func test_an_in_session_mode_change_eases_framing() -> void:
+	# Same room, ModeChanged: the combat ceremony is the pull-back. Settling on every
+	# scene_changed would snap it away.
+	var world := _world_tree()
+	if world.rig == null:
+		assert_not_null(world.rig, "Camera3D")
+		return
+	assert_eq(world.rig._framing_t, 1.0)
+	assert_almost_eq(world.rig.half_height, 5.4, 0.0001)
+	Table.mode = "COMBAT"
+	Table.scene_changed.emit()
+	Table.mode_changed.emit("COMBAT")
+	assert_eq(world.rig._framing_t, 0.0, "the pull-back is a tween, not a snap")
+	assert_almost_eq(world.rig.half_height, 5.4, 0.0001,
+		"half_height must not already be the combat target")
 
 
 func test_frame_combat_pulls_the_camera_back() -> void:

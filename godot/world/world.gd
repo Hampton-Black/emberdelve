@@ -11,6 +11,7 @@ const TARGET_WIDTH := 480
 const CameraRigScript := preload("res://world/camera_rig.gd")
 
 var rig: CameraRigScript
+var _room_id := ""
 
 
 func _ready() -> void:
@@ -18,8 +19,6 @@ func _ready() -> void:
 	Table.scene_changed.connect(_on_scene_changed)
 	Table.mode_changed.connect(_on_mode_changed)
 	_on_scene_changed()
-	if rig != null:
-		rig.settle(Table.mode)
 	_fit_pixel_viewport()
 
 
@@ -48,6 +47,15 @@ func world_to_grid(point: Vector3) -> Vector2i:
 
 func _on_scene_changed() -> void:
 	if rig == null:
+		return
+	var room_id := String(Table.scene.get("roomId", ""))
+	# A new room (hello, reconnect, restart into a different id) snaps. The same room
+	# emitting scene_changed is a token moving or a lid opening — follow, do not settle,
+	# or the combat ceremony's pull-back never plays.
+	if room_id != _room_id:
+		_room_id = room_id
+		_follow_party()
+		rig.settle(Table.mode)
 		return
 	_follow_party()
 

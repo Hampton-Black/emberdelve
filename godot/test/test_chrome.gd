@@ -310,6 +310,33 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_eq(tray.anchor_bottom, 1.0)
 
 
+func test_q_and_e_step_the_corner_through_chrome() -> void:
+	# Production: the rig sits in a SubViewport and never sees window keys. Chrome forwards.
+	# Isolation tests that parent CameraRig to GUT's root cannot fail if this path is removed.
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(2)
+	var world: Node3D = chrome.get_node("WorldView/SubViewport/World")
+	assert_not_null(world.rig, "World.rig")
+	if world.rig == null:
+		return
+	assert_eq(world.rig.corner, 0)
+	var q := InputEventKey.new()
+	q.keycode = KEY_Q
+	q.pressed = true
+	chrome._unhandled_input(q)
+	assert_eq(world.rig.corner, 3, "Q turns counter-clockwise through Chrome")
+	var e := InputEventKey.new()
+	e.keycode = KEY_E
+	e.pressed = true
+	chrome._unhandled_input(e)
+	assert_eq(world.rig.corner, 0, "E turns clockwise, back to the start")
+
+
 func test_the_window_opens_larger_than_the_plan_s_720p_default() -> void:
 	# 1280×720 makes the overlay feel like a postage stamp and the default 16px type
 	# huge inside it. A 1080p viewport is the same density with room to see the room.
