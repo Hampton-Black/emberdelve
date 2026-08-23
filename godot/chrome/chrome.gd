@@ -36,8 +36,8 @@ func _ready() -> void:
 	$Overlay/Banner.visible = not Table.connected
 	# World sits in a SubViewport. Clicks hit this Control. Viewport.gui_input
 	# already made `event.position` local to WorldView — which is SubViewport
-	# pixels, because the container is TARGET_WIDTH wide and only *scaled* up.
-	# Converting `global_position` a second time parks the hover a board away.
+	# pixels. The container fills the window 1:1; converting `global_position`
+	# a second time parks the hover a board away.
 	$WorldView.gui_input.connect(_on_world_gui_input)
 
 

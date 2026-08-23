@@ -307,7 +307,7 @@ func _self_lit(root: Node) -> void:
 			if not (src is BaseMaterial3D):
 				continue
 			var mat := (src as BaseMaterial3D).duplicate() as BaseMaterial3D
-			mat.texture_filter = World.mesh_filter()
+			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 			mat.emission_enabled = true
 			mat.emission = Color.WHITE
 			mat.emission_energy_multiplier = SELF_LIT
@@ -337,7 +337,7 @@ func _paint_base(kind: String) -> void:
 	mat.albedo_color = BASE_COLOR.get(kind, FALLBACK)
 	mat.roughness = 0.7
 	mat.metallic = 0.2
-	mat.texture_filter = World.mesh_filter()
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 	base.material_override = mat
 	base.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 

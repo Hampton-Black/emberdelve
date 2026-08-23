@@ -310,8 +310,8 @@ meshes downsampled into a pixel read. KayKit is authored as stylized 3D. Downsam
 the meshes (smeared silhouettes, crawling edges). The locked look is the assets at native
 resolution with linear filtering. The chrome still composites **on top of** the world viewport at
 native resolution, never through a project-wide stretch. Camera focus is not quantised to a
-pixel grid. `World.PIXEL_LOOK` in code is the abandoned path, default `false` — do not flip it
-without a new spec. True 2D isometric sprites (FFT / the Gemini mock) are a different medium:
+pixel grid. The 480px/960px pipeline, edge shader, and `PIXEL_LOOK` flag were removed — do not
+restore them without a new spec. True 2D isometric sprites (FFT / the Gemini mock) are a different medium:
 new drawings per facing and per creature, and Q/E is free in 3D and expensive in 2D. Not this
 client. An AI DM generates variety; kitbashed meshes scale, sprite sheets do not.
 

@@ -21,8 +21,7 @@ KayKit dungeon `wall` is the live room module. Halloween Bits is a different con
 never scaled by the dungeon module.
 
 Samplers on KayKit atlases (`dungeon_texture.png`, `halloweenbits_texture.png`, character
-colormaps) were authored as nearest for a pixel pipeline that is **no longer the look**. Live
-materials use `World.mesh_filter()` (linear while `PIXEL_LOOK` is false).
+colormaps) use linear filtering. The old nearest/pixel pipeline is gone.
 
 Do not add a pack whose zip has no license. The old `freesample/` folder was unknown-license
 and must not be re-imported.

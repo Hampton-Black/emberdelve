@@ -203,36 +203,10 @@ func _apply_camera() -> void:
 		DISTANCE * sin(ELEVATION),
 		DISTANCE * cos(ELEVATION) * cos(_azimuth),
 	)
-	# Aim once at the raw focus so the camera's own basis is available to snap against.
 	global_position = _focus + offset
 	if is_inside_tree():
 		look_at(_focus)
-		force_update_transform()
-	var aimed := _snap_focus(_focus)
-	global_position = aimed + offset
-	if is_inside_tree():
-		look_at(aimed)
 	size = half_height * 2.0
-
-
-## Quantises the focus point to whole low-resolution pixels.
-##
-## Nothing about a camera that translates smoothly ever shows this at native resolution. At
-## 960px with nearest-neighbour upscaling, a camera that moves by a fraction of a low-res pixel
-## resamples the entire frame, and every edge in the room crawls. The focus is snapped so the
-## camera can only ever move in exact pixel steps, which is what keeps the art still underneath
-## it.
-func _snap_focus(focus: Vector3) -> Vector3:
-	if not World.PIXEL_LOOK:
-		return focus
-	var rows := maxf(1.0, roundf(get_viewport().size.y))
-	var unit := (half_height * 2.0) / rows
-	var right := global_transform.basis.x
-	var up := global_transform.basis.y
-	var along := roundf(focus.dot(right) / unit) * unit
-	var above := roundf(focus.dot(up) / unit) * unit
-	var forward := focus - right * focus.dot(right) - up * focus.dot(up)
-	return forward + right * along + up * above
 
 
 func _room_extent() -> Vector2:
@@ -246,10 +220,10 @@ func _room_extent() -> Vector2:
 func _vp_size() -> Vector2:
 	var vp := get_viewport()
 	if vp == null:
-		return Vector2(960.0, 540.0)
+		return Vector2(1920.0, 1080.0)
 	var s := Vector2(vp.size)
 	if s.x < 1.0 or s.y < 1.0:
-		return Vector2(960.0, 540.0)
+		return Vector2(1920.0, 1080.0)
 	return s
 
 

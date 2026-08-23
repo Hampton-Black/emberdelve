@@ -7,19 +7,9 @@ extends Node3D
 ## on the origin; +y on the grid is north, which is -Z in the world — the same mapping as
 ## `toWorld` in the old Three.js client (`assets.ts`).
 
-const TARGET_WIDTH := 960
-## Locked look is native 3D (`false`). The `true` path is the abandoned 960px
-## nearest-neighbour pixel table. Do not flip this without a new spec.
-const PIXEL_LOOK := false
 const CameraRigScript := preload("res://world/camera_rig.gd")
 const PROP_TABLE := preload("res://world/prop_table.tres")
 const TOKEN_SCENE := preload("res://world/tokens/token.tscn")
-
-
-static func mesh_filter() -> BaseMaterial3D.TextureFilter:
-	if PIXEL_LOOK:
-		return BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	return BaseMaterial3D.TEXTURE_FILTER_LINEAR
 
 var rig: CameraRigScript
 var _room_id := ""
@@ -35,14 +25,11 @@ func _ready() -> void:
 	Table.entity_died.connect(_on_entity_died)
 	Table.strike.connect(_on_strike)
 	_on_scene_changed()
-	_fit_pixel_viewport()
-	var edges := get_node_or_null("Camera3D/Edges") as GeometryInstance3D
-	if edges:
-		edges.visible = PIXEL_LOOK
+	_fit_world_viewport()
 
 
 func _process(_delta: float) -> void:
-	_fit_pixel_viewport()
+	_fit_world_viewport()
 
 
 func grid_to_world(x: int, y: int) -> Vector3:
@@ -239,7 +226,7 @@ func _follow_party() -> void:
 	rig.follow(centre / float(count))
 
 
-func _fit_pixel_viewport() -> void:
+func _fit_world_viewport() -> void:
 	var vp := get_viewport()
 	if vp == null or not (vp is SubViewport):
 		return
@@ -249,36 +236,18 @@ func _fit_pixel_viewport() -> void:
 	var win := host.get_viewport().get_visible_rect().size
 	if win.x < 1.0 or win.y < 1.0:
 		return
-	if not PIXEL_LOOK:
-		# Native window pixels, linear sample, no 960px nearest upsample.
-		if host.anchor_right != 1.0 or host.anchor_bottom != 1.0 \
-				or not host.scale.is_equal_approx(Vector2.ONE):
-			host.set_anchors_preset(Control.PRESET_FULL_RECT)
-			host.offset_left = 0.0
-			host.offset_top = 0.0
-			host.offset_right = 0.0
-			host.offset_bottom = 0.0
-			host.position = Vector2.ZERO
-			host.scale = Vector2.ONE
-		host.stretch = true
-		host.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		vp.snap_2d_transforms_to_pixel = false
-		return
-	# stretch=true copies the container's unscaled size onto the SubViewport and refuses a
-	# manual size. Keep the container TARGET_WIDTH wide and scale it to the window so the world is
-	# pixelated and the overlay chrome, a sibling, is not. 960 is 2× the original 480 target —
-	# nearest-neighbour at 480 made KayKit tokens a smear; 960 is still integer-scaled at 1920.
-	var pixel_h := maxi(1, int(round(float(TARGET_WIDTH) * win.y / win.x)))
-	var zoom := win.x / float(TARGET_WIDTH)
-	var pixel := Vector2(float(TARGET_WIDTH), float(pixel_h))
-	if host.anchor_right != host.anchor_left or host.size != pixel \
-			or not host.scale.is_equal_approx(Vector2(zoom, zoom)):
-		host.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	if host.anchor_right != 1.0 or host.anchor_bottom != 1.0 \
+			or not host.scale.is_equal_approx(Vector2.ONE):
+		host.set_anchors_preset(Control.PRESET_FULL_RECT)
+		host.offset_left = 0.0
+		host.offset_top = 0.0
+		host.offset_right = 0.0
+		host.offset_bottom = 0.0
 		host.position = Vector2.ZERO
-		host.size = pixel
-		host.scale = Vector2(zoom, zoom)
+		host.scale = Vector2.ONE
 	host.stretch = true
-	host.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	host.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	vp.snap_2d_transforms_to_pixel = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -297,8 +266,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_route_pointer(mouse, true)
 
 
-## Window pixels → SubViewport pixels. WorldView is TARGET_WIDTH wide and scaled onto
-## the window; feeding the camera the unconverted click lands one tile off.
+## Window pixels → SubViewport pixels. WorldView fills the window 1:1; this
+## still converts through the container so a scaled or offset host cannot lie.
 static func viewport_from_host(host: SubViewportContainer, window_pos: Vector2) -> Vector2:
 	if host == null:
 		return window_pos

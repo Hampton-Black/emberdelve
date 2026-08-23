@@ -255,7 +255,7 @@ func _instance_piece(path: String, opts: Dictionary) -> Node3D:
 	elif not bool(opts.get("prop", false)):
 		piece.scale = Vector3.ONE * (1.0 / KAYKIT_MODULE)
 	_shadows(piece)
-	_nearest(piece)
+	_filter_albedo(piece)
 	return piece
 
 
@@ -311,14 +311,12 @@ func _shadows(root: Node) -> void:
 		mesh.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
 
 
-func _nearest(root: Node) -> void:
-	# KayKit atlases are a grid of flat colour. Linear filtering bleeds neighbouring
-	# swatches into every edge; nearest keeps a 480px upsample as pixels.
+func _filter_albedo(root: Node) -> void:
 	for mesh in _meshes(root):
 		for i in _surface_count(mesh):
 			var mat := mesh.get_active_material(i)
 			if mat is BaseMaterial3D:
-				(mat as BaseMaterial3D).texture_filter = World.mesh_filter()
+				(mat as BaseMaterial3D).texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 
 
 func _aabb_of(root: Node3D) -> AABB:

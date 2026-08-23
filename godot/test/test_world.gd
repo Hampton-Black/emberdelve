@@ -275,86 +275,13 @@ func _combat() -> Dictionary:
 	}
 
 
-func test_snap_focus_is_idempotent_on_a_pixel() -> void:
-	var rig := _rig()
-	if not rig.has_method("_snap_focus"):
-		assert_true(rig.has_method("_snap_focus"))
-		return
-	rig._process(0.0)
-	var raw := Vector3(0.37, 0.0, 0.11)
-	var once: Vector3 = rig._snap_focus(raw)
-	var twice: Vector3 = rig._snap_focus(once)
-	assert_almost_eq(once.x, twice.x, 0.0001)
-	assert_almost_eq(once.y, twice.y, 0.0001)
-	assert_almost_eq(once.z, twice.z, 0.0001)
-	if World.PIXEL_LOOK:
-		assert_ne(once, raw, "a fractional focus is moved onto the pixel grid")
-	else:
-		assert_eq(once, raw, "native look does not quantise the camera")
-
-
-# ---- Edge pass: depth + normals, not a second pixelation
-
-func test_the_edge_shader_loads_and_names_the_two_three_js_strengths() -> void:
-	var shader: Shader = load("res://world/pixel.gdshader")
-	assert_not_null(shader, "pixel.gdshader")
-	if shader == null:
-		return
-	# canvas_item rejects hint_depth_texture in 4.7.2; spatial is the engine path
-	# that actually has DEPTH and NORMAL_ROUGHNESS.
-	assert_eq(shader.get_mode(), Shader.MODE_SPATIAL)
-	assert_true(shader.code.contains("hint_depth_texture"), "must sample depth")
-	assert_true(shader.code.contains("hint_normal_roughness_texture"), "must sample normals")
-	assert_true(shader.code.contains("uniform float normal_edge_strength"),
-		"tunable in the inspector, not a literal in the body")
-	assert_true(shader.code.contains("uniform float depth_edge_strength"),
-		"tunable in the inspector, not a literal in the body")
-	assert_true(shader.code.contains("normal_edge_strength : hint_range(0.0, 2.0) = 0.28"))
-	assert_true(shader.code.contains("depth_edge_strength : hint_range(0.0, 2.0) = 0.12"))
-
-
-func test_the_world_wears_the_edge_pass_at_three_js_strengths() -> void:
+func test_the_pixel_pipeline_is_gone() -> void:
 	var world := _world_tree()
-	var shader: Shader = load("res://world/pixel.gdshader")
-	assert_not_null(shader, "pixel.gdshader")
-	if shader == null:
-		return
-	var mat := _edge_material(world, shader)
-	assert_not_null(mat, "world.tscn must attach pixel.gdshader")
-	if mat == null:
-		return
-	assert_eq(mat.shader, shader)
-	var edges := world.get_node_or_null("Camera3D/Edges") as GeometryInstance3D
-	if edges:
-		assert_eq(edges.visible, World.PIXEL_LOOK,
-			"edge pass is off in the locked native look")
-	var n: Variant = mat.get_shader_parameter("normal_edge_strength")
-	var d: Variant = mat.get_shader_parameter("depth_edge_strength")
-	if n == null or d == null:
-		# Dummy / headless may not reflect defaults; the scene file is the pin.
-		var scene := FileAccess.get_file_as_string("res://world/world.tscn")
-		assert_true(scene.contains("shader_parameter/normal_edge_strength = 0.28"))
-		assert_true(scene.contains("shader_parameter/depth_edge_strength = 0.12"))
-	else:
-		assert_almost_eq(float(n), 0.28, 0.0001, "playtest: Three.js 0.5 was a smear at 960")
-		assert_almost_eq(float(d), 0.12, 0.0001, "playtest: Three.js 0.25 was a smear at 960")
-
-
-func _edge_material(root: Node, shader: Shader) -> ShaderMaterial:
-	var stack: Array[Node] = [root]
-	while not stack.is_empty():
-		var node: Node = stack.pop_back()
-		for child in node.get_children():
-			stack.append(child)
-		if node is MeshInstance3D:
-			var mesh := node as MeshInstance3D
-			var mat: Material = mesh.material_override
-			if mat == null:
-				mat = mesh.get_surface_override_material(0)
-			if mat is ShaderMaterial and (mat as ShaderMaterial).shader == shader:
-				return mat
-		if node is CanvasItem:
-			var canvas_mat := (node as CanvasItem).material
-			if canvas_mat is ShaderMaterial and (canvas_mat as ShaderMaterial).shader == shader:
-				return canvas_mat
-	return null
+	assert_null(world.get_node_or_null("Camera3D/Edges"),
+		"the depth/normal edge overlay is not in the world")
+	assert_false(ResourceLoader.exists("res://world/pixel.gdshader"),
+		"pixel.gdshader is deleted")
+	var scene := FileAccess.get_file_as_string("res://world/world.tscn")
+	assert_false(scene.contains("pixel.gdshader"))
+	assert_false(_rig().has_method("_snap_focus"),
+		"camera focus is not quantised to a pixel grid")

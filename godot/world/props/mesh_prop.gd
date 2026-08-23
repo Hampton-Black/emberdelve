@@ -65,7 +65,7 @@ static func make(path: String, height: float, footprint: float) -> Node3D:
 	host.add_child(model)
 	fit(host, height, footprint)
 	shadows(host)
-	nearest(host)
+	filter_albedo(host)
 	return host
 
 
@@ -85,7 +85,7 @@ static func make_wall(path: String, spec: Dictionary) -> Node3D:
 		sit_on_floor(host)
 	host.position.z += Room.WALL_UNIT * 0.5 - Room.WALL_DEPTH * 0.5
 	shadows(host)
-	nearest(host)
+	filter_albedo(host)
 	return host
 
 
@@ -128,11 +128,19 @@ static func fit(piece: Node3D, height: float, footprint: float) -> void:
 	)
 
 
+static func filter_albedo(root: Node) -> void:
+	for mesh in meshes(root):
+		for i in _surface_count(mesh):
+			var mat := mesh.get_active_material(i)
+			if mat is BaseMaterial3D:
+				(mat as BaseMaterial3D).texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+
+
 static func paint(root: Node, colour: Color, roughness: float = 0.85) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = colour
 	mat.roughness = roughness
-	mat.texture_filter = World.mesh_filter()
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 	for mesh in meshes(root):
 		mesh.material_override = mat
 
@@ -141,14 +149,6 @@ static func shadows(root: Node) -> void:
 	for mesh in meshes(root):
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		mesh.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
-
-
-static func nearest(root: Node) -> void:
-	for mesh in meshes(root):
-		for i in _surface_count(mesh):
-			var mat := mesh.get_active_material(i)
-			if mat is BaseMaterial3D:
-				(mat as BaseMaterial3D).texture_filter = World.mesh_filter()
 
 
 static func aabb_of(root: Node3D) -> AABB:

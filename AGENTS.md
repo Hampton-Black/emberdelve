@@ -60,7 +60,7 @@ Resolved in a design review before implementation. Do not silently revisit these
 | Determinism | Real DM discretion. `ScriptedDiceRoller` behind `--demo` for reproducible tuning runs. |
 | Combat VO | **Dramatic beats only** — kills, crits, and the goblin's turn. Ordinary hits resolve instantly. |
 | Camera | Four fixed isometric corners, 90° snap (Q/E). Never free orbit — it breaks the isometric read and grid picking. |
-| Look | **Stylized isometric 3D at native resolution.** KayKit-class meshes, linear filtering, real lights. Not a 480px/960px nearest-neighbour pixel pass, not 2D isometric sprites. `World.PIXEL_LOOK` stays `false`. |
+| Look | **Stylized isometric 3D at native resolution.** KayKit-class meshes, linear filtering, real lights. Not a 480px/960px nearest-neighbour pixel pass, not 2D isometric sprites. |
 
 ### Deviations from `docs/m0-build-plan.md` as written
 

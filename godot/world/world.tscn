@@ -1,20 +1,10 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://world/world.gd" id="1_world"]
 [ext_resource type="Script" path="res://world/camera_rig.gd" id="2_cam"]
-[ext_resource type="Shader" path="res://world/pixel.gdshader" id="3_pixel"]
 [ext_resource type="Script" path="res://world/room.gd" id="4_room"]
 [ext_resource type="Script" path="res://world/lighting.gd" id="5_light"]
 [ext_resource type="Script" path="res://world/overlay.gd" id="6_overlay"]
-
-[sub_resource type="QuadMesh" id="EdgeQuad"]
-size = Vector2(2, 2)
-
-[sub_resource type="ShaderMaterial" id="EdgeMaterial"]
-render_priority = -128
-shader = ExtResource("3_pixel")
-shader_parameter/normal_edge_strength = 0.28
-shader_parameter/depth_edge_strength = 0.12
 
 [sub_resource type="Environment" id="EnvTorchlit"]
 background_mode = 1
@@ -53,13 +43,6 @@ size = 10.8
 near = 0.1
 far = 200.0
 script = ExtResource("2_cam")
-
-[node name="Edges" type="MeshInstance3D" parent="Camera3D"]
-cast_shadow = 0
-extra_cull_margin = 16384.0
-gi_mode = 0
-mesh = SubResource("EdgeQuad")
-surface_material_override/0 = SubResource("EdgeMaterial")
 
 [node name="Room" type="Node3D" parent="."]
 script = ExtResource("4_room")
