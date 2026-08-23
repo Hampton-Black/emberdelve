@@ -1,0 +1,43 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://world/tokens/token.gd" id="1_token"]
+
+[sub_resource type="CylinderMesh" id="BaseMesh"]
+top_radius = 0.34
+bottom_radius = 0.36
+height = 0.05
+radial_segments = 16
+rings = 1
+
+[sub_resource type="QuadMesh" id="BackMesh"]
+size = Vector2(0.77, 0.135)
+
+[sub_resource type="QuadMesh" id="FillMesh"]
+size = Vector2(0.72, 0.085)
+
+[node name="Token" type="Node3D"]
+script = ExtResource("1_token")
+
+[node name="Pivot" type="Node3D" parent="."]
+
+[node name="Base" type="MeshInstance3D" parent="Pivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, 0)
+gi_mode = 0
+mesh = SubResource("BaseMesh")
+
+[node name="Figure" type="Node3D" parent="Pivot"]
+
+[node name="Bar" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
+visible = false
+
+[node name="Backing" type="MeshInstance3D" parent="Bar"]
+gi_mode = 0
+cast_shadow = 0
+mesh = SubResource("BackMesh")
+
+[node name="Fill" type="MeshInstance3D" parent="Bar"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.001)
+gi_mode = 0
+cast_shadow = 0
+mesh = SubResource("FillMesh")

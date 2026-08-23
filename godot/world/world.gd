@@ -10,6 +10,7 @@ extends Node3D
 const TARGET_WIDTH := 480
 const CameraRigScript := preload("res://world/camera_rig.gd")
 const PROP_TABLE := preload("res://world/prop_table.tres")
+const TOKEN_SCENE := preload("res://world/tokens/token.tscn")
 
 var rig: CameraRigScript
 var _room_id := ""
@@ -20,6 +21,10 @@ func _ready() -> void:
 	Table.scene_changed.connect(_on_scene_changed)
 	Table.prop_revealed.connect(_on_prop_revealed)
 	Table.mode_changed.connect(_on_mode_changed)
+	Table.entity_added.connect(_on_entity_added)
+	Table.entity_moved.connect(_on_entity_moved)
+	Table.entity_died.connect(_on_entity_died)
+	Table.strike.connect(_on_strike)
 	_on_scene_changed()
 	_fit_pixel_viewport()
 
@@ -56,10 +61,12 @@ func _on_scene_changed() -> void:
 	if room_id != _room_id:
 		_room_id = room_id
 		_rebuild_props()
+		_rebuild_tokens()
 		_follow_party()
 		if rig:
 			rig.settle(Table.mode)
 		return
+	_sync_tokens()
 	_follow_party()
 
 
@@ -106,9 +113,104 @@ func _instance_prop(prop: Dictionary) -> void:
 
 
 func _on_mode_changed(mode: String) -> void:
-	if rig == null:
+	if rig:
+		rig.frame(mode)
+	_set_bars_visible(mode == "COMBAT")
+
+
+func _rebuild_tokens() -> void:
+	var holder := get_node_or_null("Tokens") as Node3D
+	if holder == null:
 		return
-	rig.frame(mode)
+	for child in holder.get_children():
+		holder.remove_child(child)
+		child.free()
+	if Table.scene.is_empty():
+		return
+	for entity in Table.scene.get("entities", []):
+		_instance_token(entity)
+
+
+func _sync_tokens() -> void:
+	var holder := get_node_or_null("Tokens") as Node3D
+	if holder == null:
+		return
+	var live: Dictionary = {}
+	for entity in Table.scene.get("entities", []):
+		var id := String(entity.get("id", ""))
+		live[id] = true
+		var token := holder.get_node_or_null(NodePath(id)) as Token
+		if token == null:
+			_instance_token(entity)
+			continue
+		token.set_hp(int(entity.get("hp", 0)), int(entity.get("maxHp", 1)))
+		var want := Vector2i(int(entity.get("x", 0)), int(entity.get("y", 0)))
+		if world_to_grid(token.position) != want:
+			token.slide_to(want)
+	for child in holder.get_children():
+		if not live.has(String(child.name)):
+			holder.remove_child(child)
+			child.free()
+
+
+func _instance_token(entity: Dictionary) -> void:
+	var holder := get_node_or_null("Tokens") as Node3D
+	if holder == null:
+		return
+	var id := String(entity.get("id", ""))
+	if id.is_empty() or holder.get_node_or_null(NodePath(id)) != null:
+		return
+	var token := TOKEN_SCENE.instantiate() as Token
+	if token == null:
+		return
+	token.name = id
+	token.position = grid_to_world(int(entity.get("x", 0)), int(entity.get("y", 0)))
+	holder.add_child(token)
+	token.configure(entity)
+	token.set_bar_visible(Table.mode == "COMBAT")
+
+
+func _on_entity_added(entity: Dictionary) -> void:
+	_instance_token(entity)
+
+
+func _on_entity_moved(entity_id: String, _from: Vector2i, to: Vector2i) -> void:
+	var token := _token_node(entity_id)
+	if token:
+		token.slide_to(to)
+
+
+func _on_entity_died(entity_id: String) -> void:
+	var token := _token_node(entity_id)
+	if token:
+		token.die()
+
+
+func _on_strike(actor_id: String, target_id: String, _connected: bool, _at: int) -> void:
+	var actor := _token_node(actor_id)
+	if actor == null:
+		return
+	var target := _token_node(target_id)
+	if target:
+		var delta: Vector3 = target.global_position - actor.global_position
+		actor.face_towards(delta.x, delta.z)
+	actor.swing()
+
+
+func _set_bars_visible(in_combat: bool) -> void:
+	var holder := get_node_or_null("Tokens") as Node3D
+	if holder == null:
+		return
+	for child in holder.get_children():
+		if child is Token:
+			(child as Token).set_bar_visible(in_combat)
+
+
+func _token_node(entity_id: String) -> Token:
+	var holder := get_node_or_null("Tokens") as Node3D
+	if holder == null:
+		return null
+	return holder.get_node_or_null(NodePath(entity_id)) as Token
 
 
 func _follow_party() -> void:

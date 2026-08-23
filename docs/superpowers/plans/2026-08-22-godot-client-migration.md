@@ -92,7 +92,7 @@
 | `godot/world/prop_table.tres` | `PropType` → scene path. The `MESH_PROPS` seam, as a resource |
 | `godot/world/props/*.tscn` | One scene per `PropType` |
 | `godot/world/tokens/token.gd` | One creature: clips, slide, health bar, impact gating |
-| `godot/world/tokens/kits/graveyard/`, `.../mini/` | One folder per kit — colormaps collide otherwise |
+| `godot/world/kits/characters/kaykit_adventurers/`, `.../kaykit_skeletons/`, `.../kaykit_animations/` | Knight, Skeleton_Warrior, shared Rig_Medium clips — one folder per atlas |
 | `godot/world/overlay.gd` | Legal-move and target highlights; hover; click routing |
 | `godot/world/lighting.gd` | Brazier lights and the three `LightingPreset` groups |
 
@@ -3988,25 +3988,41 @@ Add both packs to `LICENSES.md` with their versions, author and measured module.
 
 **Files:**
 - Create: `godot/world/tokens/token.tscn`, `godot/world/tokens/token.gd`
-- Create: `godot/world/kits/characters/graveyard/`, `godot/world/kits/characters/mini/`
+- Create: `godot/world/kits/characters/kaykit_adventurers/` (Knight only)
+- Create: `godot/world/kits/characters/kaykit_skeletons/` (Skeleton_Warrior only)
+- Create: `godot/world/kits/characters/kaykit_animations/` (Rig_Medium: General, MovementBasic, CombatMelee)
 
 **Interfaces:**
 - Consumes: `Table.scene.entities`, `Table.entity_added`, `Table.entity_moved`, `Table.entity_died`, `Table.strike`.
 - Produces: `Token` with `slide_to(square: Vector2i)`, `swing()`, `set_hp(hp: int, max_hp: int)`, `die()`.
 
-Port of `client/src/scene/tokens.ts` (430 lines) and `AGENTS.md` section Characters.
+Port of `client/src/scene/tokens.ts` (430 lines) and `AGENTS.md` section Characters, **on KayKit rather than Kenney.** Do not copy `graveyard/` or `mini/`.
 
-- [ ] **Step 1: Import both kits, in separate folders**
+Sources (outside the repo, in `~/Downloads`):
+- `KayKit_Adventurers_2.0_FREE` — `Characters/gltf/Knight.glb` + `knight_texture.png`
+- `KayKit_Skeletons_1.1_FREE.zip` — `characters/gltf/Skeleton_Warrior.glb` + `skeleton_texture.png`
+- `KayKit_Character_Animations_1.1.zip` — Rig_Medium only
 
-```bash
-mkdir -p godot/world/kits/characters && cp -R client/public/assets/kits/characters/graveyard godot/world/kits/characters/graveyard && cp -R client/public/assets/kits/characters/mini godot/world/kits/characters/mini
-```
+- [ ] **Step 1: Import the three folders, cherry-picked**
 
-**One folder each, and this is not negotiable** — both kits ship a different `Textures/colormap.png` under the same relative name, and merging them silently renders one kit in the other's palette. It costs an hour to find.
+Knight and Skeleton_Warrior are both **Rig_Medium**. Each pack has its own atlas (`knight_texture.png`, `skeleton_texture.png`) — **one folder each**, same rule as Kenney colormaps. Animations live in a third folder so neither character owns the shared clips.
+
+KayKit ships `.gltf`+`.bin` or `.glb`. Copy the pair if it is gltf. Texture filter **Nearest**. Do not copy weapons, obj, fbx, or the rest of the adventurer roster.
+
+`Knight.glb` ships **no clips**. Assign from the animations pack. The game only asks for four (`tokens.ts` `TokenClip`); leave the rest on the cutting-room floor:
+
+| Game clip | KayKit clip | From |
+|---|---|---|
+| `idle` | `Idle_A` | `Rig_Medium_General.glb` |
+| `walk` | `Walking_A` | `Rig_Medium_MovementBasic.glb` |
+| `attack-melee-right` | `Melee_1H_Attack_Chop` | `Rig_Medium_CombatMelee.glb` |
+| `die` | `Death_A` (once, clamp last frame) | `Rig_Medium_General.glb` |
+
+CombatMelee is in the 1.1 animations pack, not in Adventurers 2.0. Both tokens use this same four-clip set — do not special-case the skeleton onto `Skeletons_*` unless the shared set fails to retarget.
 
 - [ ] **Step 2: Write `token.gd`**
 
-Every model across these kits carries the **same 32-clip rig** — `idle`, `walk`, `die`, `attack-melee-right` and so on — so swapping a character is one line in the model table and nothing else. Godot's glTF import gives every instance its own `AnimationPlayer`, so the `SkeletonUtils.clone` hazard in `tokens.ts:` (a plain clone shares the rig, and two tokens of one model animate in lockstep) **does not exist here**. That is one of the few things this migration makes simpler.
+Swapping a character is still one line in the model table (`fighter` → Knight, `goblin` → Skeleton_Warrior). Godot's glTF import gives every instance its own `AnimationPlayer`, so the `SkeletonUtils.clone` hazard in `tokens.ts` **does not exist here**. That is one of the few things this migration makes simpler.
 
 Constants, from `tokens.ts`:
 
@@ -4015,7 +4031,7 @@ Constants, from `tokens.ts`:
 - Figure height **1.25** on a 1.0 square. Deliberately oversized: at 480px a to-scale human is ~24 pixels and reads as a smudge, and oversizing the figure relative to its base is what tactical RPGs do for exactly this reason.
 - `move_seconds(squares) = min(0.18 + squares * 0.07, 0.75)` — **shared with the footstep audio** in Task 10. Two copies of that number would drift apart the first time anyone retuned movement, so define it once and have both read it.
 
-Origins differ between kits — mini models stand on y=0, graveyard models are centred on the hips — so measure the bounding box rather than keeping a table of offsets.
+Origins differ between kits, so measure the bounding box rather than keeping a table of offsets. Fit the figure under the one-square wall (`tokens.ts` uses 0.8 for the fighter and 0.68 for the goblin — the 1.25 figure overtopped the ruins wall).
 
 **Characters carry a faint emissive of their own colormap** (`SELF_LIT` 0.22). The crypt is genuinely dark away from the two braziers, which is right for the room and wrong for the figures standing in it. In Godot this is `emission_texture = albedo_texture` with a low `emission_energy`, set per material on import. **Do not "fix" it by raising the ambient.**
 
