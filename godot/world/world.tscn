@@ -1,7 +1,17 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://world/world.gd" id="1_world"]
 [ext_resource type="Script" path="res://world/camera_rig.gd" id="2_cam"]
+[ext_resource type="Shader" path="res://world/pixel.gdshader" id="3_pixel"]
+
+[sub_resource type="QuadMesh" id="EdgeQuad"]
+size = Vector2(2, 2)
+
+[sub_resource type="ShaderMaterial" id="EdgeMaterial"]
+render_priority = -128
+shader = ExtResource("3_pixel")
+shader_parameter/normal_edge_strength = 0.5
+shader_parameter/depth_edge_strength = 0.25
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_world")
@@ -13,6 +23,13 @@ size = 10.8
 near = 0.1
 far = 200.0
 script = ExtResource("2_cam")
+
+[node name="Edges" type="MeshInstance3D" parent="Camera3D"]
+cast_shadow = 0
+extra_cull_margin = 16384.0
+gi_mode = 0
+mesh = SubResource("EdgeQuad")
+surface_material_override/0 = SubResource("EdgeMaterial")
 
 [node name="Room" type="Node3D" parent="."]
 
