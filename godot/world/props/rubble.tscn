@@ -1,0 +1,71 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://world/props/mesh_prop.gd" id="1_mesh"]
+
+[sub_resource type="StandardMaterial3D" id="DarkStone"]
+albedo_color = Color(0.290196, 0.270588, 0.239216, 1)
+roughness = 1.0
+
+[sub_resource type="SphereMesh" id="Chunk0"]
+radius = 0.34
+height = 0.68
+radial_segments = 8
+rings = 4
+
+[sub_resource type="SphereMesh" id="Chunk1"]
+radius = 0.22
+height = 0.44
+radial_segments = 8
+rings = 4
+
+[sub_resource type="SphereMesh" id="Chunk2"]
+radius = 0.18
+height = 0.36
+radial_segments = 8
+rings = 4
+
+[sub_resource type="SphereMesh" id="Chunk3"]
+radius = 0.13
+height = 0.26
+radial_segments = 8
+rings = 4
+
+[sub_resource type="SphereMesh" id="Chunk4"]
+radius = 0.12
+height = 0.24
+radial_segments = 8
+rings = 4
+
+[node name="Rubble" type="Node3D"]
+script = ExtResource("1_mesh")
+kind = "RUBBLE"
+
+[node name="Chunk0" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.14, 0)
+gi_mode = 0
+mesh = SubResource("Chunk0")
+surface_material_override/0 = SubResource("DarkStone")
+
+[node name="Chunk1" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.892, -0.451, 0.022, 0.448, 0.88, -0.159, 0.054, 0.151, 0.987, 0.3, 0.09, -0.2)
+gi_mode = 0
+mesh = SubResource("Chunk1")
+surface_material_override/0 = SubResource("DarkStone")
+
+[node name="Chunk2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.164, -0.9, -0.404, 0.091, 0.422, -0.902, 0.982, 0.11, 0.153, -0.28, 0.07, 0.24)
+gi_mode = 0
+mesh = SubResource("Chunk2")
+surface_material_override/0 = SubResource("DarkStone")
+
+[node name="Chunk3" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.355, -0.612, 0.707, 0.612, 0.707, 0.355, -0.707, 0.355, 0.612, 0.14, 0.05, 0.34)
+gi_mode = 0
+mesh = SubResource("Chunk3")
+surface_material_override/0 = SubResource("DarkStone")
+
+[node name="Chunk4" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.311, 0.635, -0.708, -0.635, 0.708, 0.311, 0.708, 0.311, 0.635, -0.18, 0.05, -0.3)
+gi_mode = 0
+mesh = SubResource("Chunk4")
+surface_material_override/0 = SubResource("DarkStone")

@@ -1,0 +1,89 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://world/props/sarcophagus.gd" id="1_script"]
+
+[sub_resource type="StandardMaterial3D" id="DarkStone"]
+albedo_color = Color(0.290196, 0.270588, 0.239216, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Stone"]
+albedo_color = Color(0.419608, 0.392157, 0.34902, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="LidStone"]
+albedo_color = Color(0.498039, 0.466667, 0.415686, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="Void"]
+albedo_color = Color(0.0352941, 0.0313726, 0.027451, 1)
+roughness = 1.0
+
+[sub_resource type="BoxMesh" id="BaseMesh"]
+size = Vector3(1.28, 0.13, 2.16)
+
+[sub_resource type="BoxMesh" id="StepMesh"]
+size = Vector3(1.1, 0.1, 1.98)
+
+[sub_resource type="CylinderMesh" id="BodyMesh"]
+top_radius = 0.62
+bottom_radius = 0.7
+height = 0.54
+radial_segments = 4
+rings = 1
+
+[sub_resource type="BoxMesh" id="HollowMesh"]
+size = Vector3(0.84, 0.2, 1.72)
+
+[sub_resource type="BoxMesh" id="SlabMesh"]
+size = Vector3(1.06, 0.16, 1.94)
+
+[sub_resource type="BoxMesh" id="RidgeMesh"]
+size = Vector3(0.46, 0.07, 1.36)
+
+[node name="Sarcophagus" type="Node3D"]
+scale = Vector3(0.58, 0.58, 0.58)
+script = ExtResource("1_script")
+
+[node name="Base" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.065, 0)
+gi_mode = 0
+mesh = SubResource("BaseMesh")
+surface_material_override/0 = SubResource("DarkStone")
+
+[node name="Step" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
+gi_mode = 0
+mesh = SubResource("StepMesh")
+surface_material_override/0 = SubResource("DarkStone")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.5, 0)
+rotation = Vector3(0, 0.785398, 0)
+scale = Vector3(0.98, 1, 1.88)
+gi_mode = 0
+mesh = SubResource("BodyMesh")
+surface_material_override/0 = SubResource("Stone")
+
+[node name="Hollow" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+gi_mode = 0
+mesh = SubResource("HollowMesh")
+surface_material_override/0 = SubResource("Void")
+
+[node name="Lid" type="Node3D" parent="."]
+position = Vector3(0.1, 0.88, -0.14)
+rotation = Vector3(0, 0.06, 0.022)
+
+[node name="Slab" type="MeshInstance3D" parent="Lid"]
+gi_mode = 0
+mesh = SubResource("SlabMesh")
+surface_material_override/0 = SubResource("LidStone")
+
+[node name="Ridge" type="MeshInstance3D" parent="Lid"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.115, 0)
+gi_mode = 0
+mesh = SubResource("RidgeMesh")
+surface_material_override/0 = SubResource("LidStone")
+
+[node name="Skull" type="Node3D" parent="Lid"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0.08, 0.8)

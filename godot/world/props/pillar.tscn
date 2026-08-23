@@ -1,0 +1,42 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://world/props/mesh_prop.gd" id="1_mesh"]
+
+[sub_resource type="StandardMaterial3D" id="Stone"]
+albedo_color = Color(0.419608, 0.392157, 0.34902, 1)
+roughness = 0.95
+
+[sub_resource type="BoxMesh" id="PlinthMesh"]
+size = Vector3(0.9, 0.16, 0.9)
+
+[sub_resource type="CylinderMesh" id="ShaftMesh"]
+top_radius = 0.3
+bottom_radius = 0.34
+height = 2.1
+radial_segments = 8
+rings = 1
+
+[sub_resource type="BoxMesh" id="CapMesh"]
+size = Vector3(0.9, 0.18, 0.9)
+
+[node name="Pillar" type="Node3D"]
+script = ExtResource("1_mesh")
+kind = "PILLAR"
+
+[node name="Base" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, 0)
+gi_mode = 0
+mesh = SubResource("PlinthMesh")
+surface_material_override/0 = SubResource("Stone")
+
+[node name="Shaft" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+gi_mode = 0
+mesh = SubResource("ShaftMesh")
+surface_material_override/0 = SubResource("Stone")
+
+[node name="Cap" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.34, 0)
+gi_mode = 0
+mesh = SubResource("CapMesh")
+surface_material_override/0 = SubResource("Stone")

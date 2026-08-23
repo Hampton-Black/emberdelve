@@ -1,0 +1,87 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://world/props/alcove.gd" id="1_script"]
+
+[sub_resource type="StandardMaterial3D" id="Frame"]
+albedo_color = Color(0.419608, 0.392157, 0.34902, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Void"]
+albedo_color = Color(0.0431373, 0.0392157, 0.0352941, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="LampMat"]
+albedo_color = Color(0.85098, 0.698039, 0.443137, 1)
+roughness = 0.8
+emission_enabled = true
+emission = Color(0.85098, 0.698039, 0.443137, 1)
+emission_energy_multiplier = 0.9
+
+[sub_resource type="BoxMesh" id="BackMesh"]
+size = Vector3(0.6, 0.64, 0.04)
+
+[sub_resource type="BoxMesh" id="JambMesh"]
+size = Vector3(0.1, 0.74, 0.17)
+
+[sub_resource type="BoxMesh" id="LintelMesh"]
+size = Vector3(0.8, 0.11, 0.19)
+
+[sub_resource type="BoxMesh" id="SillMesh"]
+size = Vector3(0.8, 0.09, 0.22)
+
+[sub_resource type="CylinderMesh" id="LampMesh"]
+top_radius = 0.075
+bottom_radius = 0.1
+height = 0.12
+radial_segments = 8
+rings = 1
+
+[node name="Alcove" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Inner" type="Node3D" parent="."]
+scale = Vector3(0.73, 0.73, 0.73)
+
+[node name="Back" type="MeshInstance3D" parent="Inner"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.56, 0.569041)
+gi_mode = 0
+mesh = SubResource("BackMesh")
+surface_material_override/0 = SubResource("Void")
+
+[node name="JambLeft" type="MeshInstance3D" parent="Inner"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, 0.56, 0.504041)
+gi_mode = 0
+mesh = SubResource("JambMesh")
+surface_material_override/0 = SubResource("Frame")
+
+[node name="JambRight" type="MeshInstance3D" parent="Inner"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0.56, 0.504041)
+gi_mode = 0
+mesh = SubResource("JambMesh")
+surface_material_override/0 = SubResource("Frame")
+
+[node name="Lintel" type="MeshInstance3D" parent="Inner"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.93, 0.499041)
+gi_mode = 0
+mesh = SubResource("LintelMesh")
+surface_material_override/0 = SubResource("Frame")
+
+[node name="Sill" type="MeshInstance3D" parent="Inner"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0.489041)
+gi_mode = 0
+mesh = SubResource("SillMesh")
+surface_material_override/0 = SubResource("Frame")
+
+[node name="Lamp" type="MeshInstance3D" parent="Inner"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.31, 0.479041)
+gi_mode = 0
+mesh = SubResource("LampMesh")
+surface_material_override/0 = SubResource("LampMat")
+
+[node name="Glow" type="OmniLight3D" parent="Inner"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0.449041)
+light_color = Color(0.85098, 0.698039, 0.443137, 1)
+light_energy = 0.8
+shadow_enabled = false
+omni_range = 2.4
+omni_attenuation = 2.0

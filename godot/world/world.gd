@@ -9,6 +9,7 @@ extends Node3D
 
 const TARGET_WIDTH := 480
 const CameraRigScript := preload("res://world/camera_rig.gd")
+const PROP_TABLE := preload("res://world/prop_table.tres")
 
 var rig: CameraRigScript
 var _room_id := ""
@@ -17,6 +18,7 @@ var _room_id := ""
 func _ready() -> void:
 	rig = get_node_or_null("Camera3D") as CameraRigScript
 	Table.scene_changed.connect(_on_scene_changed)
+	Table.prop_revealed.connect(_on_prop_revealed)
 	Table.mode_changed.connect(_on_mode_changed)
 	_on_scene_changed()
 	_fit_pixel_viewport()
@@ -46,18 +48,61 @@ func world_to_grid(point: Vector3) -> Vector2i:
 
 
 func _on_scene_changed() -> void:
-	if rig == null:
-		return
 	var room_id := String(Table.scene.get("roomId", ""))
 	# A new room (hello, reconnect, restart into a different id) snaps. The same room
 	# emitting scene_changed is a token moving or a lid opening — follow, do not settle,
-	# or the combat ceremony's pull-back never plays.
+	# or the combat ceremony's pull-back never plays. Props rebuild on roomId only;
+	# a reveal is Table.prop_revealed, not a second pass over the list.
 	if room_id != _room_id:
 		_room_id = room_id
+		_rebuild_props()
 		_follow_party()
-		rig.settle(Table.mode)
+		if rig:
+			rig.settle(Table.mode)
 		return
 	_follow_party()
+
+
+func _on_prop_revealed(prop: Dictionary) -> void:
+	_instance_prop(prop)
+
+
+func _rebuild_props() -> void:
+	var holder := get_node_or_null("Props") as Node3D
+	if holder == null:
+		return
+	for child in holder.get_children():
+		holder.remove_child(child)
+		child.free()
+	if Table.scene.is_empty():
+		return
+	for prop in Table.scene.get("props", []):
+		if bool(prop.get("hidden", false)):
+			continue
+		_instance_prop(prop)
+
+
+func _instance_prop(prop: Dictionary) -> void:
+	var holder := get_node_or_null("Props") as Node3D
+	if holder == null:
+		return
+	var id := String(prop.get("id", ""))
+	if id.is_empty() or holder.get_node_or_null(NodePath(id)) != null:
+		return
+	if bool(prop.get("hidden", false)):
+		return
+	var packed: PackedScene = PROP_TABLE.scene_for(String(prop.get("type", "")))
+	if packed == null:
+		return
+	var node := packed.instantiate() as Node3D
+	if node == null:
+		return
+	node.name = id
+	node.position = grid_to_world(int(prop.get("x", 0)), int(prop.get("y", 0)))
+	node.rotation.y = deg_to_rad(float(prop.get("rotation", 0.0)))
+	holder.add_child(node)
+	if node.has_method("configure"):
+		node.configure(prop, _room_id)
 
 
 func _on_mode_changed(mode: String) -> void:
@@ -67,6 +112,8 @@ func _on_mode_changed(mode: String) -> void:
 
 
 func _follow_party() -> void:
+	if rig == null:
+		return
 	var centre := Vector3.ZERO
 	var count := 0
 	for e in Table.scene.get("entities", []):

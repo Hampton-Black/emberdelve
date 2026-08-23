@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="PropTable" format=3]
+
+[ext_resource type="Script" path="res://world/prop_table.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+scenes = {
+"SARCOPHAGUS": "res://world/props/sarcophagus.tscn",
+"BRAZIER": "res://world/props/brazier.tscn",
+"PILLAR": "res://world/props/pillar.tscn",
+"RUBBLE": "res://world/props/rubble.tscn",
+"ALCOVE": "res://world/props/alcove.tscn",
+"DOOR": "res://world/props/door.tscn"
+}

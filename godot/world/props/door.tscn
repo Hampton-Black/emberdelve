@@ -1,0 +1,53 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://world/props/mesh_prop.gd" id="1_mesh"]
+
+[sub_resource type="StandardMaterial3D" id="DarkStone"]
+albedo_color = Color(0.290196, 0.270588, 0.239216, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="SlabMat"]
+albedo_color = Color(0.352941, 0.321569, 0.286275, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="BandMat"]
+albedo_color = Color(0.239216, 0.211765, 0.188235, 1)
+roughness = 0.5
+metallic = 0.6
+
+[sub_resource type="BoxMesh" id="FrameMesh"]
+size = Vector3(1.5, 2.3, 0.24)
+
+[sub_resource type="BoxMesh" id="SlabMesh"]
+size = Vector3(1.15, 2.0, 0.3)
+
+[sub_resource type="BoxMesh" id="BandMesh"]
+size = Vector3(1.2, 0.14, 0.34)
+
+[node name="Door" type="Node3D"]
+script = ExtResource("1_mesh")
+kind = "DOOR"
+
+[node name="Frame" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0)
+gi_mode = 0
+mesh = SubResource("FrameMesh")
+surface_material_override/0 = SubResource("DarkStone")
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, 0)
+gi_mode = 0
+mesh = SubResource("SlabMesh")
+surface_material_override/0 = SubResource("SlabMat")
+
+[node name="BandLow" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+gi_mode = 0
+mesh = SubResource("BandMesh")
+surface_material_override/0 = SubResource("BandMat")
+
+[node name="BandHigh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, 0)
+gi_mode = 0
+mesh = SubResource("BandMesh")
+surface_material_override/0 = SubResource("BandMat")
