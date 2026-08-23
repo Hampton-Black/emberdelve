@@ -285,6 +285,7 @@ func test_an_attack_with_no_target_publishes_no_strike() -> void:
 # ---- The fight
 
 func test_a_fight_opening_holds_the_floor_for_the_ceremony() -> void:
+	assert_eq(Table.CEREMONY_MS, 1200)
 	Table.apply_diffs([
 		{"kind": "ModeChanged", "mode": "COMBAT"},
 		{"kind": "CombatChanged", "combat": _combat()},
@@ -295,9 +296,10 @@ func test_a_fight_opening_holds_the_floor_for_the_ceremony() -> void:
 	# hold and talks over the beat.
 	await wait_frames(2)
 	Table.append_narration({"speakerId": "narrator", "text": "Steel comes out."})
-	await wait_frames(3)
-	assert_eq(Table.transcript.size(), 0, "a beat the narrator talks over is not a beat")
-	await wait_seconds(1.4)
+	# FRAMING_SECONDS is 1.1; the hold must cover the pull-back. 0.9s is still inside both.
+	await wait_seconds(0.9)
+	assert_eq(Table.transcript.size(), 0, "narration must not land during the camera pull-back")
+	await wait_seconds(0.5)
 	assert_eq(Table.transcript.size(), 1)
 
 

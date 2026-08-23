@@ -19,7 +19,8 @@ const EXPLORATION_HALF_HEIGHT := 5.4
 const COMBAT_MAX_HALF_HEIGHT := 10.0
 const FRAMING_SECONDS := 1.1
 const FOLLOW_SECONDS := 0.34
-## How far the followed token may drift from centre before the camera moves at all.
+## How far the exploration camera may push past the floor's edge to keep the party in shot.
+## Not a follow deadzone — without it, clamp-to-room quietly cancels the follow.
 const FOLLOW_SLACK := 1.4
 const ROOM_MARGIN := 0.7
 

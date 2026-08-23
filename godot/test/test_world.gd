@@ -145,13 +145,47 @@ func test_an_in_session_mode_change_eases_framing() -> void:
 		assert_not_null(world.rig, "Camera3D")
 		return
 	assert_eq(world.rig._framing_t, 1.0)
-	assert_almost_eq(world.rig.half_height, 5.4, 0.0001)
+	assert_almost_eq(world.rig.half_height, world.rig.EXPLORATION_HALF_HEIGHT, 0.0001)
 	Table.mode = "COMBAT"
 	Table.scene_changed.emit()
 	Table.mode_changed.emit("COMBAT")
+	assert_eq(world.rig._framing, "COMBAT")
 	assert_eq(world.rig._framing_t, 0.0, "the pull-back is a tween, not a snap")
-	assert_almost_eq(world.rig.half_height, 5.4, 0.0001,
+	assert_almost_eq(world.rig.half_height, world.rig.EXPLORATION_HALF_HEIGHT, 0.0001,
 		"half_height must not already be the combat target")
+
+
+func test_opening_combat_through_diffs_starts_the_pull_back() -> void:
+	# Debug `start combat` arrives as ModeChanged + CombatChanged, not as a fresh roomId.
+	Clock.silence_now()
+	var world := _world_tree()
+	if world.rig == null:
+		assert_not_null(world.rig, "Camera3D")
+		return
+	assert_almost_eq(world.rig.half_height, world.rig.EXPLORATION_HALF_HEIGHT, 0.0001)
+	Table.apply_diffs([
+		{"kind": "ModeChanged", "mode": "COMBAT"},
+		{"kind": "CombatChanged", "combat": _combat()},
+	])
+	await wait_frames(2)
+	assert_eq(world.rig._framing, "COMBAT")
+	# Clock.mark costs a frame, so _process may have already eaten a tick. settle() would
+	# have _framing_t == 1; frame() leaves the tween in flight.
+	assert_lt(world.rig._framing_t, 1.0, "in-session combat uses frame(), not settle()")
+	assert_lt(world.rig.half_height, world.rig._combat_half_height() - 1.0,
+		"half_height must not already be the combat target")
+
+
+func test_framing_constants_match_renderer_and_outlast_the_pull_back() -> void:
+	var rig := _rig()
+	assert_almost_eq(rig.EXPLORATION_HALF_HEIGHT, 5.4, 0.0001)
+	assert_almost_eq(rig.COMBAT_MAX_HALF_HEIGHT, 10.0, 0.0001)
+	assert_almost_eq(rig.FRAMING_SECONDS, 1.1, 0.0001)
+	assert_almost_eq(rig.FOLLOW_SECONDS, 0.34, 0.0001)
+	assert_almost_eq(rig.FOLLOW_SLACK, 1.4, 0.0001)
+	assert_eq(Table.CEREMONY_MS, 1200)
+	assert_lt(int(round(rig.FRAMING_SECONDS * 1000.0)), Table.CEREMONY_MS,
+		"the ceremony hold outlasts the pull-back so the DM does not talk over it")
 
 
 func test_frame_combat_pulls_the_camera_back() -> void:
@@ -159,12 +193,19 @@ func test_frame_combat_pulls_the_camera_back() -> void:
 	if not rig.has_method("frame"):
 		assert_true(rig.has_method("frame"))
 		return
+	rig.set_process(false)
 	var start: float = rig.half_height
-	assert_almost_eq(start, 5.4, 0.0001)
+	assert_almost_eq(start, rig.EXPLORATION_HALF_HEIGHT, 0.0001)
 	rig.frame("COMBAT")
-	rig._process(1.1)
-	assert_gt(rig.half_height, start, "combat is a pull-back, not a snap of the same zoom")
-	assert_lte(rig.half_height, 10.0)
+	assert_eq(rig._framing_t, 0.0)
+	rig._process(rig.FRAMING_SECONDS - 0.05)
+	assert_lt(rig._framing_t, 1.0, "still easing before FRAMING_SECONDS")
+	assert_gt(rig.half_height, start)
+	assert_lt(rig.half_height, rig.COMBAT_MAX_HALF_HEIGHT + 0.0001)
+	rig._process(0.05)
+	assert_almost_eq(rig._framing_t, 1.0, 0.0001)
+	assert_almost_eq(rig.half_height, rig._combat_half_height(), 0.0001)
+	assert_lte(rig.half_height, rig.COMBAT_MAX_HALF_HEIGHT)
 
 
 func test_follow_eases_the_focus_toward_the_point() -> void:
@@ -172,10 +213,66 @@ func test_follow_eases_the_focus_toward_the_point() -> void:
 	if not rig.has_method("follow"):
 		assert_true(rig.has_method("follow"))
 		return
+	rig.set_process(false)
 	var before := rig.global_position
 	rig.follow(Vector3(4.0, 0.0, -3.0))
-	rig._process(0.34)
+	rig._process(rig.FOLLOW_SECONDS)
 	assert_ne(rig.global_position, before, "the camera actually uses the followed point")
+
+
+func test_a_follow_shorter_than_slack_still_moves() -> void:
+	# FOLLOW_SLACK is clamp-to-room slack in Renderer.ts, not a deadzone. A 0.5-square
+	# follow must still chase, or someone "restored" a deadzone Three.js never had.
+	var rig := _rig()
+	rig.set_process(false)
+	rig.settle("EXPLORATION")
+	var before: Vector3 = rig._focus
+	rig.follow(Vector3(0.5, 0.0, 0.0))
+	rig._process(rig.FOLLOW_SECONDS)
+	var after: Vector3 = rig._focus
+	assert_false(after.is_equal_approx(before),
+		"FOLLOW_SLACK must not swallow a follow shorter than 1.4")
+
+
+func test_exploration_follow_is_the_party_centroid_not_the_fighter() -> void:
+	# Renderer.ts partyCentre: every isPlayerControlled token, never "the fighter".
+	Table.reset()
+	var party := CRYPT.duplicate(true)
+	party["entities"] = [
+		{"id": "keeper", "kind": "fighter", "name": "Alda", "x": 1, "y": 1,
+			"hp": 12, "maxHp": 12, "isPlayerControlled": true},
+		{"id": "fighter", "kind": "goblin", "name": "Decoy", "x": 10, "y": 10,
+			"hp": 7, "maxHp": 7, "isPlayerControlled": false},
+		{"id": "ally", "kind": "fighter", "name": "Bram", "x": 7, "y": 3,
+			"hp": 12, "maxHp": 12, "isPlayerControlled": true},
+	]
+	Table.set_scene(party)
+	var world := _world_tree()
+	if world.rig == null:
+		assert_not_null(world.rig, "Camera3D")
+		return
+	var a: Vector3 = world.grid_to_world(1, 1)
+	var b: Vector3 = world.grid_to_world(7, 3)
+	var expected := (a + b) * 0.5
+	assert_almost_eq(world.rig._follow_point.x, expected.x, 0.0001)
+	assert_almost_eq(world.rig._follow_point.z, expected.z, 0.0001)
+	assert_false(world.rig._follow_point.is_equal_approx(a),
+		"must not follow a single party member")
+	assert_false(world.rig._follow_point.is_equal_approx(world.grid_to_world(10, 10)),
+		"must not follow the entity whose id is fighter")
+
+
+func _combat() -> Dictionary:
+	return {
+		"order": [
+			{"entityId": "fighter", "name": "Roderick", "initiative": 18,
+				"isPlayerControlled": true},
+			{"entityId": "goblin", "name": "Vessk", "initiative": 11,
+				"isPlayerControlled": false},
+		],
+		"activeId": "fighter", "round": 1, "movementRemaining": 6, "actionAvailable": true,
+		"legalMoves": [{"x": 3, "y": 2}], "legalTargets": [],
+	}
 
 
 func test_snap_focus_is_idempotent_on_a_pixel() -> void:
