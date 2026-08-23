@@ -1,8 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://world/world.gd" id="1_world"]
 [ext_resource type="Script" path="res://world/camera_rig.gd" id="2_cam"]
 [ext_resource type="Shader" path="res://world/pixel.gdshader" id="3_pixel"]
+[ext_resource type="Script" path="res://world/room.gd" id="4_room"]
+[ext_resource type="Script" path="res://world/lighting.gd" id="5_light"]
 
 [sub_resource type="QuadMesh" id="EdgeQuad"]
 size = Vector2(2, 2)
@@ -12,6 +14,33 @@ render_priority = -128
 shader = ExtResource("3_pixel")
 shader_parameter/normal_edge_strength = 0.5
 shader_parameter/depth_edge_strength = 0.25
+
+[sub_resource type="Environment" id="EnvTorchlit"]
+background_mode = 1
+background_color = Color(0.0431373, 0.0392157, 0.0627451, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.235294, 0.227451, 0.321569, 1)
+ambient_light_energy = 1.1
+reflected_light_source = 1
+tonemap_mode = 3
+
+[sub_resource type="Environment" id="EnvDim"]
+background_mode = 1
+background_color = Color(0.027451, 0.027451, 0.0392157, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.141176, 0.133333, 0.184314, 1)
+ambient_light_energy = 0.7
+reflected_light_source = 1
+tonemap_mode = 3
+
+[sub_resource type="Environment" id="EnvDark"]
+background_mode = 1
+background_color = Color(0.0156863, 0.0156863, 0.0235294, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.0784314, 0.0784314, 0.109804, 1)
+ambient_light_energy = 0.35
+reflected_light_source = 1
+tonemap_mode = 3
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_world")
@@ -32,6 +61,33 @@ mesh = SubResource("EdgeQuad")
 surface_material_override/0 = SubResource("EdgeMaterial")
 
 [node name="Room" type="Node3D" parent="."]
+script = ExtResource("4_room")
+
+[node name="Lighting" type="Node3D" parent="Room"]
+script = ExtResource("5_light")
+
+[node name="TORCHLIT" type="Node3D" parent="Room/Lighting"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Room/Lighting/TORCHLIT"]
+environment = SubResource("EnvTorchlit")
+
+[node name="DIM" type="Node3D" parent="Room/Lighting"]
+visible = false
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Room/Lighting/DIM"]
+environment = SubResource("EnvDim")
+
+[node name="DARK" type="Node3D" parent="Room/Lighting"]
+visible = false
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Room/Lighting/DARK"]
+environment = SubResource("EnvDark")
+
+[node name="Floor" type="Node3D" parent="Room"]
+
+[node name="Walls" type="Node3D" parent="Room"]
+
+[node name="Torches" type="Node3D" parent="Room"]
 
 [node name="Props" type="Node3D" parent="."]
 
