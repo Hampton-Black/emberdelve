@@ -4,9 +4,11 @@ import dm.content.RoomDefinition;
 import dm.engine.GameEngine;
 import dm.model.Combatant;
 import dm.model.Event;
+import dm.model.Phase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -225,7 +227,7 @@ public final class DmService {
      * so the two-phase orchestration reads like ordinary sequential code.
      */
     public void handleFreeText(String actorId, String text, TurnSink sink) {
-        engine.log().append(Event.action(actorId, "said: " + text));
+        engine.log().append(new Event.PlayerSaid(Instant.now(), actorId, text));
         // The other half of the transcript. Without it the log showed everything the DM said and
         // nothing it was answering, which makes a turn that went wrong unreadable after the fact.
         log.info("| {} | {}", actorId, text);
@@ -335,6 +337,8 @@ public final class DmService {
             for (var call : result.toolCalls()) {
                 calls++;
                 var outcome = dispatcher.dispatch(call);
+                engine.log().append(new Event.ToolCallIssued(Instant.now(), Phase.MECHANICS,
+                        call.name(), call.argumentsJson(), outcome.ok(), outcome.message()));
 
                 if (outcome.ok()) {
                     applied++;
@@ -558,6 +562,8 @@ public final class DmService {
                 }
 
                 var outcome = dispatcher.dispatch(call);
+                engine.log().append(new Event.ToolCallIssued(Instant.now(), Phase.RECONCILE,
+                        call.name(), call.argumentsJson(), outcome.ok(), outcome.message()));
 
                 if (outcome.ok()) {
                     applied++;

@@ -97,10 +97,6 @@ public record WorldState(
             case Event.ToolCallIssued ignored -> this;
             case Event.NarrationLogged ignored -> this;
             case Event.RoomDressed ignored -> this;
-            // The M0 vocabulary, deleted in Task 8. Nothing folds from prose.
-            case Event.RollLogged ignored -> this;
-            case Event.ActionTaken ignored -> this;
-            case Event.PropRevealedEvent e -> revealed(e.propId());
         };
     }
 
