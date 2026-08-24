@@ -14,6 +14,8 @@ import dm.generate.RoomDresser;
 import dm.generate.RoomDumper;
 import dm.generate.RoomGenerator;
 import dm.generate.RoomSource;
+import dm.model.Entity;
+import dm.model.NarrationSegment;
 import dm.repo.InMemoryGameRepository;
 import dm.wire.Json;
 import io.javalin.Javalin;
@@ -112,7 +114,12 @@ public final class App {
             tts = new TtsClient(
                     config.require("ELEVENLABS_API_KEY"),
                     config.require("ELEVENLABS_VOICE_NARRATOR"),
-                    config.require("ELEVENLABS_VOICE_GOBLIN"));
+                    config.require("ELEVENLABS_VOICE_GOBLIN"),
+                    // "narrator" is both the fallback and a real speaker id, and both want the
+                    // narrator's voice, so one answer covers the unknown case and the honest one.
+                    id -> engine.repo().find(id)
+                            .map(Entity::kind)
+                            .orElse(NarrationSegment.NARRATOR));
             final TtsClient voice = tts;
 
             app.post("/tts", ctx -> {

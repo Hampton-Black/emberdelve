@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 /**
  * Segment in, audio bytes out.
@@ -45,16 +46,32 @@ public final class TtsClient {
     private final String apiKey;
     private final String narratorVoice;
     private final String goblinVoice;
+    /**
+     * Entity id to entity kind. Injected rather than looked up because this client is handed a
+     * speaker id by an HTTP endpoint and has no world to consult.
+     */
+    private final UnaryOperator<String> kindOf;
 
-    public TtsClient(String apiKey, String narratorVoice, String goblinVoice) {
+    public TtsClient(String apiKey, String narratorVoice, String goblinVoice,
+                     UnaryOperator<String> kindOf) {
         this.apiKey = apiKey;
         this.narratorVoice = narratorVoice;
         this.goblinVoice = goblinVoice;
+        this.kindOf = kindOf;
     }
 
-    /** Which of the two voices says this. */
-    private String voiceFor(String speakerId) {
-        return "goblin".equalsIgnoreCase(speakerId) ? goblinVoice : narratorVoice;
+    /**
+     * Which of the two voices says this.
+     *
+     * <p>Keyed on kind rather than on the id. There is one goblin today and its id is the string
+     * "goblin", so matching the id worked — and would have stopped working, silently, the first
+     * time a dungeon held two and their ids became "goblin-1" and "goblin-2". A wrong voice
+     * raises nothing and looks like nothing; you find it by ear, mid-session.
+     *
+     * <p>Package-private so the choice can be tested without a key or a network.
+     */
+    String voiceFor(String speakerId) {
+        return "goblin".equalsIgnoreCase(kindOf.apply(speakerId)) ? goblinVoice : narratorVoice;
     }
 
     /**
