@@ -5,6 +5,7 @@ import dm.engine.GameEngine;
 import dm.model.Combatant;
 import dm.model.Event;
 import dm.model.Phase;
+import dm.state.EventLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -35,7 +37,7 @@ import java.util.stream.Collectors;
  * <p>Narration stays with exactly one model, so the tone cannot drift between turns — the failure
  * {@code ai-dm-system-design.md} §10 warns is audible immediately.
  *
- * <p>Context is the full transcript with no compaction (shortcut #11).
+ * <p>Context is a window of recent turns plus the projection of established facts.
  */
 public final class DmService {
 
@@ -63,6 +65,12 @@ public final class DmService {
 
     /** §7: reject, let it retry once, then take the tools away. */
     private static final int REJECTIONS_BEFORE_DEGRADING = 2;
+
+    /**
+     * How many turns of transcript the prose model sees. A tuning knob, not a design decision —
+     * and one that can now be tested against a recorded session rather than guessed at.
+     */
+    static final int WINDOW_TURNS = 6;
 
     private final DmClient toolClient;
     private final DmClient proseClient;
@@ -322,7 +330,7 @@ public final class DmService {
 
             var conversation = new ArrayList<DmClient.ChatMessage>();
             conversation.add(DmClient.ChatMessage.system(toolPrompt + "\n\n" + worldState(false)));
-            conversation.addAll(history);
+            conversation.addAll(window(history, WINDOW_TURNS));
             conversation.add(DmClient.ChatMessage.user(text));
             conversation.addAll(localRounds);
 
@@ -420,7 +428,7 @@ public final class DmService {
         var conversation = new ArrayList<DmClient.ChatMessage>();
         // World state is recomputed here: phase 1 may have spawned or revealed things.
         conversation.add(DmClient.ChatMessage.system(prosePrompt + "\n\n" + worldState(true)));
-        conversation.addAll(history);
+        conversation.addAll(window(history, WINDOW_TURNS));
         conversation.add(DmClient.ChatMessage.user(text));
 
         // The engine's rulings, not the model's tool calls — the prose model never made those,
@@ -453,11 +461,15 @@ public final class DmService {
         // Said here rather than in the system prompt because it is only true on the turns where
         // it is true, and a standing "do not repeat yourself" is a rule the model has no way to
         // check itself against.
-        if (isRepeat(text)) {
-            directive.append("The player has tried something like this before, and the "
-                    + "transcript has what happened last time. Do not tell it again. Narrate "
-                    + "what is different now — the same action against a room that has changed, "
-                    + "or the same obstacle refusing them a second time and what that costs.\n\n");
+        if (isRepeat(engine.log(), text)) {
+            directive.append("The player has tried something like this before. ");
+            narrationAfter(engine.log(), text).ifPresent(earlier -> directive
+                    .append("Last time you told them, out loud:\n\n\"")
+                    .append(earlier.strip())
+                    .append("\"\n\n"));
+            directive.append("Do not tell it again. Narrate what is different now — the same "
+                    + "action against a room that has changed, or the same obstacle refusing "
+                    + "them a second time and what that costs.\n\n");
         }
         directive.append("Three sentences at most.");
         conversation.add(DmClient.ChatMessage.user(directive.toString()));
@@ -743,6 +755,16 @@ public final class DmService {
                     .append(" failed in a row, with no success since.\n");
         }
 
+        var facts = engine.state().factsHere();
+        if (!facts.isEmpty()) {
+            sb.append("\n## Established\n\n");
+            sb.append("Things you have already told the player are true in this room. They are "
+                    + "true. Do not contradict them and do not re-introduce them as new.\n\n");
+            for (var fact : facts) {
+                sb.append("- ").append(fact.text()).append("\n");
+            }
+        }
+
         sb.append("\n## Grid\n\n")
                 .append("- size: ").append(room.width()).append("x").append(room.height())
                 .append("\n- axes: x eastward, y northward")
@@ -792,17 +814,53 @@ public final class DmService {
     /**
      * Whether the player has already asked for something much like this.
      *
-     * <p>Compared as bags of significant words rather than as strings: "I shove the lid open" and
-     * "I try shoving that lid open again" are the same request and share no exact prefix. Only
-     * what the player typed is compared, never the narration, and only against their own earlier
-     * turns in this session.
+     * <p>Reads the log rather than the transcript, so its reach does not shrink when the window
+     * does. It is a bag-of-words comparison over short strings — the cost of scanning every turn
+     * of a long session is nothing, and the alternative is detection that silently gets worse
+     * the longer someone plays.
+     *
+     * <p>{@code PlayerSaid} is appended at the start of the turn, before this is consulted, so
+     * the last event that equals {@code text} is this turn. A sentence is not a repeat of itself.
      */
-    private boolean isRepeat(String text) {
-        var earlier = history.stream()
-                .filter(m -> "user".equals(m.role()) && m.content() != null)
-                .map(DmClient.ChatMessage::content)
+    static boolean isRepeat(EventLog log, String text) {
+        var earlier = log.events().stream()
+                .filter(Event.PlayerSaid.class::isInstance)
+                .map(Event.PlayerSaid.class::cast)
+                .map(Event.PlayerSaid::text)
                 .toList();
+        if (!earlier.isEmpty() && earlier.getLast().equals(text)) {
+            earlier = earlier.subList(0, earlier.size() - 1);
+        }
         return resemblesAny(text, earlier);
+    }
+
+    /**
+     * What the DM said on the turn that line opened.
+     *
+     * <p>Carried into the directive rather than referred to, because the turn being referred to
+     * may have fallen out of the window — and a model told not to repeat a thing it cannot see
+     * writes a fresh version of it instead. Spec §7a.
+     */
+    static Optional<String> narrationAfter(EventLog log, String earlierPlayerText) {
+        var events = log.events();
+        for (int i = 0; i < events.size(); i++) {
+            if (events.get(i) instanceof Event.PlayerSaid said
+                    && said.text().equals(earlierPlayerText)) {
+                return events.stream().skip(i + 1)
+                        .takeWhile(e -> !(e instanceof Event.PlayerSaid))
+                        .filter(Event.NarrationLogged.class::isInstance)
+                        .map(Event.NarrationLogged.class::cast)
+                        .map(Event.NarrationLogged::text)
+                        .reduce((a, b) -> a + " " + b);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** The most recent turns, verbatim. Spec §7: recency is what prose needs. */
+    static List<DmClient.ChatMessage> window(List<DmClient.ChatMessage> history, int turns) {
+        int keep = Math.min(history.size(), turns * 2);
+        return List.copyOf(history.subList(history.size() - keep, history.size()));
     }
 
     /** Package-private so the threshold can be tested without a model or a session. */

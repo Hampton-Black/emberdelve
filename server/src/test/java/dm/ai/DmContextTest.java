@@ -1,0 +1,67 @@
+package dm.ai;
+
+import dm.model.Event;
+import dm.state.EventLog;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Spec §7a. Truncating the transcript without these two repairs turns a fixed fault back into a
+ * subtler one: a model told "the transcript has what happened last time" with no such transcript
+ * invents what it is declining to repeat.
+ */
+class DmContextTest {
+
+    private static final Instant T = Instant.now();
+
+    private static EventLog logWith(String... playerLines) {
+        var log = new EventLog();
+        for (String line : playerLines) {
+            log.append(new Event.PlayerSaid(T, "fighter", line));
+            log.append(new Event.NarrationLogged(T, "narrator", "The lid does not move. [" + line + "]"));
+        }
+        return log;
+    }
+
+    @Test
+    @DisplayName("a repeat is caught however far back the first attempt was")
+    void repeatDetectionIgnoresTheWindow() {
+        var log = logWith("I shove the sarcophagus lid open",
+                "I look at the braziers", "I look at the door", "I check the walls",
+                "I listen", "I wait", "I look up", "I search the rubble");
+
+        assertTrue(DmService.isRepeat(log, "I try shoving that lid open again"),
+                "forty turns later is still a repeat — the log is not a window");
+        assertFalse(DmService.isRepeat(log, "I light a torch"));
+    }
+
+    @Test
+    @DisplayName("the earlier narration is recoverable, so the directive can carry it inline")
+    void earlierNarrationIsRecoverable() {
+        var log = logWith("I shove the sarcophagus lid open", "I look at the braziers");
+
+        var earlier = DmService.narrationAfter(log, "I shove the sarcophagus lid open");
+        assertTrue(earlier.orElseThrow().contains("shove the sarcophagus lid open"),
+                "pointing at a transcript that may not be in context is how the model invents");
+    }
+
+    @Test
+    @DisplayName("the window keeps the most recent turns and drops the rest")
+    void windowKeepsRecent() {
+        var turns = new java.util.ArrayList<DmClient.ChatMessage>();
+        for (int i = 0; i < 20; i++) {
+            turns.add(DmClient.ChatMessage.user("turn " + i));
+            turns.add(DmClient.ChatMessage.assistant("answer " + i));
+        }
+
+        var window = DmService.window(turns, DmService.WINDOW_TURNS);
+
+        assertEquals(DmService.WINDOW_TURNS * 2, window.size());
+        assertTrue(window.getFirst().content().contains("turn 14"));
+        assertTrue(window.getLast().content().contains("answer 19"));
+    }
+}
