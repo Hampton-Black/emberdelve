@@ -3,6 +3,7 @@ package dm.replay;
 import dm.content.ContentLoader;
 import dm.engine.CombatSink;
 import dm.engine.GameEngine;
+import dm.model.Combatant;
 import dm.model.Diff;
 import dm.model.Event;
 import dm.model.RollResult;
@@ -10,6 +11,8 @@ import dm.state.EventLog;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -76,9 +79,23 @@ public final class ReplayRunner {
             case Event.AttackResolved e -> java.util.stream.Stream.concat(
                     java.util.stream.Stream.of(e.attack()), e.damage().stream());
             case Event.CheckResolved e -> java.util.stream.Stream.of(e.roll());
-            case Event.CombatStarted e -> e.initiative().stream();
+            case Event.CombatStarted e -> initiativeInAskOrder(e);
             default -> java.util.stream.Stream.empty();
         };
+    }
+
+    /**
+     * The log stores initiative in turn order; the engine asks in livingEntities() order
+     * (entity id). A goblin-first fight must not falsely diverge.
+     */
+    private static java.util.stream.Stream<RollResult> initiativeInAskOrder(Event.CombatStarted e) {
+        var byId = new HashMap<String, RollResult>();
+        for (int i = 0; i < e.order().size(); i++) {
+            byId.put(e.order().get(i).entityId(), e.initiative().get(i));
+        }
+        return e.order().stream()
+                .sorted(Comparator.comparing(Combatant::entityId))
+                .map(c -> byId.get(c.entityId()));
     }
 
     /**

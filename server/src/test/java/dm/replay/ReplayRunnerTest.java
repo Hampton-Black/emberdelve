@@ -1,9 +1,18 @@
 package dm.replay;
 
+import dm.content.ContentLoader;
+import dm.engine.CombatSink;
+import dm.engine.GameEngine;
+import dm.engine.ScriptedDiceRoller;
+import dm.model.Event;
+import dm.state.EventLog;
+import dm.state.SessionWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,6 +36,23 @@ class ReplayRunnerTest {
         assertTrue(result.matched(),
                 "divergence at: " + result.firstDivergence());
         assertTrue(result.compared() > 0, "an empty comparison proves nothing");
+    }
+
+    @Test
+    @DisplayName("a fight the goblin won initiative in replays without a false divergence")
+    void goblinWonInitiativeReplays(@TempDir Path dir) {
+        var writer = SessionWriter.open(dir);
+        var log = new EventLog(writer);
+        log.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION, 0L, "none", "none"));
+        // livingEntities() is id order: fighter then goblin. 1+1=2 vs 20+2=22 — goblin first.
+        var engine = new GameEngine(new ContentLoader(), log, new ScriptedDiceRoller(1, 20));
+        engine.start();
+        engine.spawnGoblin(6, 6);
+        engine.combat().start(new CombatSink.Buffer());
+        writer.close();
+
+        var result = ReplayRunner.replay(writer.path());
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
     }
 
     @Test
