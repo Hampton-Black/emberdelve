@@ -57,6 +57,14 @@ public final class ReplayRunner {
                 case Event.CheckResolved e ->
                         engine.rollCheck(e.actorId(), e.skill().orElseThrow(),
                                 dm.model.Difficulty.ofDc(e.dc()));
+                // TurnAdvanced names the incoming combatant. Ending that id would require
+                // the engine to end a turn that has not started. End whoever is active now;
+                // compare checks the event the engine emits.
+                case Event.TurnAdvanced ignored -> {
+                    if (engine.combat().isActive()) {
+                        engine.combat().endTurn(engine.combat().activeId(), SILENT);
+                    }
+                }
                 // Everything else is an input the engine does not act on, or an outcome the
                 // engine produces for itself. Replaying either would double it.
                 default -> { }
@@ -112,6 +120,7 @@ public final class ReplayRunner {
                 case Event.ToolCallIssued ignored -> { }
                 case Event.NarrationLogged ignored -> { }
                 case Event.RoomDressed ignored -> { }
+                case Event.FactAsserted ignored -> { }
                 default -> expected.add(event);
             }
         }

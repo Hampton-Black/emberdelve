@@ -1,5 +1,7 @@
 package dm.replay;
 
+import dm.ai.DmClient;
+import dm.ai.ToolDispatcher;
 import dm.content.ContentLoader;
 import dm.engine.CombatSink;
 import dm.engine.GameEngine;
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 
@@ -30,12 +33,19 @@ class ReplayRunnerTest {
 
     @Test
     @DisplayName("a recorded fight replays to the same events it produced the first time")
-    void recordedSessionReplays() {
+    void recordedSessionReplays() throws Exception {
         var result = ReplayRunner.replay(SESSION);
 
         assertTrue(result.matched(),
                 "divergence at: " + result.firstDivergence());
-        assertTrue(result.compared() > 0, "an empty comparison proves nothing");
+        assertTrue(result.compared() >= 11,
+                "the fixture must cover a goblin turn, not a one-swing kill; compared="
+                        + result.compared());
+        String jsonl = Files.readString(SESSION);
+        assertTrue(jsonl.contains("\"type\":\"turn_advanced\""),
+                "the fixture must contain a turn_advanced");
+        assertTrue(jsonl.contains("\"killed\":true"),
+                "the fixture must keep a killing blow");
     }
 
     @Test
@@ -49,6 +59,52 @@ class ReplayRunnerTest {
         engine.start();
         engine.spawnGoblin(6, 6);
         engine.combat().start(new CombatSink.Buffer());
+        writer.close();
+
+        var result = ReplayRunner.replay(writer.path());
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
+    }
+
+    @Test
+    @DisplayName("a fight that lasts past the first swing replays, goblin turn included")
+    void aFightThatLastsPastTheFirstSwingReplays(@TempDir Path dir) {
+        var writer = SessionWriter.open(dir);
+        var log = new EventLog(writer);
+        log.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION, 0L, "none", "none"));
+        // Fighter init 1, goblin 20 — goblin first. Goblin hits (19) for 4. Fighter hits (14) for 4.
+        var engine = new GameEngine(new ContentLoader(), log,
+                new ScriptedDiceRoller(1, 20, 19, 4, 14, 4));
+        var sink = new CombatSink.Buffer();
+        engine.start();
+        engine.spawnGoblin(6, 6);
+        engine.combat().start(sink);
+        engine.combat().runAutomaticTurns(sink, () -> {});
+        engine.combat().attack("fighter", "goblin", sink);
+        writer.close();
+
+        assertTrue(log.events().stream().anyMatch(Event.TurnAdvanced.class::isInstance),
+                "setup: the goblin's turn must advance");
+        assertTrue(log.events().stream().anyMatch(e ->
+                e instanceof Event.AttackResolved a && a.killed()));
+
+        var result = ReplayRunner.replay(writer.path());
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
+        assertTrue(result.compared() >= 6, "compared=" + result.compared());
+    }
+
+    @Test
+    @DisplayName("an asserted fact does not fail replay because of the id the dispatcher minted")
+    void anAssertedFactDoesNotFailReplayBecauseOfItsMintedId(@TempDir Path dir) {
+        var writer = SessionWriter.open(dir);
+        var log = new EventLog(writer);
+        log.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION, 0L, "none", "none"));
+        var engine = new GameEngine(new ContentLoader(), log, new ScriptedDiceRoller(20));
+        engine.start();
+        var dispatched = new ToolDispatcher(engine).dispatch(new DmClient.ToolCall(
+                "1", "assert_fact",
+                "{\"text\":\"The air tastes of old iron.\",\"anchor\":\"ambient\"}"));
+        assertTrue(dispatched.ok(), dispatched.message());
+        assertTrue(log.events().stream().anyMatch(Event.FactAsserted.class::isInstance));
         writer.close();
 
         var result = ReplayRunner.replay(writer.path());
