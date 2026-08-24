@@ -83,6 +83,10 @@ public final class Config {
         return get(key).orElse(fallback);
     }
 
+    public String orElse(String key, String fallback) {
+        return has(key) ? require(key) : fallback;
+    }
+
     public String require(String key) {
         return get(key).orElseThrow(() -> new IllegalStateException(
                 key + " is not set. Copy .env.example to .env and fill it in."));

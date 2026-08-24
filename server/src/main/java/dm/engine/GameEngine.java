@@ -84,7 +84,16 @@ public final class GameEngine {
      */
     public void restart() {
         combat.reset();
+        Event.SessionStarted header = log.events().stream()
+                .filter(Event.SessionStarted.class::isInstance)
+                .map(Event.SessionStarted.class::cast)
+                .findFirst()
+                .orElse(null);
         log.clear();
+        if (header != null) {
+            log.append(new Event.SessionStarted(Instant.now(), header.schemaVersion(),
+                    header.seed(), header.toolModel(), header.proseModel()));
+        }
         start();
     }
 

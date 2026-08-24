@@ -15,13 +15,17 @@ import dm.generate.RoomDumper;
 import dm.generate.RoomGenerator;
 import dm.generate.RoomSource;
 import dm.model.Entity;
+import dm.model.Event;
 import dm.model.NarrationSegment;
 import dm.state.EventLog;
+import dm.state.SessionWriter;
 import dm.wire.Json;
 import io.javalin.Javalin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 
 public final class App {
@@ -43,7 +47,9 @@ public final class App {
         DiceRoller dice = demoMode ? new ScriptedDiceRoller(DEMO_SCRIPT) : new RandomDiceRoller();
 
         var content = new ContentLoader();
-        var eventLog = new EventLog();
+        var writer = SessionWriter.open(Path.of("sessions"));
+        var eventLog = new EventLog(writer);
+        Runtime.getRuntime().addShutdownHook(new Thread(writer::close));
 
         // --generate <seed> boots into a procedurally generated room instead of the crypt.
         // The crypt stays the default: it is the room every M0 measurement was taken in.
@@ -73,6 +79,13 @@ public final class App {
         }
 
         var engine = new GameEngine(content, eventLog, dice, room);
+        eventLog.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION,
+                0L, // the dungeon seed lands here when navigation does
+                config.orElse("DM_MODEL_TOOLS", "none"),
+                config.orElse("DM_MODEL_PROSE", "none")));
+        // The dress pass lands here when navigation makes it per-room. A generated
+        // room currently bakes Dressing into RoomDefinition and does not carry a
+        // Dressing object, so there is nothing to append until then.
         engine.start();
 
         // Everything up to T5 runs without a key; only narration needs one.

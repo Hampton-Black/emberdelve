@@ -21,7 +21,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class EventLog {
 
     private final List<Event> events = new CopyOnWriteArrayList<>();
-    private final SessionWriter writer;
+    private SessionWriter writer;
 
     private volatile WorldState state = WorldState.EMPTY;
 
@@ -50,10 +50,15 @@ public final class EventLog {
     }
 
     /**
-     * Forget the session in memory. A writer, if attached, stays on the same file; opening a new
-     * one is the caller's job (see {@code App}/{@code GameEngine.restart} in a later task).
+     * Forget the session. If a writer is attached, close its file and open a new one in the
+     * same directory — a restart is a new session, not a second chapter of the old file.
      */
     public synchronized void clear() {
+        if (writer != null) {
+            Path dir = writer.path().getParent();
+            writer.close();
+            writer = SessionWriter.open(dir);
+        }
         events.clear();
         state = WorldState.EMPTY;
     }

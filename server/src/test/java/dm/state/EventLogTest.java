@@ -112,4 +112,26 @@ class EventLogTest {
         assertTrue(log.events().isEmpty());
         assertEquals(WorldState.EMPTY, log.state());
     }
+
+    @Test
+    @DisplayName("clearing a written session opens a new file")
+    void clearOpensANewFile(@TempDir Path dir) throws Exception {
+        var first = SessionWriter.open(dir);
+        var log = new EventLog(first);
+        log.append(new Event.SessionStarted(T, Event.SCHEMA_VERSION, 7L, "tools", "prose"));
+
+        log.clear();
+        log.append(new Event.SessionStarted(T, Event.SCHEMA_VERSION, 7L, "tools", "prose"));
+
+        var files = Files.list(dir).toList();
+        assertEquals(2, files.size());
+        Path second = files.stream()
+                .filter(p -> !p.equals(first.path()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(1, Files.readAllLines(first.path()).size(),
+                "the old file is left as it was");
+        assertEquals(1, Files.readAllLines(second).size(),
+                "the new file received the post-clear event");
+    }
 }
