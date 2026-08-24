@@ -373,7 +373,7 @@ class CombatEngineTest {
     @DisplayName("a wound is described, never counted — the narrator must not read hit points out")
     void woundIsDescribedNotCounted() {
         // The goblin swings, because only the fighter has enough hit points to survive a hit and
-        // still be a fraction. 12 less 4+2 is half, which is "wounded" rather than "6/12".
+        // still be a fraction. 12 less 4+2 is half, which is "bloodied" rather than "6/12".
         var fixture = fight(1, 20, 14, 4);
         fixture.start();
         fixture.place("goblin", 6, 5);
@@ -383,7 +383,7 @@ class CombatEngineTest {
         fixture.engine.combat().attack("goblin", "fighter", sink);
 
         var beat = sink.collectedBeats().getLast();
-        assertEquals("Vessk hits Roderick for 6 damage.", beat);
+        assertEquals("Vessk hits you for 6 damage. You are now bloodied.", beat);
         assertFalse(beat.contains("/") || beat.toLowerCase().contains("hp"),
                 "a hit-point count here invites the model to say it");
     }
@@ -416,14 +416,14 @@ class CombatEngineTest {
 
         var sink = new CombatSink.Buffer();
         fixture.engine.combat().attack("fighter", "goblin", sink);
-        assertEquals(List.of("Roderick swings at Vessk and misses."), sink.collectedBeats());
+        assertEquals(List.of("You swing at Vessk and miss."), sink.collectedBeats());
 
         var fumble = new CombatSink.Buffer();
         fixture.engine.combat().endTurn("fighter", fumble);
         fixture.engine.combat().endTurn("goblin", fumble);
         var second = new CombatSink.Buffer();
         fixture.engine.combat().attack("fighter", "goblin", second);
-        assertTrue(second.collectedBeats().getFirst().contains("fumbles"),
+        assertTrue(second.collectedBeats().getFirst().contains("fumble"),
                 second.collectedBeats().toString());
     }
 
@@ -441,7 +441,7 @@ class CombatEngineTest {
         var beats = sink.collectedBeats();
         assertEquals(2, beats.size(), beats.toString());
         assertTrue(beats.getFirst().contains("closes the distance"), beats.toString());
-        assertTrue(beats.get(1).contains("hits Roderick"), beats.toString());
+        assertTrue(beats.get(1).contains("hits you"), beats.toString());
     }
 
     @Test
