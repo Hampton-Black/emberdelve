@@ -423,4 +423,49 @@ class NarrationParserTest {
         assertEquals("", textOf("goblin"));
         assertTrue(textOf("narrator").contains("works its jaw"));
     }
+
+    @Test
+    @DisplayName("a creature loses its voice once the narrator takes a line of its own")
+    void creatureReleasesVoiceOnANarratorLine() {
+        var p = parser();
+        // The §4.4 sequence: the goblin speaks, the narrator takes two lines, and then the
+        // player asks a question the model never marked. It used to come out as the goblin.
+        p.accept("[[goblin]] \"Ssstay back!\"\n"
+                + "The thing crouches lower, watching the door.\n"
+                + "Somewhere behind the wall, water drips.\n"
+                + "\"What else did you see in there?\"");
+        p.finish();
+
+        assertTrue(textOf("goblin").contains("Ssstay back"));
+        assertFalse(textOf("goblin").contains("What else did you see"),
+                "the player's question is not the goblin's, two narrator lines later");
+        assertTrue(textOf("narrator").contains("What else did you see"));
+    }
+
+    @Test
+    @DisplayName("a creature keeps its voice across its own consecutive lines")
+    void creatureKeepsVoiceAcrossItsOwnLines() {
+        var p = parser();
+        p.accept("[[goblin]] \"You came down here for gold.\"\n"
+                + "\"There isss no gold.\"");
+        p.finish();
+
+        assertTrue(textOf("goblin").contains("came down here"));
+        assertTrue(textOf("goblin").contains("isss no gold"),
+                "consecutive quoted lines with no narration between them are one speech");
+    }
+
+    @Test
+    @DisplayName("a dialogue tag on the same line does not release the voice")
+    void dialogueTagDoesNotRelease() {
+        var p = parser();
+        p.accept("[[goblin]] \"You'll die here.\" The goblin spits on the stone. "
+                + "\"Just like the othersss.\"");
+        p.finish();
+
+        assertTrue(textOf("goblin").contains("die here"));
+        assertTrue(textOf("goblin").contains("othersss"),
+                "prose between two quotes on one line is a dialogue tag, not a narrator line");
+        assertTrue(textOf("narrator").contains("spits on the stone"));
+    }
 }

@@ -75,6 +75,10 @@ public final class NarrationParser {
      * talking — a combat beat. On a free-text turn the narrator writes the player's dialogue too,
      * and a wrong guess there is not a flat voice but somebody else's: the player's taunt read
      * back in the snarl of the thing they taunted.
+     *
+     * <p>Released when the narrator takes a line of its own — see {@link #push}. Before that it
+     * was released by nothing at all, and §4.4 records it holding across two narrator lines and
+     * reading the player's own question in the goblin's snarl.
      */
     private String lastCreature;
 
@@ -212,8 +216,9 @@ public final class NarrationParser {
         // Whose voice quoted speech belongs to right now. Until a creature has spoken this turn
         // there is nobody to hand a quotation to, so the narrator keeps it — that is what lets
         // it read a sign or a letter aloud in its own voice.
-        String quoted = NarrationSegment.NARRATOR.equals(speaker) ? lastCreature : speaker;
-        if (quoted == null) {
+        // Evaluated per push rather than once per chunk: a narrator line inside this same chunk
+        // releases the creature, and every quotation after it belongs to the narrator again.
+        if (quotedVoice() == null) {
             push(NarrationSegment.NARRATOR, text);
             return;
         }
@@ -227,7 +232,7 @@ public final class NarrationParser {
             // for the rest of the turn.
             if (insideQuote && c == '\n' && i + 1 < text.length() && text.charAt(i + 1) == '\n') {
                 insideQuote = false;
-                push(quoted, text.substring(start, i));
+                push(quotedOrNarrator(), text.substring(start, i));
                 start = i;
                 continue;
             }
@@ -237,7 +242,7 @@ public final class NarrationParser {
             }
             if (insideQuote) {
                 insideQuote = false;
-                push(quoted, text.substring(start, i + 1));
+                push(quotedOrNarrator(), text.substring(start, i + 1));
                 start = i + 1;
             } else {
                 push(NarrationSegment.NARRATOR, text.substring(start, i));
@@ -246,7 +251,17 @@ public final class NarrationParser {
             }
         }
 
-        push(insideQuote ? quoted : NarrationSegment.NARRATOR, text.substring(start));
+        push(insideQuote ? quotedOrNarrator() : NarrationSegment.NARRATOR, text.substring(start));
+    }
+
+    /** Whose voice a quotation belongs to right now, or null if nobody can take one. */
+    private String quotedVoice() {
+        return NarrationSegment.NARRATOR.equals(speaker) ? lastCreature : speaker;
+    }
+
+    private String quotedOrNarrator() {
+        String voice = quotedVoice();
+        return voice == null ? NarrationSegment.NARRATOR : voice;
     }
 
     /**
@@ -260,9 +275,23 @@ public final class NarrationParser {
      * upstream with any confidence.
      */
     private void push(String voice, String text) {
-        if (!unspeakable(text)) {
-            onSegment.accept(new NarrationSegment(voice, text));
+        if (unspeakable(text)) {
+            return;
         }
+        // A creature keeps its voice across its own consecutive lines and loses it the moment
+        // the narrator takes a line of its own. m0-evaluation.md §4.4: the marker survived two
+        // narrator lines and then took the player's question in the goblin's voice.
+        //
+        // A line, not merely prose. "You'll die here." The goblin spits. "Just like the others."
+        // is one line with a dialogue tag in it, and releasing there would break every two-part
+        // piece of dialogue the model writes. The test is a newline inside speakable narration,
+        // which is why this sits below the unspeakable guard: the bare "\n" between two quoted
+        // lines is not narration and must not release anything.
+        if (NarrationSegment.NARRATOR.equals(voice) && text.indexOf('\n') >= 0) {
+            lastCreature = null;
+            speaker = NarrationSegment.NARRATOR;
+        }
+        onSegment.accept(new NarrationSegment(voice, text));
     }
 
     /** Whether this is worth handing to a voice: blank, or punctuation with nothing inside it. */
