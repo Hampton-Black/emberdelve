@@ -823,6 +823,17 @@ public final class DmService {
      * the last event that equals {@code text} is this turn. A sentence is not a repeat of itself.
      */
     static boolean isRepeat(EventLog log, String text) {
+        return earlierMatchingTurn(log, text).isPresent();
+    }
+
+    /**
+     * The most recent earlier player line that this one is a retry of, if any.
+     *
+     * <p>{@code PlayerSaid} is appended at the start of the turn, before this is consulted, so
+     * the last event that equals {@code text} is this turn and is skipped. "Last time you told
+     * them" means the most recent remaining match, not the first time they ever asked.
+     */
+    static Optional<String> earlierMatchingTurn(EventLog log, String text) {
         var earlier = log.events().stream()
                 .filter(Event.PlayerSaid.class::isInstance)
                 .map(Event.PlayerSaid.class::cast)
@@ -831,7 +842,12 @@ public final class DmService {
         if (!earlier.isEmpty() && earlier.getLast().equals(text)) {
             earlier = earlier.subList(0, earlier.size() - 1);
         }
-        return resemblesAny(text, earlier);
+        for (String previous : earlier.reversed()) {
+            if (resembles(text, previous)) {
+                return Optional.of(previous);
+            }
+        }
+        return Optional.empty();
     }
 
     /**
@@ -840,12 +856,17 @@ public final class DmService {
      * <p>Carried into the directive rather than referred to, because the turn being referred to
      * may have fallen out of the window — and a model told not to repeat a thing it cannot see
      * writes a fresh version of it instead. Spec §7a.
+     *
+     * <p>The candidate is resolved through {@code earlierMatchingTurn} first, so a paraphrased
+     * retry still finds the turn it is repeating. An exact string that did not resemble anything
+     * still matches by equality, as it did.
      */
     static Optional<String> narrationAfter(EventLog log, String earlierPlayerText) {
+        var target = earlierMatchingTurn(log, earlierPlayerText).orElse(earlierPlayerText);
         var events = log.events();
         for (int i = 0; i < events.size(); i++) {
             if (events.get(i) instanceof Event.PlayerSaid said
-                    && said.text().equals(earlierPlayerText)) {
+                    && said.text().equals(target)) {
                 return events.stream().skip(i + 1)
                         .takeWhile(e -> !(e instanceof Event.PlayerSaid))
                         .filter(Event.NarrationLogged.class::isInstance)
@@ -865,24 +886,29 @@ public final class DmService {
 
     /** Package-private so the threshold can be tested without a model or a session. */
     static boolean resemblesAny(String text, List<String> earlierInputs) {
-        var words = significantWords(text);
-        if (words.size() < 2) {
-            return false;
-        }
         for (String previous : earlierInputs) {
-            var earlier = significantWords(previous);
-            if (earlier.isEmpty()) {
-                continue;
-            }
-            var shared = new java.util.HashSet<>(words);
-            shared.retainAll(earlier);
-            // Two thirds of the shorter one. Loose enough to catch a reworded retry, tight enough
-            // that "I look at the door" and "I look at the sarcophagus" stay different questions.
-            if (shared.size() * 3 >= Math.min(words.size(), earlier.size()) * 2) {
+            if (resembles(text, previous)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** Two thirds of the shorter bag. The only bag-of-words comparison. */
+    private static boolean resembles(String text, String previous) {
+        var words = significantWords(text);
+        if (words.size() < 2) {
+            return false;
+        }
+        var earlier = significantWords(previous);
+        if (earlier.isEmpty()) {
+            return false;
+        }
+        var shared = new java.util.HashSet<>(words);
+        shared.retainAll(earlier);
+        // Loose enough to catch a reworded retry, tight enough that "I look at the door" and
+        // "I look at the sarcophagus" stay different questions.
+        return shared.size() * 3 >= Math.min(words.size(), earlier.size()) * 2;
     }
 
     /** Content words, lowercased. Everything a retry would keep and nothing it would not. */

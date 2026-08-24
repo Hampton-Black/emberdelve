@@ -50,6 +50,24 @@ class DmContextTest {
     }
 
     @Test
+    @DisplayName("a paraphrased retry still recovers the earlier narration")
+    void paraphrasedRetryRecoversEarlierNarration() {
+        var log = logWith("I shove the sarcophagus lid open");
+
+        var exact = DmService.narrationAfter(log, "I shove the sarcophagus lid open");
+        assertTrue(exact.orElseThrow().contains("shove the sarcophagus lid open"),
+                "verbatim recovery is how the directive has always quoted last time");
+
+        // Production appends PlayerSaid at the start of the turn, then asks narrationAfter
+        // with the current line — which is a paraphrase, not the earlier string.
+        log.append(new Event.PlayerSaid(T, "fighter", "I try shoving that lid open again"));
+
+        var recovered = DmService.narrationAfter(log, "I try shoving that lid open again");
+        assertEquals(exact, recovered,
+                "a reworded retry still has to carry the earlier line inline — spec §7a");
+    }
+
+    @Test
     @DisplayName("the window keeps the most recent turns and drops the rest")
     void windowKeepsRecent() {
         var turns = new java.util.ArrayList<DmClient.ChatMessage>();
