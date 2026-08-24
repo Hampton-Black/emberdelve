@@ -11,6 +11,7 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.4")
     // RollRequest carries Optional fields (§6); Jackson needs this to serialise them.
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.18.4")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.4")
     implementation("org.slf4j:slf4j-simple:2.0.17")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.12.2")

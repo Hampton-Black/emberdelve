@@ -17,3 +17,6 @@ client/.vite/
 *.iml
 .DS_Store
 client/tsconfig.tsbuildinfo
+
+# Play sessions. The ones worth keeping get copied into src/test/resources/sessions/.
+server/sessions/

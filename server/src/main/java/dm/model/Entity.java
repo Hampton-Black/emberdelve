@@ -1,5 +1,7 @@
 package dm.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.Map;
 
 /**
@@ -28,6 +30,7 @@ public record Entity(
         skillModifiers = Map.copyOf(skillModifiers);
     }
 
+    @JsonIgnore
     public boolean isAlive() {
         return hp > 0;
     }

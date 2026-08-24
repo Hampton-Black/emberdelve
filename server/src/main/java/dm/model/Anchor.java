@@ -11,6 +11,17 @@ package dm.model;
  * <p>Present from the first event written, because retrofitting an anchor onto a log full of
  * anchorless facts is a migration and adding the field now is free.
  */
+@com.fasterxml.jackson.annotation.JsonTypeInfo(
+        use = com.fasterxml.jackson.annotation.JsonTypeInfo.Id.NAME,
+        include = com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY, property = "kind")
+@com.fasterxml.jackson.annotation.JsonSubTypes({
+        @com.fasterxml.jackson.annotation.JsonSubTypes.Type(
+                value = Anchor.Ambient.class, name = "ambient"),
+        @com.fasterxml.jackson.annotation.JsonSubTypes.Type(
+                value = Anchor.AtSquare.class, name = "at_square"),
+        @com.fasterxml.jackson.annotation.JsonSubTypes.Type(
+                value = Anchor.On.class, name = "on"),
+})
 public sealed interface Anchor {
 
     record Ambient() implements Anchor {}

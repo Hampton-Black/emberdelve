@@ -1,5 +1,7 @@
 package dm.model;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import dm.generate.Dressing;
 
 import java.time.Instant;
@@ -10,7 +12,32 @@ import java.util.Optional;
  * The append-only spine. Roll results are logged here with their faces and outcome
  * (invariant #6) — replay reads results, it never re-rolls from a seed.
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+@JsonSubTypes({
+        @JsonSubTypes.Type(value = Event.SessionStarted.class, name = "session_started"),
+        @JsonSubTypes.Type(value = Event.PlayerSaid.class, name = "player_said"),
+        @JsonSubTypes.Type(value = Event.ToolCallIssued.class, name = "tool_call_issued"),
+        @JsonSubTypes.Type(value = Event.NarrationLogged.class, name = "narration_logged"),
+        @JsonSubTypes.Type(value = Event.PartySpawned.class, name = "party_spawned"),
+        @JsonSubTypes.Type(value = Event.EntitySpawned.class, name = "entity_spawned"),
+        @JsonSubTypes.Type(value = Event.EntityMoved.class, name = "entity_moved"),
+        @JsonSubTypes.Type(value = Event.AttackResolved.class, name = "attack_resolved"),
+        @JsonSubTypes.Type(value = Event.CheckResolved.class, name = "check_resolved"),
+        @JsonSubTypes.Type(value = Event.PropRevealed.class, name = "prop_revealed"),
+        @JsonSubTypes.Type(value = Event.RoomDressed.class, name = "room_dressed"),
+        @JsonSubTypes.Type(value = Event.CombatStarted.class, name = "combat_started"),
+        @JsonSubTypes.Type(value = Event.TurnAdvanced.class, name = "turn_advanced"),
+        @JsonSubTypes.Type(value = Event.CombatEnded.class, name = "combat_ended"),
+        @JsonSubTypes.Type(value = Event.ModeEntered.class, name = "mode_entered"),
+        @JsonSubTypes.Type(value = Event.FactAsserted.class, name = "fact_asserted"),
+})
 public sealed interface Event {
+
+    /**
+     * Bumped whenever a recorded log stops being readable by this build. Old logs are refused,
+     * never upgraded — spec §3. Discarding one is free; an upgrader is a tax paid forever.
+     */
+    int SCHEMA_VERSION = 1;
 
     Instant at();
 
