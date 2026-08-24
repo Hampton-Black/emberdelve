@@ -17,9 +17,9 @@ import dm.generate.RoomGenerator;
 import dm.generate.RoomSource;
 import dm.model.Entity;
 import dm.model.Event;
-import dm.model.NarrationSegment;
 import dm.state.EventLog;
 import dm.state.SessionWriter;
+import dm.state.WorldState;
 import dm.wire.Json;
 import io.javalin.Javalin;
 import org.slf4j.Logger;
@@ -135,11 +135,10 @@ public final class App {
                     config.require("ELEVENLABS_API_KEY"),
                     config.require("ELEVENLABS_VOICE_NARRATOR"),
                     config.require("ELEVENLABS_VOICE_GOBLIN"),
-                    // "narrator" is both the fallback and a real speaker id, and both want the
-                    // narrator's voice, so one answer covers the unknown case and the honest one.
-                    id -> engine.state().find(id)
-                            .map(Entity::kind)
-                            .orElse(NarrationSegment.NARRATOR));
+                    // Falls back to the speaker id: [[goblin]] is attributed before reconcile
+                    // has spawned the creature, and treating the unresolved id as a kind is
+                    // what keeps the arrival line in the goblin's voice.
+                    id -> kindForVoice(engine.state(), id));
             final TtsClient voice = tts;
 
             app.post("/tts", ctx -> {
@@ -179,6 +178,14 @@ public final class App {
                 engine.state().entities().size(),
                 dm == null ? "disabled" : dm.modelId(),
                 demoMode ? ", demo dice" : "");
+    }
+
+    /**
+     * Kind for TTS. Falls back to the speaker id itself so a {@code [[goblin]]} line that
+     * arrives before reconcile has spawned the creature still gets the goblin voice.
+     */
+    static String kindForVoice(WorldState state, String speakerId) {
+        return state.find(speakerId).map(Entity::kind).orElse(speakerId);
     }
 
     private App() {

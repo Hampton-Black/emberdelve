@@ -19,8 +19,8 @@ import java.util.Locale;
  * a difficulty band — the schema itself makes those unrepresentable, and the dispatcher
  * re-validates anyway.
  *
- * <p>Four tools, not the five in §7 as written: narration moves through the text channel so it
- * streams from the first token. See AGENTS.md → Deviations.
+ * <p>Five tools. Narration still moves through the text channel so it streams from the first
+ * token; {@code assert_fact} is the fifth, offered only on reconcile. See AGENTS.md → Deviations.
  */
 public final class ToolSchema {
 
@@ -138,12 +138,12 @@ public final class ToolSchema {
                                 List.of("ambient", "at_square", "on"),
                                 "Where it lives. ambient has no square; at_square needs x and y; "
                                         + "on needs target_id.");
-                        intProp(properties, "x", 0, engine.room().width() - 1);
-                        intProp(properties, "y", 0, engine.room().height() - 1);
-                        stringProp(properties, "target_id",
+                        nullableIntProp(properties, "x", 0, engine.room().width() - 1);
+                        nullableIntProp(properties, "y", 0, engine.room().height() - 1);
+                        nullableStringProp(properties, "target_id",
                                 "The entity or prop this is attached to, when anchor is on.");
                     },
-                    "text", "anchor");
+                    "text", "anchor", "x", "y", "target_id");
             ((ObjectNode) assertFact.get("function")).put("strict", true);
             tools.add(assertFact);
         }
@@ -191,9 +191,27 @@ public final class ToolSchema {
         prop.put("maximum", max);
     }
 
+    /** Strict schemas require every property; a missing optional is {@code null}, not absent. */
+    private static void nullableIntProp(ObjectNode properties, String name, int min, int max) {
+        ObjectNode prop = properties.putObject(name);
+        var type = prop.putArray("type");
+        type.add("integer");
+        type.add("null");
+        prop.put("minimum", min);
+        prop.put("maximum", max);
+    }
+
     private static void stringProp(ObjectNode properties, String name, String description) {
         ObjectNode prop = properties.putObject(name);
         prop.put("type", "string");
+        prop.put("description", description);
+    }
+
+    private static void nullableStringProp(ObjectNode properties, String name, String description) {
+        ObjectNode prop = properties.putObject(name);
+        var type = prop.putArray("type");
+        type.add("string");
+        type.add("null");
         prop.put("description", description);
     }
 

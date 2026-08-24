@@ -1,9 +1,13 @@
 package dm.ai;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import dm.model.Anchor;
 import dm.model.Event;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -59,5 +63,46 @@ class AssertFactTest {
         assertTrue(ToolSchema.allowedInReconcile(ToolSchema.ASSERT_FACT));
         assertFalse(ToolSchema.forTurn(fixture.engine()).toString().contains(ToolSchema.ASSERT_FACT),
                 "the mechanics model adjudicates; it does not get to write the world's prose");
+        assertTrue(ToolSchema.forReconcile(fixture.engine()).toString().contains(ToolSchema.ASSERT_FACT),
+                "reconcile is the pass that writes down what the narrator already said");
+    }
+
+    @Test
+    @DisplayName("assert_fact's strict schema requires every property, with null for the optional ones")
+    void strictSchemaRequiresEveryProperty() {
+        var fn = assertFactFunction(ToolSchema.forReconcile(DispatcherFixture.inCrypt().engine()));
+        assertTrue(fn.path("strict").asBoolean());
+
+        var params = fn.get("parameters");
+        var required = new HashSet<String>();
+        params.get("required").forEach(n -> required.add(n.asText()));
+        var names = new HashSet<String>();
+        params.get("properties").fieldNames().forEachRemaining(names::add);
+
+        assertEquals(names, required, "strict:true forbids a property that is not required");
+        assertTrue(required.containsAll(Set.of("text", "anchor", "x", "y", "target_id")));
+        assertTrue(isNullUnion(params.get("properties").get("x"), "integer"));
+        assertTrue(isNullUnion(params.get("properties").get("y"), "integer"));
+        assertTrue(isNullUnion(params.get("properties").get("target_id"), "string"));
+    }
+
+    private static JsonNode assertFactFunction(JsonNode tools) {
+        for (var tool : tools) {
+            if (ToolSchema.ASSERT_FACT.equals(tool.path("function").path("name").asText())) {
+                return tool.get("function");
+            }
+        }
+        fail("reconcile schema did not offer assert_fact");
+        return null;
+    }
+
+    private static boolean isNullUnion(JsonNode prop, String jsonType) {
+        var type = prop.get("type");
+        if (type == null || !type.isArray()) {
+            return false;
+        }
+        var types = new HashSet<String>();
+        type.forEach(n -> types.add(n.asText()));
+        return types.equals(Set.of(jsonType, "null"));
     }
 }

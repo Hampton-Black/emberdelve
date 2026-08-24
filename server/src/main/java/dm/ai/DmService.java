@@ -6,6 +6,7 @@ import dm.model.Combatant;
 import dm.model.Event;
 import dm.model.Phase;
 import dm.state.EventLog;
+import dm.state.WorldState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -755,21 +756,33 @@ public final class DmService {
                     .append(" failed in a row, with no success since.\n");
         }
 
-        var facts = engine.state().factsHere();
-        if (!facts.isEmpty()) {
-            sb.append("\n## Established\n\n");
-            sb.append("Things you have already told the player are true in this room. They are "
-                    + "true. Do not contradict them and do not re-introduce them as new.\n\n");
-            for (var fact : facts) {
-                sb.append("- ").append(fact.text()).append("\n");
-            }
-        }
+        sb.append(established(engine.state()));
 
         sb.append("\n## Grid\n\n")
                 .append("- size: ").append(room.width()).append("x").append(room.height())
                 .append("\n- axes: x eastward, y northward")
                 .append("\n- mode: ").append(engine.mode()).append("\n");
 
+        return sb.toString();
+    }
+
+    /**
+     * The Established block the models see. Empty when nothing has been asserted yet.
+     *
+     * <p>Package-private so the heading can be locked without standing a {@code DmService} up.
+     */
+    static String established(WorldState state) {
+        var facts = state.factsHere();
+        if (facts.isEmpty()) {
+            return "";
+        }
+        var sb = new StringBuilder();
+        sb.append("\n## Established\n\n");
+        sb.append("Things you have already told the player are true in this room. They are "
+                + "true. Do not contradict them and do not re-introduce them as new.\n\n");
+        for (var fact : facts) {
+            sb.append("- ").append(fact.text()).append("\n");
+        }
         return sb.toString();
     }
 

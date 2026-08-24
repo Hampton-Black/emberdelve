@@ -1,11 +1,14 @@
 package dm.ai;
 
+import dm.model.Anchor;
 import dm.model.Event;
 import dm.state.EventLog;
+import dm.state.WorldState;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -81,5 +84,19 @@ class DmContextTest {
         assertEquals(DmService.WINDOW_TURNS * 2, window.size());
         assertTrue(window.getFirst().content().contains("turn 14"));
         assertTrue(window.getLast().content().contains("answer 19"));
+    }
+
+    @Test
+    @DisplayName("a folded fact appears under ## Established in the world-state the models see")
+    void establishedFactsAreShownToTheModels() {
+        var state = WorldState.fold(List.of(
+                new Event.FactAsserted(T, "f1", "crypt",
+                        "The air tastes of old iron.", Anchor.AMBIENT)));
+
+        var text = DmService.established(state);
+
+        assertTrue(text.contains("## Established"),
+                "the heading is how the models are told these are already true");
+        assertTrue(text.contains("The air tastes of old iron."));
     }
 }
