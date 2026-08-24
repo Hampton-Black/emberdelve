@@ -6,7 +6,7 @@ import dm.model.Outcome;
 import dm.state.WorldState;
 
 /**
- * Turns one resolved attack into the sentence the narrator is handed.
+ * Turns a combat fact into the sentence the narrator is handed.
  *
  * <p>The whole of this class is m0-evaluation.md §4.4 fault 1. The engine used to hand over
  * "Vessk hits Roderick for 6 damage." and leave the narrator to work out that Roderick is the
@@ -27,7 +27,7 @@ public final class BeatRenderer {
         boolean targetIsPlayer = isParty(state, attack.targetId());
 
         String actor = actorIsPlayer ? "You" : nameOf(state, attack.actorId());
-        String target = targetIsPlayer ? "you" : nameOf(state, attack.targetId());
+        String target = address(state, attack.targetId());
 
         if (!attack.hit()) {
             String verb = attack.attack().outcome() == Outcome.CRIT_FAIL
@@ -49,6 +49,25 @@ public final class BeatRenderer {
 
         String wound = condition(state, attack.targetId(), targetIsPlayer);
         return actor + " " + hit.formatted(target, attack.damageDealt()) + " " + wound;
+    }
+
+    /**
+     * The goblin closing into reach. Same person rule as {@link #render}: second person when the
+     * party is the target, by name otherwise.
+     */
+    public static String renderClose(WorldState state, String actorId, String targetId) {
+        return nameOf(state, actorId) + " closes the distance to " + address(state, targetId) + ".";
+    }
+
+    /**
+     * The goblin advancing but not yet in reach. Same person rule as {@link #renderClose}.
+     */
+    public static String renderAdvance(WorldState state, String actorId, String targetId) {
+        return nameOf(state, actorId) + " advances toward " + address(state, targetId) + ".";
+    }
+
+    private static String address(WorldState state, String entityId) {
+        return isParty(state, entityId) ? "you" : nameOf(state, entityId);
     }
 
     private static boolean isParty(WorldState state, String entityId) {

@@ -50,7 +50,7 @@ public final class CombatEngine {
         this.room = room;
     }
 
-    private WorldState state() {
+    WorldState state() {
         return log.state();
     }
 

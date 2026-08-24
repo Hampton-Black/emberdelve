@@ -78,4 +78,38 @@ class BeatRendererTest {
         assertTrue(fumble.contains("fumbles"), fumble);
         assertFalse(miss.matches(".*\\d.*"), "dm.md forbids hit points said aloud");
     }
+
+    @Test
+    @DisplayName("closing on the party is addressed to the player")
+    void closeOnPartyIsSecondPerson() {
+        var beat = BeatRenderer.renderClose(WORLD, "goblin", "fighter");
+
+        assertEquals("Vessk closes the distance to you.", beat);
+        assertFalse(beat.contains("Roderick"),
+                "the player is never named in the third person in a beat");
+    }
+
+    @Test
+    @DisplayName("advancing on the party is addressed to the player")
+    void advanceOnPartyIsSecondPerson() {
+        var beat = BeatRenderer.renderAdvance(WORLD, "goblin", "fighter");
+
+        assertEquals("Vessk advances toward you.", beat);
+        assertFalse(beat.contains("Roderick"),
+                "the player is never named in the third person in a beat");
+    }
+
+    @Test
+    @DisplayName("closing on someone outside the party is by name")
+    void closeOnNonPartyIsByName() {
+        var world = WorldState.fold(List.of(
+                new Event.PartySpawned(T, List.of(entity("fighter", "Roderick", true))),
+                new Event.EntitySpawned(T, entity("goblin", "Vessk", false)),
+                new Event.EntitySpawned(T, entity("wight", "Aldric", false))));
+
+        assertEquals("Vessk closes the distance to Aldric.",
+                BeatRenderer.renderClose(world, "goblin", "wight"));
+        assertEquals("Vessk advances toward Aldric.",
+                BeatRenderer.renderAdvance(world, "goblin", "wight"));
+    }
 }

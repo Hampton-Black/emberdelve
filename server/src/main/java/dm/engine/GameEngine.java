@@ -206,11 +206,11 @@ public final class GameEngine {
      * happened. Vessk came back from a fight he had lost.
      *
      * <p>Refusing is the honest fix rather than the convenient one. Handing each spawn its own
-     * id would let a second goblin exist, but the id is load-bearing in two places outside the
-     * engine — {@code TtsClient} picks the goblin's voice by it, and {@code DmService} decides
-     * which sarcophagus note to show by whether an entity called "goblin" exists — so a
-     * "goblin-2" would be narrated in the narrator's voice. One goblin is what this build
-     * actually supports, and it should say so instead of corrupting itself quietly.
+     * id would let a second goblin exist, but the id is still load-bearing outside the engine —
+     * {@code DmService} decides which sarcophagus note to show by whether an entity called
+     * "goblin" exists. {@code TtsClient} keys the voice on kind, so a "goblin-2" would sound
+     * like Vessk and still fail to open the lid. One goblin is what this build actually
+     * supports, and it should say so instead of corrupting itself quietly.
      */
     public List<Diff> spawnGoblin(int x, int y) {
         var definition = content.entity("goblin");

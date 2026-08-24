@@ -1,5 +1,6 @@
 package dm.engine;
 
+import dm.ai.BeatRenderer;
 import dm.model.Entity;
 import dm.model.Square;
 
@@ -37,8 +38,8 @@ final class GoblinAi {
                 // From here rather than from moveTo: a move only knows a destination, and what
                 // the narrator needs is why. Only this class knows the goblin was closing.
                 sink.beat(self.isAdjacentTo(foe)
-                        ? self.name() + " closes the distance to " + foe.name() + "."
-                        : self.name() + " advances toward " + foe.name() + ".");
+                        ? BeatRenderer.renderClose(combat.state(), self.id(), foe.id())
+                        : BeatRenderer.renderAdvance(combat.state(), self.id(), foe.id()));
                 beat.run();
             }
         }

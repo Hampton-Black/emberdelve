@@ -21,9 +21,10 @@ public interface CombatSink {
     /**
      * One plain sentence of what just happened, for whoever is going to narrate it.
      *
-     * <p>Facts, never prose — "Vessk hits Roderick for 5 damage", not "the blade bites deep". The
-     * engine knows what happened and the model knows how to say it, and neither should be doing
-     * the other's job. Default no-op: most callers only want the diffs.
+     * <p>One second-person sentence from {@link dm.ai.BeatRenderer}, facts only —
+     * "Vessk hits you for 6 damage. You are now bloodied.", not "the blade bites deep".
+     * The engine knows what happened and the model knows how to say it, and neither should
+     * be doing the other's job. Default no-op: most callers only want the diffs.
      */
     default void beat(String fact) {
     }

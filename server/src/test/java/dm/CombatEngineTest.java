@@ -440,7 +440,9 @@ class CombatEngineTest {
 
         var beats = sink.collectedBeats();
         assertEquals(2, beats.size(), beats.toString());
-        assertTrue(beats.getFirst().contains("closes the distance"), beats.toString());
+        assertEquals("Vessk closes the distance to you.", beats.getFirst());
+        assertFalse(beats.getFirst().contains("Roderick"),
+                "the player is never named in the third person in a beat");
         assertTrue(beats.get(1).contains("hits you"), beats.toString());
     }
 
