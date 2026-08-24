@@ -29,13 +29,14 @@ public final class ToolSchema {
     public static final String REVEAL_PROP = "reveal_prop";
     public static final String SPAWN_ENTITY = "spawn_entity";
     public static final String START_COMBAT = "start_combat";
+    public static final String ASSERT_FACT = "assert_fact";
 
     /** Everything {@code spawn_entity} can bring into the room. M0 has one creature. */
     public static final List<String> SPAWNABLE_KINDS = List.of("goblin");
 
     /** What {@link #forReconcile} actually offers. See {@code DmService.runReconcilePhase}. */
     private static final java.util.Set<String> RECONCILE_TOOLS =
-            java.util.Set.of(REVEAL_PROP, SPAWN_ENTITY, START_COMBAT);
+            java.util.Set.of(REVEAL_PROP, SPAWN_ENTITY, START_COMBAT, ASSERT_FACT);
 
     private ToolSchema() {
     }
@@ -126,6 +127,27 @@ public final class ToolSchema {
                     }));
         }
 
+        if (!withChecks) {
+            ObjectNode assertFact = tool(ASSERT_FACT,
+                    "Record something the narrator said that the board cannot hold — a smell, "
+                            + "a sound, a scratch on a wall, a ring on a dead hand.",
+                    properties -> {
+                        stringProp(properties, "text",
+                                "What is now true. Short. One fact.");
+                        enumProp(properties, "anchor",
+                                List.of("ambient", "at_square", "on"),
+                                "Where it lives. ambient has no square; at_square needs x and y; "
+                                        + "on needs target_id.");
+                        intProp(properties, "x", 0, engine.room().width() - 1);
+                        intProp(properties, "y", 0, engine.room().height() - 1);
+                        stringProp(properties, "target_id",
+                                "The entity or prop this is attached to, when anchor is on.");
+                    },
+                    "text", "anchor");
+            ((ObjectNode) assertFact.get("function")).put("strict", true);
+            tools.add(assertFact);
+        }
+
         return tools;
     }
 
@@ -167,6 +189,12 @@ public final class ToolSchema {
         prop.put("type", "integer");
         prop.put("minimum", min);
         prop.put("maximum", max);
+    }
+
+    private static void stringProp(ObjectNode properties, String name, String description) {
+        ObjectNode prop = properties.putObject(name);
+        prop.put("type", "string");
+        prop.put("description", description);
     }
 
     private static List<String> lowerNames(Enum<?>[] values) {

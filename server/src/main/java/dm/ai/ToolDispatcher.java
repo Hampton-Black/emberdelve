@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import dm.wire.Json;
 import dm.engine.CombatSink;
 import dm.engine.GameEngine;
+import dm.model.Anchor;
 import dm.model.Diff;
 import dm.model.Difficulty;
 import dm.model.Event;
@@ -14,9 +15,11 @@ import dm.model.Skill;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Validates and applies tool calls. This is where invariant #7 is actually enforced — the schema
@@ -64,6 +67,7 @@ public final class ToolDispatcher {
                 case ToolSchema.REVEAL_PROP -> revealProp(args);
                 case ToolSchema.SPAWN_ENTITY -> spawnEntity(args);
                 case ToolSchema.START_COMBAT -> startCombat();
+                case ToolSchema.ASSERT_FACT -> assertFact(args);
                 default -> Result.rejected("no such tool: " + call.name());
             };
         } catch (Exception e) {
@@ -188,6 +192,49 @@ public final class ToolDispatcher {
                         + "sentences. Do not list the order. Do not narrate anyone's turn, "
                         + "attack, movement or wound: none of that has happened yet.",
                 buffer.collectedDiffs(), buffer.collectedRolls());
+    }
+
+    /**
+     * Records something the DM said that the board cannot hold.
+     *
+     * <p>The text is free-form and goes nowhere but the next prompt — it drives no roll, gates no
+     * legal move, and reaches no renderer. The anchor is closed. Spec §9: that split is what
+     * leaves invariant #7 standing while letting the DM improvise.
+     */
+    private Result assertFact(JsonNode arguments) {
+        String text = arguments.path("text").asText("").strip();
+        if (text.isBlank()) {
+            return Result.rejected("An assertion with no text asserts nothing.");
+        }
+
+        Anchor anchor;
+        String kind = arguments.path("anchor").asText("ambient");
+        switch (kind) {
+            case "at_square" -> {
+                int x = arguments.path("x").asInt(-1);
+                int y = arguments.path("y").asInt(-1);
+                if (!engine.isInBounds(x, y)) {
+                    return Result.rejected("(" + x + "," + y + ") is off the grid.");
+                }
+                anchor = new Anchor.AtSquare(x, y);
+            }
+            case "on" -> {
+                String targetId = arguments.path("target_id").asText("");
+                boolean exists = engine.state().find(targetId).isPresent()
+                        || engine.room().props().stream().anyMatch(p -> p.id().equals(targetId));
+                if (!exists) {
+                    return Result.rejected("There is no " + targetId + " here to attach it to.");
+                }
+                anchor = new Anchor.On(targetId);
+            }
+            default -> anchor = Anchor.AMBIENT;
+        }
+
+        engine.log().append(new Event.FactAsserted(Instant.now(),
+                "fact-" + UUID.randomUUID().toString().substring(0, 8),
+                engine.state().roomId(), text, anchor));
+
+        return Result.applied("Recorded: " + text, List.of());
     }
 
     private static <E extends Enum<E>> Optional<E> parseEnum(Class<E> type, String raw) {

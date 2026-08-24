@@ -54,3 +54,15 @@ attempt to fix its arguments, and that is all.
 **To say that nothing needs to change, return no tool calls.** Not a call named `none`, not a
 call with empty arguments, not a sentence saying so — nothing at all. That is the answer most of
 the time and it is the correct one.
+
+## Things the board cannot hold
+
+Some of what the narrator says is true and has no mechanism behind it — a smell, a sound, a
+scratch on a wall, a ring on a dead hand. Those are not failures. Call `assert_fact` with what
+was asserted, so it is still true next turn.
+
+Anchor it to a square or to something already in the room when it is a thing in a place. Leave it
+`ambient` when it is not — a temperature, a smell, a sound has no square.
+
+Do not assert what a tool already did. A goblin you spawned is on the board; it does not also
+need asserting.
