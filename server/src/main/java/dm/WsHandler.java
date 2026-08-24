@@ -326,7 +326,7 @@ public final class WsHandler {
         }
         // Same reason the engine refuses a move: a dead fighter has no turns left to take, and
         // a DM asked to narrate one would invent a living player to narrate it for.
-        if (engine.repo().find(actorId).filter(Entity::isAlive).isEmpty()) {
+        if (engine.state().find(actorId).filter(Entity::isAlive).isEmpty()) {
             send(ctx, new ServerMessage.Error("Roderick is dead. Descend again to start a new session."));
             return;
         }

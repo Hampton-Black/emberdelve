@@ -1,5 +1,6 @@
 package dm.engine;
 
+import dm.ai.BeatRenderer;
 import dm.content.RoomDefinition;
 import dm.model.Combatant;
 import dm.model.CombatView;
@@ -11,7 +12,8 @@ import dm.model.Outcome;
 import dm.model.RollRequest;
 import dm.model.RollResult;
 import dm.model.Square;
-import dm.repo.GameRepository;
+import dm.state.EventLog;
+import dm.state.WorldState;
 
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -33,54 +35,48 @@ import java.util.Set;
  * a finished answer: {@link CombatView#legalMoves()} and {@link CombatView#legalTargets()}. The
  * client highlights squares; it never works out which ones.
  *
- * <p>Turn state is held in fields rather than in the repository. A fight does not survive a
+ * <p>Turn state is folded from the log rather than held in fields. A fight does not survive a
  * restart and is not meant to — M0 has no save (§12).
  */
 public final class CombatEngine {
 
-    private final GameRepository repo;
+    private final EventLog log;
     private final DiceRoller dice;
     private final RoomDefinition room;
 
-    private List<Combatant> order = List.of();
-    private int turnIndex;
-    private int round;
-    private int movementRemaining;
-    private boolean actionAvailable;
-    private boolean active;
-
-    public CombatEngine(GameRepository repo, DiceRoller dice, RoomDefinition room) {
-        this.repo = repo;
+    public CombatEngine(EventLog log, DiceRoller dice, RoomDefinition room) {
+        this.log = log;
         this.dice = dice;
         this.room = room;
     }
 
+    private WorldState state() {
+        return log.state();
+    }
+
+    /** True while a fight is running. Folded, not held. */
     public boolean isActive() {
-        return active;
+        return state().combat().isPresent();
     }
 
     /** Drop the fight without ending it in fiction. Only a new session should call this. */
     public void reset() {
-        active = false;
-        order = List.of();
-        turnIndex = 0;
-        round = 0;
-        movementRemaining = 0;
-        actionAvailable = false;
+        // Folded. {@link GameEngine#restart} clears the log, which drops the fight.
     }
 
     /** Null when no fight is running — the shape {@link Diff.CombatChanged} carries. */
     public CombatView view() {
-        if (!active) {
+        var combat = state().combat().orElse(null);
+        if (combat == null) {
             return null;
         }
         var actor = activeEntity();
         return new CombatView(
-                order,
+                combat.order(),
                 actor.map(Entity::id).orElse(""),
-                round,
-                movementRemaining,
-                actionAvailable,
+                combat.round(),
+                combat.movementRemaining(),
+                combat.actionAvailable(),
                 actor.map(this::legalMoves).orElse(List.of()),
                 actor.map(this::legalTargets).orElse(List.of()));
     }
@@ -105,15 +101,16 @@ public final class CombatEngine {
     public void start(CombatSink sink) {
         // A fight with only one side in it would begin and never end: nothing would ever
         // satisfy isOver(), and the turn would sit on a combatant with nobody to attack.
-        if (active || isOver()) {
+        if (isActive() || isOver()) {
             return;
         }
 
         var rolled = new ArrayList<Combatant>();
+        var initiativeRolls = new HashMap<String, RollResult>();
         for (var entity : livingEntities()) {
             RollResult result = dice.roll(
                     RollRequest.initiative(entity.id(), entity.initiativeModifier()));
-            repo.append(Event.roll(result));
+            initiativeRolls.put(entity.id(), result);
             sink.roll(result);
             rolled.add(new Combatant(entity.id(), entity.name(), result.total(),
                     entity.isPlayerControlled()));
@@ -125,22 +122,14 @@ public final class CombatEngine {
                 .thenComparing(c -> c.isPlayerControlled() ? 0 : 1)
                 .thenComparing(Combatant::entityId));
 
-        order = List.copyOf(rolled);
-        turnIndex = 0;
-        round = 1;
-        active = true;
-        repo.setMode(Mode.COMBAT);
-        beginTurn();
-
-        repo.append(new Event.ModeEntered(Instant.now(), Mode.COMBAT));
+        var order = List.copyOf(rolled);
+        log.append(new Event.CombatStarted(Instant.now(), order,
+                rolled.stream().map(c -> initiativeRolls.get(c.entityId())).toList()));
         sink.diffs(List.of(new Diff.ModeChanged(Mode.COMBAT), new Diff.CombatChanged(view())));
     }
 
     private void end(CombatSink sink) {
-        active = false;
-        order = List.of();
-        repo.setMode(Mode.EXPLORATION);
-        repo.append(new Event.ModeEntered(Instant.now(), Mode.EXPLORATION));
+        log.append(new Event.CombatEnded(Instant.now()));
         sink.diffs(List.of(new Diff.ModeChanged(Mode.EXPLORATION), new Diff.CombatChanged(null)));
     }
 
@@ -159,14 +148,13 @@ public final class CombatEngine {
 
         Map<Square, Integer> cost = reachable(actor);
         Integer spent = cost.get(destination);
-        if (spent == null || spent > movementRemaining) {
+        if (spent == null || spent > movementRemaining()) {
             throw new IllegalArgumentException(
                     actor.name() + " cannot reach (" + x + "," + y + ") this turn");
         }
 
-        movementRemaining -= spent;
-        repo.put(actor.movedTo(x, y));
-        repo.append(Event.action(actorId, "moved to " + x + "," + y));
+        log.append(new Event.EntityMoved(Instant.now(), actorId,
+                actor.x(), actor.y(), x, y, spent));
 
         sink.diffs(List.of(
                 new Diff.EntityMoved(actorId, actor.x(), actor.y(), x, y),
@@ -176,17 +164,16 @@ public final class CombatEngine {
     public void attack(String actorId, String targetId, CombatSink sink) {
         var actor = requireActive(actorId);
 
-        if (!actionAvailable) {
+        if (!actionAvailable()) {
             throw new IllegalArgumentException(actor.name() + " has already acted this turn");
         }
-        var target = repo.find(targetId).orElseThrow(
+        var target = state().find(targetId).orElseThrow(
                 () -> new IllegalArgumentException("No such entity: " + targetId));
         if (!legalTargets(actor).contains(targetId)) {
             throw new IllegalArgumentException(
                     target.name() + " is not in reach of " + actor.name());
         }
 
-        actionAvailable = false;
         resolveAttack(actor, target, sink);
 
         if (isOver()) {
@@ -199,58 +186,50 @@ public final class CombatEngine {
     /**
      * The forty lines §12 allows. {@code d20 + toHit} against AC, natural 20 doubles the damage
      * dice, natural 1 misses regardless — no crit tables, no resistances, no fumble effects.
+     *
+     * <p>One event, whole. Split into a damage and a death, the beat handed to the narrator loses
+     * its attacker — and m0-evaluation.md §4.4 is a record of what that costs: a killing blow
+     * narrated backwards, with the player's hit points draining under a scene describing the
+     * opposite.
      */
     private void resolveAttack(Entity actor, Entity target, CombatSink sink) {
         RollResult attack = dice.roll(
                 RollRequest.attack(actor.id(), target.id(), actor.toHit(), target.ac()));
-        repo.append(Event.roll(attack));
         sink.roll(attack);
 
-        if (attack.outcome() == Outcome.MISS || attack.outcome() == Outcome.CRIT_FAIL) {
-            repo.append(Event.action(actor.id(), "missed " + target.name()));
-            sink.beat(attack.outcome() == Outcome.CRIT_FAIL
-                    ? actor.name() + " swings at " + target.name() + " and fumbles badly."
-                    : actor.name() + " swings at " + target.name() + " and misses.");
+        boolean missed = attack.outcome() == Outcome.MISS
+                || attack.outcome() == Outcome.CRIT_FAIL;
+
+        if (missed) {
+            log.append(new Event.AttackResolved(Instant.now(), actor.id(), target.id(),
+                    attack, Optional.empty(), 0, false, false));
+            sink.beat(BeatRenderer.render(log.state(), lastAttack()));
             return;
         }
 
         String damageDice = attack.isCrit() ? doubled(actor.damageDice()) : actor.damageDice();
         RollResult damage = dice.roll(
                 RollRequest.damage(actor.id(), damageDice, actor.damageModifier()));
-        repo.append(Event.roll(damage));
         sink.roll(damage);
 
         var hurt = target.damaged(damage.total());
-        repo.put(hurt);
-        repo.append(Event.action(actor.id(),
-                "hit " + target.name() + " for " + damage.total()));
 
-        sink.beat((attack.isCrit()
-                ? "%s lands a critical hit on %s for %d damage."
-                : "%s hits %s for %d damage.")
-                .formatted(actor.name(), target.name(), damage.total()));
+        log.append(new Event.AttackResolved(Instant.now(), actor.id(), target.id(),
+                attack, Optional.of(damage), damage.total(), true, !hurt.isAlive()));
 
-        var diffs = new ArrayList<Diff>();
-        diffs.add(new Diff.StatChanged(target.id(), "hp", target.hp(), hurt.hp()));
-        sink.diffs(diffs);
-
-        if (!hurt.isAlive()) {
-            repo.append(Event.action(target.id(), "died"));
-            sink.beat(target.name() + " is killed by the blow.");
-        } else {
-            // The narrator is told the shape of the wound, not the arithmetic — dm.md forbids
-            // stating hit points aloud, and a fraction invites the model to read it out.
-            sink.beat("%s is now %s.".formatted(target.name(), condition(hurt)));
-        }
+        sink.diffs(List.of(new Diff.StatChanged(target.id(), "hp", target.hp(), hurt.hp())));
+        sink.beat(BeatRenderer.render(log.state(), lastAttack()));
     }
 
-    /** How hurt something looks, for prose. Never a number: see the caller. */
-    private static String condition(Entity entity) {
-        double left = (double) entity.hp() / Math.max(entity.maxHp(), 1);
-        if (left > 0.7) return "barely marked";
-        if (left > 0.4) return "wounded";
-        if (left > 0.15) return "badly hurt";
-        return "on the edge of death";
+    /** The attack just appended. Rendered from the log so the beat and the board cannot disagree. */
+    private Event.AttackResolved lastAttack() {
+        var events = log.events();
+        for (int i = events.size() - 1; i >= 0; i--) {
+            if (events.get(i) instanceof Event.AttackResolved attack) {
+                return attack;
+            }
+        }
+        throw new IllegalStateException("no attack to render");
     }
 
     /** {@code 1d8} becomes {@code 2d8}. The modifier is deliberately not doubled, as in 5e. */
@@ -276,13 +255,14 @@ public final class CombatEngine {
      */
     public void runAutomaticTurns(CombatSink sink, Runnable beat) {
         int guard = 0;
-        while (active && ++guard <= order.size() + 1) {
+        int roster = state().combat().map(c -> c.order().size()).orElse(0);
+        while (isActive() && ++guard <= roster + 1) {
             var actor = activeEntity().orElse(null);
             if (actor == null || actor.isPlayerControlled()) {
                 return;
             }
             GoblinAi.takeTurn(this, actor, sink, beat);
-            if (active) {
+            if (isActive()) {
                 advanceTurn();
                 sink.diffs(List.of(new Diff.CombatChanged(view())));
             }
@@ -297,7 +277,7 @@ public final class CombatEngine {
      */
     Entity step(Entity actor, Square to, CombatSink sink) {
         moveTo(actor.id(), to.x(), to.y(), sink);
-        return repo.find(actor.id()).orElseThrow();
+        return state().find(actor.id()).orElseThrow();
     }
 
     void swing(Entity actor, Entity target, CombatSink sink) {
@@ -305,26 +285,23 @@ public final class CombatEngine {
     }
 
     int movementRemaining() {
-        return movementRemaining;
+        return state().combat().map(c -> c.movementRemaining()).orElse(0);
     }
 
     boolean actionAvailable() {
-        return actionAvailable;
+        return state().combat().map(c -> c.actionAvailable()).orElse(false);
     }
 
     // ---- Turn bookkeeping ----
 
-    private void beginTurn() {
-        activeEntity().ifPresent(entity -> {
-            movementRemaining = entity.speedSquares();
-            actionAvailable = true;
-        });
-    }
-
     private void advanceTurn() {
-        if (!active) {
+        var combat = state().combat().orElse(null);
+        if (combat == null) {
             return;
         }
+        var order = combat.order();
+        int turnIndex = indexOf(order, combat.activeId());
+        int round = combat.round();
         // Bounded: with everything dead the fight would already have ended.
         for (int i = 0; i < order.size(); i++) {
             turnIndex++;
@@ -332,19 +309,28 @@ public final class CombatEngine {
                 turnIndex = 0;
                 round++;
             }
-            if (activeEntity().isPresent()) {
-                beginTurn();
+            String nextId = order.get(turnIndex).entityId();
+            if (state().find(nextId).filter(Entity::isAlive).isPresent()) {
+                log.append(new Event.TurnAdvanced(Instant.now(), nextId, round));
                 return;
             }
         }
     }
 
+    private static int indexOf(List<Combatant> order, String entityId) {
+        for (int i = 0; i < order.size(); i++) {
+            if (order.get(i).entityId().equals(entityId)) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
     /** The combatant whose turn it is, or empty if that combatant has since died. */
     private Optional<Entity> activeEntity() {
-        if (!active || order.isEmpty()) {
-            return Optional.empty();
-        }
-        return repo.find(order.get(turnIndex).entityId()).filter(Entity::isAlive);
+        return state().combat()
+                .flatMap(c -> state().find(c.activeId()))
+                .filter(Entity::isAlive);
     }
 
     private Entity requireActive(String actorId) {
@@ -357,14 +343,14 @@ public final class CombatEngine {
     }
 
     private int modifierOf(String entityId) {
-        return repo.find(entityId).map(Entity::initiativeModifier).orElse(0);
+        return state().find(entityId).map(Entity::initiativeModifier).orElse(0);
     }
 
     // ---- Legality ----
 
     /** Everything adjacent, alive, and on the other side. */
     private List<String> legalTargets(Entity actor) {
-        if (!actionAvailable) {
+        if (!actionAvailable()) {
             return List.of();
         }
         return livingEntities().stream()
@@ -376,7 +362,7 @@ public final class CombatEngine {
 
     private List<Square> legalMoves(Entity actor) {
         return reachable(actor).entrySet().stream()
-                .filter(e -> e.getValue() > 0 && e.getValue() <= movementRemaining)
+                .filter(e -> e.getValue() > 0 && e.getValue() <= movementRemaining())
                 .map(Map.Entry::getKey)
                 .sorted(Comparator.comparingInt(Square::y).thenComparingInt(Square::x))
                 .toList();
@@ -443,7 +429,7 @@ public final class CombatEngine {
      * faces to a different combatant on different runs.
      */
     List<Entity> livingEntities() {
-        return repo.entities().stream()
+        return state().entities().values().stream()
                 .filter(Entity::isAlive)
                 .sorted(Comparator.comparing(Entity::id))
                 .toList();

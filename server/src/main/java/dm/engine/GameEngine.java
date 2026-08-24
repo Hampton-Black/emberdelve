@@ -6,19 +6,19 @@ import dm.model.Diff;
 import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Mode;
-import dm.model.Outcome;
-import dm.model.PartyMember;
 import dm.model.Prop;
 import dm.model.RollRequest;
 import dm.model.RollResult;
 import dm.model.Skill;
 import dm.model.Difficulty;
 import dm.model.SceneState;
-import dm.repo.GameRepository;
+import dm.state.EventLog;
+import dm.state.WorldState;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Authoritative state. Applies actions and emits diffs; the client renders what it is told
@@ -29,42 +29,49 @@ public final class GameEngine {
     private static final String ROOM_ID = "crypt";
 
     private final ContentLoader content;
-    private final GameRepository repo;
+    private final EventLog log;
     private final DiceRoller dice;
     private final RoomDefinition room;
     private final CombatEngine combat;
 
-    /** See {@link #consecutiveFailedChecks()}. Session state, like the fight's turn order. */
-    private int consecutiveFailedChecks;
-
-    public GameEngine(ContentLoader content, GameRepository repo, DiceRoller dice) {
-        this(content, repo, dice, content.room(ROOM_ID));
+    public GameEngine(ContentLoader content, EventLog log, DiceRoller dice) {
+        this(content, log, dice, content.room(ROOM_ID));
     }
 
-    public GameEngine(ContentLoader content, GameRepository repo, DiceRoller dice,
+    public GameEngine(ContentLoader content, EventLog log, DiceRoller dice,
                       RoomDefinition room) {
         this.content = content;
-        this.repo = repo;
+        this.log = log;
         this.dice = dice;
         this.room = room;
-        this.combat = new CombatEngine(repo, dice, room);
+        this.combat = new CombatEngine(log, dice, room);
+    }
+
+    /** The log. The only way anything in this engine writes. */
+    public EventLog log() {
+        return log;
+    }
+
+    /** The world as it stands. A value — hold it for as long as you need one answer. */
+    public WorldState state() {
+        return log.state();
     }
 
     /** Spawn the party at the room's start positions. M0's party has exactly one member. */
     public void start() {
         var fighter = content.entity("fighter");
         var starts = room.startPositions().party();
-        var members = new ArrayList<PartyMember>();
+        var members = new ArrayList<Entity>();
 
         for (int i = 0; i < starts.size(); i++) {
             var at = starts.get(i);
             // One member in M0, but the loop is the point — see invariant #2.
             String entityId = starts.size() == 1 ? fighter.id() : fighter.id() + "-" + i;
-            repo.put(fighter.spawn(entityId, at.x(), at.y()));
-            members.add(new PartyMember(entityId));
+            members.add(fighter.spawn(entityId, at.x(), at.y()));
         }
-        repo.setParty(List.copyOf(members));
-        repo.setMode(Mode.EXPLORATION);
+
+        log.append(new Event.PartySpawned(Instant.now(), List.copyOf(members)));
+        log.append(new Event.ModeEntered(Instant.now(), Mode.EXPLORATION));
     }
 
     /**
@@ -77,8 +84,7 @@ public final class GameEngine {
      */
     public void restart() {
         combat.reset();
-        repo.clear();
-        consecutiveFailedChecks = 0;
+        log.clear();
         start();
     }
 
@@ -99,10 +105,6 @@ public final class GameEngine {
         return dice;
     }
 
-    public GameRepository repo() {
-        return repo;
-    }
-
     public CombatEngine combat() {
         return combat;
     }
@@ -112,25 +114,25 @@ public final class GameEngine {
      * revealed, so a curious player cannot read the secrets out of a websocket frame.
      */
     public SceneState scene() {
-        var revealed = repo.revealedPropIds();
+        var revealed = state().revealedPropIds();
 
         List<Prop> visible = room.props().stream()
                 .filter(p -> !p.hidden() || revealed.contains(p.id()))
                 .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false))
                 .toList();
 
-        var entities = repo.entities().stream()
+        var entities = state().entities().values().stream()
                 .sorted(java.util.Comparator.comparing(Entity::id))
                 .map(Entity::toView)
                 .toList();
 
         return new SceneState(room.roomId(), room.width(), room.height(),
                 room.floorType(), room.wallType(), visible, entities, room.lighting(),
-                repo.mode(), combat.view());
+                state().mode(), combat.view());
     }
 
     public Mode mode() {
-        return repo.mode();
+        return state().mode();
     }
 
     // ---- Mutations. Each returns the diffs the client needs to catch up. ----
@@ -146,7 +148,7 @@ public final class GameEngine {
             return;
         }
 
-        var entity = repo.find(actorId).orElseThrow(
+        var entity = state().find(actorId).orElseThrow(
                 () -> new IllegalArgumentException("No such entity: " + actorId));
 
         // Out of combat nothing else was checking this. A fighter who lost the fight was still
@@ -162,25 +164,26 @@ public final class GameEngine {
         if (room.isObstructed(x, y)) {
             throw new IllegalArgumentException("Something solid is already at " + x + "," + y);
         }
-        boolean occupied = repo.entities().stream()
+        boolean occupied = state().entities().values().stream()
                 .anyMatch(e -> e.isAlive() && !e.id().equals(actorId) && e.x() == x && e.y() == y);
         if (occupied) {
             throw new IllegalArgumentException("Someone is standing at " + x + "," + y);
         }
 
-        repo.put(entity.movedTo(x, y));
-        repo.append(Event.action(actorId, "moved to " + x + "," + y));
+        // Zero movement spent: outside a fight there is no budget to spend. The field exists so
+        // a fight's remaining movement folds out of the log instead of living in a field.
+        log.append(new Event.EntityMoved(Instant.now(), actorId,
+                entity.x(), entity.y(), x, y, 0));
         sink.diffs(List.of(new Diff.EntityMoved(actorId, entity.x(), entity.y(), x, y)));
     }
 
     public List<Diff> revealProp(String propId) {
         var definition = room.prop(propId);
 
-        if (repo.revealedPropIds().contains(propId)) {
+        if (state().revealedPropIds().contains(propId)) {
             return List.of();
         }
-        repo.reveal(propId);
-        repo.append(new Event.PropRevealedEvent(Instant.now(), propId));
+        log.append(new Event.PropRevealed(Instant.now(), ROOM_ID, propId));
         return List.of(new Diff.PropRevealed(definition.toProp().revealed()));
     }
 
@@ -188,7 +191,7 @@ public final class GameEngine {
      * Puts the goblin on the grid. There is room for exactly one.
      *
      * <p>The entity id is the definition's, which is the constant {@code "goblin"}, and
-     * {@code repo.put} is keyed by id — so a second spawn never added a second creature, it
+     * the world is keyed by id — so a second spawn never added a second creature, it
      * overwrote the first. Overwriting a <em>dead</em> one is a resurrection: back at full hp,
      * back on the board, and rolling initiative in the next fight as though nothing had
      * happened. Vessk came back from a fight he had lost.
@@ -203,7 +206,7 @@ public final class GameEngine {
     public List<Diff> spawnGoblin(int x, int y) {
         var definition = content.entity("goblin");
 
-        var existing = repo.find(definition.id());
+        var existing = state().find(definition.id());
         if (existing.isPresent()) {
             throw new IllegalArgumentException(existing.get().isAlive()
                     ? existing.get().name() + " is already on the grid."
@@ -211,8 +214,7 @@ public final class GameEngine {
         }
 
         var goblin = definition.spawn(definition.id(), x, y);
-        repo.put(goblin);
-        repo.append(Event.action(goblin.id(), "appeared at " + x + "," + y));
+        log.append(new Event.EntitySpawned(Instant.now(), goblin));
         return List.of(new Diff.EntityAdded(goblin.toView()));
     }
 
@@ -226,11 +228,10 @@ public final class GameEngine {
      * without an initiative order is a UI that says COMBAT while nobody has a turn.
      */
     public List<Diff> setMode(Mode mode) {
-        if (repo.mode() == mode || mode == Mode.COMBAT) {
+        if (state().mode() == mode || mode == Mode.COMBAT) {
             return List.of();
         }
-        repo.setMode(mode);
-        repo.append(new Event.ModeEntered(Instant.now(), mode));
+        log.append(new Event.ModeEntered(Instant.now(), mode));
         return List.of(new Diff.ModeChanged(mode));
     }
 
@@ -240,21 +241,13 @@ public final class GameEngine {
      * tunes the real thing rather than a lookalike.
      */
     public RollResult rollCheck(String actorId, Skill skill, Difficulty difficulty) {
-        var actor = repo.find(actorId).orElseThrow(
+        var actor = state().find(actorId).orElseThrow(
                 () -> new IllegalArgumentException("No such entity: " + actorId));
 
         var result = dice.roll(
                 RollRequest.skillCheck(actorId, skill, actor.skillModifier(skill), difficulty));
-        repo.append(Event.roll(result));
-
-        // Deliberately not keyed by skill. Shoving the lid, failing, then searching the wall and
-        // failing again is not two unrelated attempts — it is a player who is stuck, and being
-        // stuck is the thing worth reacting to.
-        if (result.outcome() == Outcome.SUCCESS || result.outcome() == Outcome.CRIT) {
-            consecutiveFailedChecks = 0;
-        } else {
-            consecutiveFailedChecks++;
-        }
+        log.append(new Event.CheckResolved(Instant.now(), actorId, Optional.of(skill),
+                difficulty.dc(), result, result.outcome()));
         return result;
     }
 
@@ -266,7 +259,7 @@ public final class GameEngine {
      * — the engine has no opinion about what a stuck player deserves.
      */
     public int consecutiveFailedChecks() {
-        return consecutiveFailedChecks;
+        return state().consecutiveFailedChecks();
     }
 
     public boolean isInBounds(int x, int y) {

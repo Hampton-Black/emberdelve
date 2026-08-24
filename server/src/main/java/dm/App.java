@@ -16,7 +16,7 @@ import dm.generate.RoomGenerator;
 import dm.generate.RoomSource;
 import dm.model.Entity;
 import dm.model.NarrationSegment;
-import dm.repo.InMemoryGameRepository;
+import dm.state.EventLog;
 import dm.wire.Json;
 import io.javalin.Javalin;
 import org.slf4j.Logger;
@@ -43,7 +43,7 @@ public final class App {
         DiceRoller dice = demoMode ? new ScriptedDiceRoller(DEMO_SCRIPT) : new RandomDiceRoller();
 
         var content = new ContentLoader();
-        var repo = new InMemoryGameRepository();
+        var eventLog = new EventLog();
 
         // --generate <seed> boots into a procedurally generated room instead of the crypt.
         // The crypt stays the default: it is the room every M0 measurement was taken in.
@@ -72,7 +72,7 @@ public final class App {
             room = generated.toRoomDefinition();
         }
 
-        var engine = new GameEngine(content, repo, dice, room);
+        var engine = new GameEngine(content, eventLog, dice, room);
         engine.start();
 
         // Everything up to T5 runs without a key; only narration needs one.
@@ -117,7 +117,7 @@ public final class App {
                     config.require("ELEVENLABS_VOICE_GOBLIN"),
                     // "narrator" is both the fallback and a real speaker id, and both want the
                     // narrator's voice, so one answer covers the unknown case and the honest one.
-                    id -> engine.repo().find(id)
+                    id -> engine.state().find(id)
                             .map(Entity::kind)
                             .orElse(NarrationSegment.NARRATOR));
             final TtsClient voice = tts;
@@ -156,7 +156,7 @@ public final class App {
         log.info("Emberdelve on 127.0.0.1:{} — room '{}', {} entities, dm={}{}",
                 cli.port(),
                 engine.room().name(),
-                repo.entities().size(),
+                engine.state().entities().size(),
                 dm == null ? "disabled" : dm.modelId(),
                 demoMode ? ", demo dice" : "");
     }

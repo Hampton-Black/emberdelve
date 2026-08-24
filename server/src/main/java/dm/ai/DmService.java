@@ -225,7 +225,7 @@ public final class DmService {
      * so the two-phase orchestration reads like ordinary sequential code.
      */
     public void handleFreeText(String actorId, String text, TurnSink sink) {
-        engine.repo().append(Event.action(actorId, "said: " + text));
+        engine.log().append(Event.action(actorId, "said: " + text));
         // The other half of the transcript. Without it the log showed everything the DM said and
         // nothing it was answering, which makes a turn that went wrong unreadable after the fact.
         log.info("| {} | {}", actorId, text);
@@ -385,7 +385,7 @@ public final class DmService {
         var seed = inferUnmarkedQuotes ? soleCreature() : null;
         var parser = new NarrationParser(liveSpeakers(), seed, segment -> {
             narrated.append(segment.text());
-            engine.repo().append(Event.narration(segment.speakerId(), segment.text()));
+            engine.log().append(Event.narration(segment.speakerId(), segment.text()));
             // The transcript, in the server log, one segment per line. The log recorded every
             // tool call, every timing and every rejection, and not one word of what was actually
             // said — so "the DM quoted its own prompt" and "there was an empty line from
@@ -610,7 +610,7 @@ public final class DmService {
      */
     private String worldState(boolean forProse) {
         RoomDefinition room = engine.room();
-        var revealed = engine.repo().revealedPropIds();
+        var revealed = engine.state().revealedPropIds();
         var sb = new StringBuilder();
 
         sb.append("# Current state\n\n");
@@ -652,7 +652,7 @@ public final class DmService {
         // A generated room has no crypt-specific notes, and a Secrets heading with nothing
         // under it is an invitation to invent one — so when neither note exists the whole
         // block, preamble included, is omitted.
-        var sarcophagusNote = engine.repo().find("goblin").isEmpty()
+        var sarcophagusNote = engine.state().find("goblin").isEmpty()
                 ? room.dmNotes().theSarcophagus()
                 : room.dmNotes().theSarcophagusOpened();
         var doorNote = room.dmNotes().theDoor();
@@ -693,7 +693,7 @@ public final class DmService {
         }
 
         sb.append("## Entities present\n\n");
-        for (var entity : engine.repo().entities()) {
+        for (var entity : engine.state().entities().values()) {
             sb.append("- `").append(entity.id()).append("` — ").append(entity.name())
                     .append(", ").append(entity.hp()).append("/").append(entity.maxHp())
                     .append(" hp, at (").append(entity.x()).append(",").append(entity.y())
@@ -776,7 +776,7 @@ public final class DmService {
      * where the inference is safe when it is safe at all.
      */
     private String soleCreature() {
-        var creatures = engine.repo().entities().stream()
+        var creatures = engine.state().entities().values().stream()
                 .filter(e -> !e.isPlayerControlled() && e.isAlive())
                 .map(e -> e.id().toLowerCase())
                 .toList();
@@ -890,10 +890,10 @@ public final class DmService {
         for (var kind : ToolSchema.SPAWNABLE_KINDS) {
             speakers.put(kind.toLowerCase(), kind.toLowerCase());
         }
-        for (var entity : engine.repo().entities()) {
+        for (var entity : engine.state().entities().values()) {
             speakers.putIfAbsent(entity.name().toLowerCase(), entity.id().toLowerCase());
         }
-        for (var entity : engine.repo().entities()) {
+        for (var entity : engine.state().entities().values()) {
             speakers.put(entity.id().toLowerCase(), entity.id().toLowerCase());
         }
         return speakers;

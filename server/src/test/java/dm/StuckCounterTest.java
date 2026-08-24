@@ -5,7 +5,7 @@ import dm.engine.GameEngine;
 import dm.engine.ScriptedDiceRoller;
 import dm.model.Difficulty;
 import dm.model.Skill;
-import dm.repo.InMemoryGameRepository;
+import dm.state.EventLog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +26,7 @@ class StuckCounterTest {
     /** Fighter athletics is +5; HARD is DC 20, so a 14 fails and a 15 succeeds. */
     private static GameEngine engineRolling(Integer... faces) {
         var engine = new GameEngine(
-                new ContentLoader(), new InMemoryGameRepository(), new ScriptedDiceRoller(faces));
+                new ContentLoader(), new EventLog(), new ScriptedDiceRoller(faces));
         engine.start();
         return engine;
     }

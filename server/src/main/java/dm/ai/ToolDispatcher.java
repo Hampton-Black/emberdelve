@@ -87,7 +87,7 @@ public final class ToolDispatcher {
         }
 
         String actorId = args.path("actor_id").asText("");
-        var actor = engine.repo().find(actorId);
+        var actor = engine.state().find(actorId);
         if (actor.isEmpty()) {
             return Result.rejected("no entity '" + actorId + "' is present");
         }
@@ -113,7 +113,7 @@ public final class ToolDispatcher {
         if (!hidden) {
             return Result.rejected("'" + propId + "' is not a hidden prop in this room");
         }
-        if (engine.repo().revealedPropIds().contains(propId)) {
+        if (engine.state().revealedPropIds().contains(propId)) {
             return Result.rejected("'" + propId + "' has already been revealed");
         }
 
@@ -136,7 +136,7 @@ public final class ToolDispatcher {
                     x, y, engine.room().width(), engine.room().height()));
         }
 
-        boolean occupied = engine.repo().entities().stream()
+        boolean occupied = engine.state().entities().values().stream()
                 .anyMatch(e -> e.x() == x && e.y() == y);
         if (occupied) {
             return Result.rejected("(" + x + "," + y + ") is already occupied — pick another square");
@@ -144,7 +144,7 @@ public final class ToolDispatcher {
 
         // The engine keeps one goblin and throws rather than overwrite it. Asked for a second,
         // the model should be told why and left to write around it, not handed an exception.
-        var existing = engine.repo().find("goblin");
+        var existing = engine.state().find("goblin");
         if (existing.isPresent()) {
             return Result.rejected(existing.get().isAlive()
                     ? "there is already a goblin on the grid — it cannot be spawned twice"
@@ -162,7 +162,7 @@ public final class ToolDispatcher {
         if (engine.mode() == Mode.COMBAT) {
             return Result.rejected("combat has already started");
         }
-        boolean hostilePresent = engine.repo().entities().stream()
+        boolean hostilePresent = engine.state().entities().values().stream()
                 .anyMatch(e -> !e.isPlayerControlled());
         if (!hostilePresent) {
             return Result.rejected(

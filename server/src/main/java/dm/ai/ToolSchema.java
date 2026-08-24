@@ -74,7 +74,7 @@ public final class ToolSchema {
     private static ArrayNode build(GameEngine engine, boolean withChecks) {
         ArrayNode tools = Json.MAPPER.createArrayNode();
 
-        var actorIds = engine.repo().entities().stream().map(e -> e.id()).toList();
+        var actorIds = engine.state().entities().values().stream().map(e -> e.id()).toList();
 
         if (withChecks) {
             tools.add(tool(ROLL_CHECK,
@@ -94,7 +94,7 @@ public final class ToolSchema {
         // Only offered while something is actually hidden — a tool with an empty enum is not
         // a valid schema, and one with nothing to reveal is an invitation to hallucinate.
         var hidden = engine.room().hiddenPropIds().stream()
-                .filter(id -> !engine.repo().revealedPropIds().contains(id))
+                .filter(id -> !engine.state().revealedPropIds().contains(id))
                 .toList();
         if (!hidden.isEmpty()) {
             tools.add(tool(REVEAL_PROP,

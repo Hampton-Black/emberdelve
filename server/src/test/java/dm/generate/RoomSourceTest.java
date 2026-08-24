@@ -73,8 +73,8 @@ class RoomSourceTest {
         var dresser = new RoomDresser(new ScriptedDmClient(""), CONTENT.prompt("dress-room"));
         var room = RoomSource.generated(CONTENT, dresser, "crypt", 21);
 
-        var repo = new dm.repo.InMemoryGameRepository();
-        var engine = new dm.engine.GameEngine(CONTENT, repo, new dm.engine.RandomDiceRoller(), room);
+        var log = new dm.state.EventLog();
+        var engine = new dm.engine.GameEngine(CONTENT, log, new dm.engine.RandomDiceRoller(), room);
         engine.start();
 
         var scene = engine.scene();
@@ -96,8 +96,8 @@ class RoomSourceTest {
                 """), CONTENT.prompt("dress-room"));
         var room = RoomSource.generated(CONTENT, dresser, "crypt", 21);
 
-        var repo = new dm.repo.InMemoryGameRepository();
-        var engine = new dm.engine.GameEngine(CONTENT, repo, new dm.engine.RandomDiceRoller(),
+        var log = new dm.state.EventLog();
+        var engine = new dm.engine.GameEngine(CONTENT, log, new dm.engine.RandomDiceRoller(),
                 room);
         engine.start();
 
@@ -137,8 +137,8 @@ class RoomSourceTest {
                 """), CONTENT.prompt("dress-room"));
         var room = RoomSource.generated(CONTENT, dresser, "crypt", 21);
 
-        var repo = new dm.repo.InMemoryGameRepository();
-        var engine = new dm.engine.GameEngine(CONTENT, repo, new dm.engine.RandomDiceRoller(),
+        var log = new dm.state.EventLog();
+        var engine = new dm.engine.GameEngine(CONTENT, log, new dm.engine.RandomDiceRoller(),
                 room);
         engine.start();
 

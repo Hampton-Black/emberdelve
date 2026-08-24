@@ -1,18 +1,21 @@
 package dm;
 
 import dm.content.ContentLoader;
+import dm.engine.CombatEngine;
 import dm.engine.CombatSink;
 import dm.engine.GameEngine;
 import dm.engine.ScriptedDiceRoller;
 import dm.model.Diff;
 import dm.model.Entity;
+import dm.model.Event;
 import dm.model.Mode;
 import dm.model.RollPurpose;
 import dm.model.Square;
-import dm.repo.InMemoryGameRepository;
+import dm.state.EventLog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,14 +30,14 @@ class CombatEngineTest {
 
     /** Fighter: AC 16, 12 hp, +5 to hit, 1d8+3, DEX +1. Goblin: AC 15, 7 hp, +4, 1d6+2, DEX +2. */
     private static Fixture fight(Integer... faces) {
-        var repo = new InMemoryGameRepository();
-        var engine = new GameEngine(new ContentLoader(), repo, new ScriptedDiceRoller(faces));
+        var log = new EventLog();
+        var engine = new GameEngine(new ContentLoader(), log, new ScriptedDiceRoller(faces));
         engine.start();
         engine.spawnGoblin(6, 6);
-        return new Fixture(engine, repo);
+        return new Fixture(engine, log);
     }
 
-    private record Fixture(GameEngine engine, InMemoryGameRepository repo) {
+    private record Fixture(GameEngine engine, EventLog log) {
         CombatSink.Buffer start() {
             var sink = new CombatSink.Buffer();
             engine.combat().start(sink);
@@ -42,12 +45,69 @@ class CombatEngineTest {
         }
 
         void place(String id, int x, int y) {
-            repo.put(repo.find(id).orElseThrow().movedTo(x, y));
+            var entity = engine.state().find(id).orElseThrow();
+            log.append(new Event.EntityMoved(Instant.now(), id, entity.x(), entity.y(), x, y, 0));
         }
 
         Entity get(String id) {
-            return repo.find(id).orElseThrow();
+            return engine.state().find(id).orElseThrow();
         }
+
+        void put(Entity entity) {
+            log.append(new Event.EntitySpawned(Instant.now(), entity));
+        }
+    }
+
+    private dm.state.EventLog log;
+    private CombatSink.Buffer sink;
+
+    private CombatEngine engineWith(List<Integer> faces) {
+        log = new dm.state.EventLog();
+        sink = new CombatSink.Buffer();
+        var content = new ContentLoader();
+        var game = new GameEngine(content, log, new ScriptedDiceRoller(faces));
+        game.start();
+        game.spawnGoblin(game.defaultGoblinSpawn().x(), game.defaultGoblinSpawn().y());
+        return game.combat();
+    }
+
+    @Test
+    @DisplayName("an attack is recorded as one fact carrying both sides and both rolls")
+    void attackIsOneEvent() {
+        // A hit: 18 on the die beats AC, then 4 on the damage die.
+        var engine = engineWith(List.of(20, 1, 18, 4));
+        engine.start(sink);
+        // Start positions are not adjacent; close so the attack is legal. Movement is not a roll.
+        engine.moveTo(engine.view().activeId(), 6, 5, sink);
+        var attacker = engine.view().activeId();
+        var target = engine.view().legalTargets().getFirst();
+
+        engine.attack(attacker, target, sink);
+
+        var resolved = log.events().stream()
+                .filter(dm.model.Event.AttackResolved.class::isInstance)
+                .map(dm.model.Event.AttackResolved.class::cast)
+                .toList();
+
+        assertEquals(1, resolved.size(), "one attack, one fact — not a damage and a death");
+        var attack = resolved.getFirst();
+        assertEquals(attacker, attack.actorId());
+        assertEquals(target, attack.targetId());
+        assertTrue(attack.hit());
+        assertTrue(attack.damage().isPresent());
+        assertTrue(attack.damageDealt() > 0);
+    }
+
+    @Test
+    @DisplayName("a fight's order and rounds are folded from the log, not held beside it")
+    void combatStateComesFromTheFold() {
+        var engine = engineWith(List.of(20, 1));
+        engine.start(sink);
+
+        var record = log.state().combat().orElseThrow();
+        assertEquals(engine.view().activeId(), record.activeId());
+        assertEquals(engine.view().round(), record.round());
+        assertEquals(engine.view().order().size(), record.order().size());
     }
 
     // ---- Initiative ----
@@ -85,7 +145,7 @@ class CombatEngineTest {
         assertEquals(2, sink.collectedRolls().size());
         assertTrue(sink.collectedRolls().stream()
                 .allMatch(r -> r.request().purpose() == RollPurpose.INITIATIVE));
-        assertEquals(Mode.COMBAT, fixture.repo.mode());
+        assertEquals(Mode.COMBAT, fixture.engine.state().mode());
         assertTrue(sink.collectedDiffs().stream().anyMatch(d -> d instanceof Diff.CombatChanged));
     }
 
@@ -116,7 +176,7 @@ class CombatEngineTest {
         fixture.place("fighter", 6, 5);
         fixture.place("goblin", 6, 6);
         // A 12 hp target, so the crit's total is readable instead of clamping at zero.
-        fixture.repo.put(fixture.get("goblin").withHp(12));
+        fixture.put(fixture.get("goblin").withHp(12));
 
         var sink = new CombatSink.Buffer();
         fixture.engine.combat().attack("fighter", "goblin", sink);
@@ -154,7 +214,7 @@ class CombatEngineTest {
         fixture.engine.combat().attack("fighter", "goblin", sink);
 
         assertFalse(fixture.engine.combat().isActive());
-        assertEquals(Mode.EXPLORATION, fixture.repo.mode());
+        assertEquals(Mode.EXPLORATION, fixture.engine.state().mode());
         assertTrue(sink.collectedDiffs().stream()
                 .anyMatch(d -> d instanceof Diff.CombatChanged c && c.combat() == null));
     }
@@ -299,13 +359,13 @@ class CombatEngineTest {
         var fixture = fight(20, 1, 14, 4);
         fixture.start();
         fixture.place("fighter", 6, 5);
-        fixture.repo.put(fixture.get("goblin").withHp(7));
+        fixture.put(fixture.get("goblin").withHp(7));
 
         var sink = new CombatSink.Buffer();
         fixture.engine.combat().attack("fighter", "goblin", sink);
 
         assertEquals(
-                List.of("Roderick hits Vessk for 7 damage.", "Vessk is killed by the blow."),
+                List.of("Vessk is killed by the blow."),
                 sink.collectedBeats());
     }
 
@@ -322,9 +382,10 @@ class CombatEngineTest {
         var sink = new CombatSink.Buffer();
         fixture.engine.combat().attack("goblin", "fighter", sink);
 
-        var condition = sink.collectedBeats().getLast();
-        assertEquals("Roderick is now wounded.", condition);
-        assertFalse(condition.matches(".*\\d.*"), "a number here invites the model to say it");
+        var beat = sink.collectedBeats().getLast();
+        assertEquals("Vessk hits Roderick for 6 damage.", beat);
+        assertFalse(beat.contains("/") || beat.toLowerCase().contains("hp"),
+                "a hit-point count here invites the model to say it");
     }
 
     @Test
@@ -333,7 +394,11 @@ class CombatEngineTest {
         var fixture = fight(20, 1, 20, 3, 3);
         fixture.start();
         fixture.place("fighter", 6, 5);
-        fixture.repo.put(fixture.get("goblin").withHp(20));
+        var goblin = fixture.get("goblin");
+        fixture.put(new Entity(goblin.id(), goblin.kind(), goblin.name(), goblin.ac(),
+                20, 20, goblin.toHit(), goblin.damageDice(), goblin.damageModifier(),
+                goblin.speedFeet(), goblin.initiativeModifier(), goblin.x(), goblin.y(),
+                goblin.isPlayerControlled(), goblin.skillModifiers()));
 
         var sink = new CombatSink.Buffer();
         fixture.engine.combat().attack("fighter", "goblin", sink);
@@ -374,7 +439,7 @@ class CombatEngineTest {
         fixture.engine.combat().runAutomaticTurns(sink, () -> {});
 
         var beats = sink.collectedBeats();
-        assertEquals(3, beats.size(), beats.toString());
+        assertEquals(2, beats.size(), beats.toString());
         assertTrue(beats.getFirst().contains("closes the distance"), beats.toString());
         assertTrue(beats.get(1).contains("hits Roderick"), beats.toString());
     }
@@ -399,18 +464,17 @@ class CombatEngineTest {
     @DisplayName("spawning again does not raise the goblin that already died")
     void spawningDoesNotResurrect() {
         var fixture = fight(20, 20, 20, 20, 20, 20);
-        var repo = fixture.repo();
 
         // Kill him outright rather than rolling for it: this is about what a spawn does to a
         // corpse, not about how the corpse got there.
-        repo.put(repo.find("goblin").orElseThrow().damaged(99));
-        assertFalse(repo.find("goblin").orElseThrow().isAlive(), "setup: the goblin should be dead");
+        fixture.put(fixture.get("goblin").damaged(99));
+        assertFalse(fixture.get("goblin").isAlive(), "setup: the goblin should be dead");
 
         var refused = assertThrows(IllegalArgumentException.class,
                 () -> fixture.engine().spawnGoblin(6, 6));
         assertTrue(refused.getMessage().contains("dead"), refused.getMessage());
 
-        assertFalse(repo.find("goblin").orElseThrow().isAlive(),
+        assertFalse(fixture.get("goblin").isAlive(),
                 "a spawn brought the dead goblin back to full health");
     }
 
@@ -418,9 +482,8 @@ class CombatEngineTest {
     @DisplayName("a dead hostile never rolls initiative, however many times combat is started")
     void deadHostileNeverRollsInitiative() {
         var fixture = fight(20, 20, 20, 20, 20, 20);
-        var repo = fixture.repo();
 
-        repo.put(repo.find("goblin").orElseThrow().damaged(99));
+        fixture.put(fixture.get("goblin").damaged(99));
         assertThrows(IllegalArgumentException.class, () -> fixture.engine().spawnGoblin(6, 6));
 
         var sink = fixture.start();
