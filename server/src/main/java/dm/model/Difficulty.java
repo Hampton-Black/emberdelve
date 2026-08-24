@@ -20,4 +20,18 @@ public enum Difficulty {
     public int dc() {
         return dc;
     }
+
+    /**
+     * The band a recorded DC came from. Replay reads a number back out of a log and has to put
+     * it into the closed set it left as — invariant #7, doing its job on the way back in.
+     */
+    public static Difficulty ofDc(int dc) {
+        for (var difficulty : values()) {
+            if (difficulty.dc == dc) {
+                return difficulty;
+            }
+        }
+        throw new IllegalArgumentException(
+                "no difficulty band has DC " + dc + " — the log was written by another build");
+    }
 }

@@ -27,7 +27,9 @@ public record Entity(
         Map<Skill, Integer> skillModifiers
 ) {
     public Entity {
-        skillModifiers = Map.copyOf(skillModifiers);
+        var ordered = new java.util.EnumMap<Skill, Integer>(Skill.class);
+        ordered.putAll(skillModifiers);
+        skillModifiers = java.util.Collections.unmodifiableMap(ordered);
     }
 
     @JsonIgnore

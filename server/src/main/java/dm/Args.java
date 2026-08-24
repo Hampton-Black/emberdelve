@@ -1,5 +1,8 @@
 package dm;
 
+import java.nio.file.Path;
+import java.util.Optional;
+
 /**
  * The command line, parsed once.
  *
@@ -7,7 +10,7 @@ package dm;
  * load-bearing: the Godot client derives every URL it uses from one setting, and a port the
  * server misreads is a client that attaches to nothing with no error worth reading.
  */
-public record Args(boolean demoMode, int port, Long generateSeed) {
+public record Args(boolean demoMode, int port, Long generateSeed, Optional<Path> replay) {
 
     private static final int DEFAULT_PORT = 7070;
 
@@ -15,6 +18,7 @@ public record Args(boolean demoMode, int port, Long generateSeed) {
         boolean demo = false;
         int port = DEFAULT_PORT;
         Long seed = null;
+        Optional<Path> replay = Optional.empty();
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -27,11 +31,15 @@ public record Args(boolean demoMode, int port, Long generateSeed) {
                     seed = Long.parseLong(value(args, i, "--generate"));
                     i++;
                 }
+                case "--replay" -> {
+                    replay = Optional.of(Path.of(value(args, i, "--replay")));
+                    i++;
+                }
                 default -> { }
             }
         }
 
-        return new Args(demo, port, seed);
+        return new Args(demo, port, seed, replay);
     }
 
     private static String value(String[] args, int at, String flag) {

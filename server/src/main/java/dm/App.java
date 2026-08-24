@@ -10,6 +10,7 @@ import dm.engine.DiceRoller;
 import dm.engine.GameEngine;
 import dm.engine.RandomDiceRoller;
 import dm.engine.ScriptedDiceRoller;
+import dm.replay.ReplayRunner;
 import dm.generate.RoomDresser;
 import dm.generate.RoomDumper;
 import dm.generate.RoomGenerator;
@@ -41,6 +42,12 @@ public final class App {
 
     public static void main(String[] args) {
         var cli = Args.parse(args);
+        if (cli.replay().isPresent()) {
+            var result = ReplayRunner.replay(cli.replay().get());
+            log.info("replayed {} events: {}", result.compared(),
+                    result.matched() ? "identical" : result.firstDivergence());
+            System.exit(result.matched() ? 0 : 1);
+        }
         boolean demoMode = cli.demoMode();
         var config = Config.load();
 

@@ -1,6 +1,9 @@
 package dm;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,5 +38,12 @@ class ArgsTest {
     void aPortThatIsNotANumberIsAnError() {
         assertThrows(IllegalArgumentException.class,
                 () -> Args.parse(new String[] {"--port", "seven"}));
+    }
+
+    @Test
+    @DisplayName("--replay takes a path")
+    void parsesReplay() {
+        var args = Args.parse(new String[]{"--replay", "sessions/a.jsonl"});
+        assertEquals(Path.of("sessions/a.jsonl"), args.replay().orElseThrow());
     }
 }
