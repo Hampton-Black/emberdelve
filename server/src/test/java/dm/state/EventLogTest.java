@@ -1,9 +1,13 @@
 package dm.state;
 
 import dm.model.Anchor;
+import dm.model.Combatant;
 import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Mode;
+import dm.model.Outcome;
+import dm.model.RollRequest;
+import dm.model.RollResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,6 +17,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,6 +28,10 @@ class EventLogTest {
     private static Entity goblin() {
         return new Entity("goblin", "goblin", "Vessk", 15, 7, 7, 4, "1d6", 2, 30, 2,
                 2, 2, false, Map.of());
+    }
+
+    private static RollResult roll(int face, int total, Outcome outcome) {
+        return new RollResult(RollRequest.initiative("x", 0), List.of(face), total, outcome);
     }
 
     @Test
@@ -57,6 +66,27 @@ class EventLogTest {
         assertEquals(log.events(), reloaded.events());
         assertEquals(log.state(), reloaded.state(),
                 "a log read back from disk folds to the same world");
+    }
+
+    @Test
+    @DisplayName("checks, attacks, and initiative round-trip through JSONL")
+    void rollEventsRoundTrip(@TempDir Path dir) throws Exception {
+        var writer = SessionWriter.open(dir);
+        var log = new EventLog(writer);
+
+        log.append(new Event.SessionStarted(T, Event.SCHEMA_VERSION, 7L, "tools", "prose"));
+        log.append(new Event.CheckResolved(T, "fighter", Optional.empty(), 15,
+                roll(18, 21, Outcome.SUCCESS), Outcome.SUCCESS));
+        log.append(new Event.AttackResolved(T, "fighter", "goblin",
+                roll(20, 25, Outcome.CRIT), Optional.of(roll(6, 9, Outcome.HIT)), 9, true, false));
+        log.append(new Event.CombatStarted(T, List.of(
+                new Combatant("fighter", "fighter", 18, true),
+                new Combatant("goblin", "goblin", 9, false)),
+                List.of(roll(16, 18, Outcome.SUCCESS), roll(7, 9, Outcome.SUCCESS))));
+        writer.close();
+
+        var reloaded = EventLog.load(writer.path());
+        assertEquals(log.events(), reloaded.events());
     }
 
     @Test

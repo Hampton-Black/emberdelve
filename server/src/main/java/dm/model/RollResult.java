@@ -1,5 +1,7 @@
 package dm.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.List;
 
 /**
@@ -17,6 +19,7 @@ public record RollResult(
         return faces.isEmpty() ? 0 : faces.getFirst();
     }
 
+    @JsonIgnore
     public boolean isCrit() {
         return outcome == Outcome.CRIT;
     }

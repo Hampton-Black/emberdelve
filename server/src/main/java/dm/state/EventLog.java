@@ -49,7 +49,10 @@ public final class EventLog {
         return List.copyOf(events);
     }
 
-    /** Forget the session. A new game in the same process, and a new file if one is attached. */
+    /**
+     * Forget the session in memory. A writer, if attached, stays on the same file; opening a new
+     * one is the caller's job (see {@code App}/{@code GameEngine.restart} in a later task).
+     */
     public synchronized void clear() {
         events.clear();
         state = WorldState.EMPTY;
