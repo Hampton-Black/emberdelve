@@ -111,7 +111,8 @@ public final class App {
             // runs behind dice animation and can afford to wait.
             dm = new DmService(
                     new VeniceDmClient(config, toolModel, java.time.Duration.ofSeconds(20)),
-                    new VeniceDmClient(config, proseModel, java.time.Duration.ofSeconds(90)),
+                    new VeniceDmClient(config, proseModel, java.time.Duration.ofSeconds(90),
+                            config.get("DM_REASONING_EFFORT_PROSE").orElse(null)),
                     engine,
                     content.prompt("dm-tools"),
                     content.prompt("dm"),

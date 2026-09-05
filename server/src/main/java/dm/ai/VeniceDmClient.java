@@ -40,15 +40,28 @@ public final class VeniceDmClient implements DmClient {
     private final String apiKey;
     private final String model;
     private final Duration timeout;
+    /** Venice {@code reasoning_effort}, or null to leave the model default. */
+    private final String reasoningEffort;
 
     public VeniceDmClient(Config config, String model, Duration timeout) {
+        this(config, model, timeout, null);
+    }
+
+    public VeniceDmClient(Config config, String model, Duration timeout, String reasoningEffort) {
         this.apiKey = config.require("VENICE_API_KEY");
         this.baseUrl = trimTrailingSlash(config.get("VENICE_BASE_URL", "https://api.venice.ai/api/v1"));
         this.model = model;
         this.timeout = timeout;
+        this.reasoningEffort = reasoningEffort == null || reasoningEffort.isBlank()
+                ? null : reasoningEffort;
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-        log.info("DmClient -> {} model={} timeout={}s", baseUrl, model, timeout.toSeconds());
+        if (this.reasoningEffort == null) {
+            log.info("DmClient -> {} model={} timeout={}s", baseUrl, model, timeout.toSeconds());
+        } else {
+            log.info("DmClient -> {} model={} timeout={}s reasoning_effort={}",
+                    baseUrl, model, timeout.toSeconds(), this.reasoningEffort);
+        }
     }
 
     @Override
@@ -171,6 +184,12 @@ public final class VeniceDmClient implements DmClient {
         root.put("stream", true);
         root.put("max_tokens", 800);
         root.put("temperature", 0.85);
+        if (reasoningEffort != null) {
+            // Gemini 3.x Flash cannot disable thinking; "low" is the floor Venice will accept.
+            // Unsupported values 400 from the provider — leave this unset on models that
+            // do not advertise supportsReasoningEffort.
+            root.put("reasoning_effort", reasoningEffort);
+        }
 
         ArrayNode messages = root.putArray("messages");
         for (ChatMessage message : conversation) {
