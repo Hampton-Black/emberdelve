@@ -36,19 +36,22 @@ public final class BeatRenderer {
             return actor + " " + verb.formatted(target);
         }
 
-        if (attack.killed()) {
-            return targetIsPlayer
-                    ? "You are killed by the blow."
-                    : capitalise(target) + " is killed by the blow.";
-        }
-
         String hit = attack.attack().isCrit()
                 ? (actorIsPlayer ? "land a critical hit on %s for %d damage."
                                  : "lands a critical hit on %s for %d damage.")
                 : (actorIsPlayer ? "hit %s for %d damage." : "hits %s for %d damage.");
 
-        String wound = condition(state, attack.targetId(), targetIsPlayer);
-        return actor + " " + hit.formatted(target, attack.damageDealt()) + " " + wound;
+        // A kill replaces the wound clause; it does not replace the sentence. The killing blow
+        // used to return "Vessk is killed by the blow." on its own, which is the one beat in the
+        // game that dropped its attacker — leaving the narrator to guess who had swung, on the
+        // most important beat of the fight. m2-evaluation.md §8. The guess it has to make on a
+        // hit is the guess it got backwards in m0-evaluation.md §4.4.
+        String outcome = attack.killed()
+                ? (targetIsPlayer ? "You are killed by the blow."
+                                  : capitalise(target) + " is killed by the blow.")
+                : condition(state, attack.targetId(), targetIsPlayer);
+
+        return actor + " " + hit.formatted(target, attack.damageDealt()) + " " + outcome;
     }
 
     /**

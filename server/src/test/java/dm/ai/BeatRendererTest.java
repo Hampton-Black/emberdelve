@@ -55,6 +55,25 @@ class BeatRendererTest {
     }
 
     @Test
+    @DisplayName("a kill names who struck it, in the right person")
+    void killsNameTheActor() {
+        // m2-evaluation.md §8: the beat said only "Vessk is killed by the blow", so the narrator
+        // had to guess who swung. Gemini guessed right; a worse writer will invert it, which is
+        // the M0 §4.4 fault all over again.
+        var playerKills = BeatRenderer.render(WORLD, new Event.AttackResolved(T, "fighter", "goblin",
+                roll(18, Outcome.HIT), Optional.of(roll(9, Outcome.HIT)), 9, true, true));
+        assertTrue(playerKills.startsWith("You hit Vessk"), playerKills);
+        assertTrue(playerKills.contains("Vessk is killed"), playerKills);
+
+        var goblinKills = BeatRenderer.render(WORLD, new Event.AttackResolved(T, "goblin", "fighter",
+                roll(18, Outcome.HIT), Optional.of(roll(9, Outcome.HIT)), 9, true, true));
+        assertTrue(goblinKills.startsWith("Vessk hits you"), goblinKills);
+        assertTrue(goblinKills.contains("You are killed"), goblinKills);
+        assertFalse(goblinKills.contains("Roderick"),
+                "the player is never named in the third person in a beat");
+    }
+
+    @Test
     @DisplayName("a kill says who died, in the right person")
     void killsReadCorrectly() {
         assertTrue(BeatRenderer.render(WORLD, new Event.AttackResolved(T, "fighter", "goblin",

@@ -364,8 +364,11 @@ class CombatEngineTest {
         var sink = new CombatSink.Buffer();
         fixture.engine.combat().attack("fighter", "goblin", sink);
 
+        // The display name above is what this beat is for, and the old assertion did not hold
+        // the engine to it: a killing blow used to report only the death, with no attacker in
+        // it at all. m2-evaluation.md §8.
         assertEquals(
-                List.of("Vessk is killed by the blow."),
+                List.of("You hit Vessk for 7 damage. Vessk is killed by the blow."),
                 sink.collectedBeats());
     }
 
