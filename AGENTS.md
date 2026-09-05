@@ -1,24 +1,55 @@
 # Emberdelve — Agent Rules
 
 AI Dungeon Master. Java backend, Godot desktop client.
-**Current milestone: M0 — gate PASSED 2026-08-20.** Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22). A two-week vertical slice that existed to
-answer one question: *does this feel like a Dungeon Master running a game?* It does. The verdict,
-the evidence and the two faults that survived it are in `docs/m0-evaluation.md`.
 
-Read `docs/m0-build-plan.md` before changing anything. `docs/ai-dm-system-design.md` is the
-long-range design; M0 deliberately contradicts parts of it, and where they disagree **M0 wins**.
-`docs/m0-evaluation.md` is the gate itself — what three played sessions measured, the signed
-verdict, and what M0 hands to M1.
+**Current milestone: M2 — gate PASSED 2026-09-05.** State is a fold over an append-only event
+log, every session writes itself to JSONL, and a recorded session replays offline in the test
+suite. The gate was a 30-turn played session whose callbacks survived the context window:
+`docs/m2-evaluation.md`.
+
+**Next: dungeon navigation**, re-planned against `EventLog` and `WorldState`. The plan at
+`docs/superpowers/plans/2026-08-21-m1-dungeon-navigation.md` is **stale in both halves** — its
+client tasks are React/Three.js, and its Java tasks are built around a `GameRepository` that no
+longer exists. Its `LayoutGenerator`, `ExitPlacer`, and `SpatialValidator` tasks survive.
+
+### Milestones, and what each one settled
+
+| | Gate | Verdict | Where |
+|---|---|---|---|
+| **M0** | Does this feel like a DM running a game? | PASS 2026-08-20 | `docs/m0-evaluation.md` |
+| **M1** | Can the world be made rather than authored? | **Half done.** Room generation merged; navigation outstanding | `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` |
+| **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `docs/m2-evaluation.md` |
+
+Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22).
+
+### Reading order
+
+`docs/m2-evaluation.md` first — it is the most recent gate and its §8 lists what M2 handed
+forward. `docs/superpowers/specs/2026-08-23-m2-spine-design.md` is the architecture everything
+now sits on. `docs/ai-dm-system-design.md` is the long-range design and has been **superseded
+twice** on milestone ordering (M1 took generation before the rules engine; M2 took the spine
+before the rest of M1) — read its §14 as a record of early intent, not a plan.
+
+`docs/m0-build-plan.md` and `docs/m0-evaluation.md` are history. They are still worth reading for
+*why* things are the way they are, and their shortcuts table no longer describes this codebase.
+Where M0 and M2 disagree, **M2 wins**.
 
 ---
 
-## The point of M0
+## The point of M0, and what replaced it
 
-M0 is a **gate, not a foundation.** Everything that contributes to *feel* is in scope.
-Everything that contributes to *correctness, scale, or persistence* is out of scope and gets
-hardcoded. This is not technical debt — it is the point. **M0 code is expected to be thrown away.**
+M0 was a **gate, not a foundation.** Everything that contributed to *feel* was in scope;
+everything that contributed to *correctness, scale, or persistence* was hardcoded on purpose.
+M0 code was expected to be thrown away, and much of it has been.
 
-If you find yourself making something general, correct, or scalable, stop and re-read this section.
+**M2 is the foundation M0 deliberately did not build.** The persistence and correctness shortcuts
+are gone: state is a fold, the log is durable, the context is bounded. The rest of M0's
+shortcuts — one room, one goblin, forty lines of attack resolution — are still in force and still
+deliberate. The table below says which is which.
+
+The instinct M0 warned against still applies to everything M2 did not touch. If you are
+generalising the *rules* or the *content*, stop. If you are making the *spine* correct, that is
+now the job.
 
 ---
 
@@ -38,7 +69,11 @@ Each one is expensive to unwind. They are not style preferences.
 6. **Roll results are logged as events.** Never plan to replay by re-rolling from a seed.
 7. **All LLM-facing enums are closed and validated server-side.** No free-form string from the
    model reaches the engine. Tools use `strict: true`.
-8. **No `user://` save of the session.** In-memory only.
+8. **Every state change is an event, and state is only ever a fold over the log.** There is no
+   second write path — no setter, no `put`. If a change did not emit an event it did not happen.
+   This is what keeps the log complete without anyone having to remember to keep it complete.
+   *(Replaced M0's "no save, in-memory only" at the M2 gate. Sessions now write JSONL; nothing
+   resumes from one — see the shortcuts table.)*
 9. **Modern Java only** — records, sealed interfaces, pattern matching, virtual threads.
    No Spring. No `AbstractXFactory`. No mutable POJOs with getters and setters.
 10. **Do not add tools, entity types, props, or rules** beyond what is listed below.
@@ -143,9 +178,19 @@ despite being the strongest privacy tier.
 | `qwen3-next-80b` | 540 / 771 / 577 / 586ms | 100% valid | **invents props** |
 | `deepseek-v4-flash-0731-fast` | 1195 / 1364 / 1599 / **38478**ms | 100% valid | good, stays in-world |
 
-**Current pick: `DM_MODEL_TOOLS=qwen3-next-80b`, `DM_MODEL_PROSE=` your best writer** —
-`venice-uncensored-role-play` is what the played sessions ran on and what the tone in
-`m0-evaluation.md` was judged against; `claude-opus-5` is the `.env.example` default.
+**Current pick, as of the M2 gate: `DM_MODEL_TOOLS=qwen3-next-80b`,
+`DM_MODEL_PROSE=gemini-3-8-flash` with `DM_REASONING_EFFORT_PROSE=low`.** That is the split the
+30-turn session in `docs/m2-evaluation.md` was played and judged on, chosen after six shorter
+sessions the same day eliminated the alternatives:
+
+- `venice-uncensored-role-play` — the better voice and the worse follower. It leaked the
+  world-state footer into spoken narration. It is what `m0-evaluation.md` judged tone against.
+- `gemini-3-8-flash` at **default** thinking — 9–15s to a first word. `low` is the floor (it
+  cannot be turned off) and brings that to 3–8s. Setting this is not optional.
+- `deepseek-v4-flash` on tools — coherent, and put an 8.5s hole in front of a die.
+
+`claude-opus-5` remains the `.env.example` default and is a fine writer; it has not been played
+against a full gate.
 
 **`qwen3-next-80b` has a tail too, found in play, not in the benchmark:** 14.3s and 15.5s tool
 phases in two logged sessions, no error, full quota. Rarer than the 480b's and it survives the
@@ -182,21 +227,40 @@ Two disqualifiers found by measuring rather than reasoning:
 | Goblin | AC 15, HP 7, +4 to hit, 1d6+2 damage, speed 30ft |
 | Attack resolution | `d20 + bonus >= AC`; nat 20 doubles dice. No crit tables, no resistances. |
 | Skill check DCs | A 5-value enum only: 5 / 10 / 15 / 20 / 25 |
-| State | `ConcurrentHashMap` behind `GameRepository` |
-| Event log | In-memory `List<Event>` behind the same interface |
-| Voices | Two hardcoded voice IDs in config |
+| Voices | Two voice IDs in config, chosen by entity **kind** |
 | System prompt | One string in `prompts/dm.md`, loaded at boot |
-| Context | Full transcript, no compaction |
 | Errors | No recovery — log and surface a visible error toast |
-| Tests | Dice and attack resolution only |
 
-## LLM tools — exactly these four
+### Retired at the M2 gate — do not restore these
 
-`roll_check` (skill + difficulty enums), `reveal_prop` (per-room closed enum of hidden prop ids),
-`spawn_entity` (kind: `goblin` only), `start_combat`.
+| Was | Is now |
+|---|---|
+| `ConcurrentHashMap` behind `GameRepository` | `WorldState`, an immutable record folded from the log. `GameRepository` is deleted |
+| In-memory `List<Event>` behind the same interface | `EventLog` + `SessionWriter`, appending JSONL to `server/sessions/` |
+| Full transcript, no compaction | `WINDOW_TURNS = 6` of verbatim transcript, plus an engine-owned projection that never truncates |
+| Tests: dice and attack resolution only | The fold, the log, the parser, the beats, the context, and a recorded session replayed offline |
+
+**Still deliberately absent:** Postgres, resume-from-log, snapshotting, and schema migrations. A
+log written at an older `Event.SCHEMA_VERSION` is **refused, never upgraded** — discarding an old
+log is free and an upgrader is a tax paid forever.
+
+## LLM tools — exactly these five
+
+On the **mechanics** pass: `roll_check` (skill + difficulty enums), `reveal_prop` (per-room closed
+enum of hidden prop ids), `spawn_entity` (kind: `goblin` only), `start_combat`.
+
+On the **reconcile** pass only: `reveal_prop`, `spawn_entity`, `start_combat`, and `assert_fact`.
+No dice in that phase — the outcome has already been narrated.
 
 Every enum is closed and validated server-side. Invalid calls are rejected with a structured
 error; the model retries once, then the turn degrades to narration-only.
+
+**`assert_fact` is the one tool that carries free-form model text**, and it is not a hole in
+invariant #7. The rule, stated so it does not erode: *free-form model text may enter the prompt;
+anything reaching the engine or the renderer goes through a closed enum.* A fact's `text` makes
+one round trip back into the next prompt — it drives no roll, gates no legal move, and reaches no
+renderer. Its `anchor` (`ambient` / `at_square` / `on`) is closed and validated like everything
+else.
 
 ---
 
@@ -208,7 +272,8 @@ These are the things most likely to eat week two.
 - **Do not tune lighting and post-processing for more than one evening.** Timebox it. This is the
   single largest time sink in the project and it will consume as much as you give it.
 - **Do not add a second room.** The impulse will be strong. One room.
-- **Do not build save/load.** Restarting the process is fine.
+- **Do not build save/load.** Sessions are *written* — that is the replay harness — but nothing
+  resumes from one, and resume is the expensive half. Restarting the process is still fine.
 - **Do not optimize anything.** One room, two entities.
 - **Do not generalize.** Every abstraction in M0 is written against a sample size of one.
 - **Do not build a character sheet UI.** HP and AC as text is sufficient.
@@ -468,9 +533,26 @@ half. Decide whether the board locks during narration or the beat queues.
 
 **The narrator can describe a world change nothing can back.** A player asked for the goblin to
 become "an immense, steaming hotdog" and the narrator obliged; there is no transformation tool, so
-the reconcile pass correctly declined to invent a mechanism and the goblin went on fighting. Same
-class as the goblin that is described but never spawns — harmless only because this instance was
-funny. Not worth a prompt line on a prototype.
+the reconcile pass correctly declined to invent a mechanism and the goblin went on fighting.
+
+*Partly answered by M2.* `assert_fact` now records assertions the board cannot hold, so the DM at
+least stays **consistent** about its own hotdog rather than forgetting it next turn. What it
+cannot do is make the board agree. The M2 gate produced the same class of thing with a straight
+face: a copper key in a lamp's fat, asserted, durable, and turning a lock in a door that still
+cannot open (`m2-evaluation.md` §4).
+
+### Carried out of M2 — findings, not tasks
+
+The full list is `docs/m2-evaluation.md` §8. The ones that will bite first:
+
+- **Talking to yourself can start a fight.** A spoken aside on turn 11 of the gate session had the
+  mechanics model spawn Vessk and call `start_combat`. The two-failure escalation rule in
+  `dm-tools.md` is doing that. It ate the parley the session needed.
+- **`roll_check` twice on one action** still happens despite the tools prompt.
+- **Grid coordinates leak into `## Established`** (`alcove at (9,6)`). They will be read aloud the
+  moment a writer is sloppier than Gemini, against the standing "never say a grid coordinate" rule.
+- **Invented content is now durable**, which is the spine working and a content problem. Do not
+  add a second room to cash in an asserted key.
 
 **`TurnMetrics` mislabels its counter** — see the latency section. One line; left alone so the
 numbers in `m0-evaluation.md` match the logs as they were written.
@@ -612,11 +694,23 @@ feel gets tuned without burning a turn or an API key.
 
 ```bash
 cd server && ./gradlew run          # server on :7070
-cd server && ./gradlew test         # dice, attack resolution, combat legality
-cd server && ./gradlew run --args='--demo'   # scripted dice, reproducible
+cd server && ./gradlew test         # the whole suite, including the replayed fixture session
+cd server && ./gradlew run --args='--demo'    # scripted dice, reproducible
+cd server && ./gradlew run --args='--generate 7'   # boot a seeded generated room
 cd godot && godot .                 # the Godot editor
 cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit   # godot tests
 ```
+
+Replaying a session — no network, no key, exit 0 on an identical event stream:
+
+```bash
+cd server && ./gradlew run --args='--replay sessions/20260905-205347-b4a16f95.jsonl'
+```
+
+Every session writes itself to `server/sessions/` (gitignored). A session worth keeping gets
+copied into `server/src/test/resources/sessions/` and replays on every build. **That is the
+workflow the whole of M2 exists for:** when something goes wrong in play, the file that proves it
+is already on disk.
 
 ## Secrets
 
