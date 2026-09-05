@@ -4,6 +4,7 @@ import dm.content.RoomDefinition;
 import dm.engine.GameEngine;
 import dm.model.Combatant;
 import dm.model.Event;
+import dm.model.Outcome;
 import dm.model.Phase;
 import dm.state.EventLog;
 import dm.state.WorldState;
@@ -525,7 +526,8 @@ public final class DmService {
         var tools = ToolSchema.forReconcile(engine);
         var conversation = new ArrayList<DmClient.ChatMessage>();
         conversation.add(DmClient.ChatMessage.system(reconcilePrompt + "\n\n" + worldState(false)));
-        conversation.add(DmClient.ChatMessage.user(prompt(narration, alreadyDone)));
+        conversation.add(DmClient.ChatMessage.user(
+                reconcilePrompt(narration, alreadyDone)));
 
         var failed = new boolean[]{false};
         var discard = new DmClient.DmListener() {
@@ -605,12 +607,31 @@ public final class DmService {
     }
 
     /** What the reconcile model is actually answering. */
-    private static String prompt(String narration, List<String> alreadyDone) {
+    static String reconcilePrompt(String narration, List<String> alreadyDone) {
         var sb = new StringBuilder();
         sb.append(alreadyDone.isEmpty()
                 ? "The engine did nothing this turn.\n\n"
                 : "The engine already did this, this turn:\n" + String.join("\n", alreadyDone)
                         + "\n\n");
+
+        // The one Established lie the M2 gate produced. Turn 8 failed a wall search and this pass
+        // wrote down "The stone perimeter is slick with damp lime and yields nothing to
+        // searching"; turn 25 found an alcove in that perimeter. The engine was always going to
+        // allow reveal_prop(alcove) — the fault is a failed check recorded as a fact about the
+        // world instead of a fact about the search, so the next success walks into a hole the
+        // projection dug for it. m2-evaluation.md §4.
+        //
+        // Said here rather than in dm-reconcile.md for the same reason the repeat directive is
+        // said per turn: it is only true on the turns where it is true, and a standing rule about
+        // absence is one the model has no way to check itself against.
+        if (anyCheckFailed(alreadyDone)) {
+            sb.append("A check failed this turn. That means the character **did not find** "
+                    + "anything this pass — it does not mean there is nothing there. If you call "
+                    + "`assert_fact`, record what they did and did not manage, never what the "
+                    + "room does or does not contain. \"The lime is slick and their fingers "
+                    + "found no seam\" is a fact. \"The wall holds nothing\" is a claim about a "
+                    + "room you cannot see, and a later success will contradict it.\n\n");
+        }
         // Quoted and labelled rather than handed over bare. Bare, the model reads it as the scene
         // continuing and answers it as a turn.
         sb.append("The narrator then told the player, out loud:\n\n\"")
@@ -618,6 +639,18 @@ public final class DmService {
                 .append("\"\n\nWhat must change on the board for that to be true? "
                         + "Call nothing if the answer is nothing.");
         return sb.toString();
+    }
+
+    /**
+     * Whether any check the engine ran this turn came back a failure.
+     *
+     * <p>Read off the dispatcher's own messages, which end in the {@link dm.model.Outcome} name.
+     * A string match rather than a structured signal because that is what this phase is handed —
+     * worth revisiting if the reconcile pass ever takes the events instead.
+     */
+    private static boolean anyCheckFailed(List<String> alreadyDone) {
+        return alreadyDone.stream().anyMatch(result ->
+                result.contains(Outcome.FAILURE.name()) || result.contains(Outcome.CRIT_FAIL.name()));
     }
 
     // ---- Context ----

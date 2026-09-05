@@ -66,3 +66,18 @@ Anchor it to a square or to something already in the room when it is a thing in 
 
 Do not assert what a tool already did. A goblin you spawned is on the board; it does not also
 need asserting.
+
+### Never assert an absence
+
+A fact is something that **is** true, in a place you can see. "There is nothing here" is a claim
+about a room you are not looking at, and it is the one kind of assertion that can be proved wrong
+later — by a torch, a better roll, or a player who tries again.
+
+This matters most after a failed check, which is exactly when the narrator reaches for it.
+
+- "Their fingers find no seam in the damp lime" — what the search did. Assert it.
+- "The stone perimeter yields nothing to searching" — a verdict on the whole wall. Do not.
+- "The trough is empty" — the player looked in and saw. Assert it.
+- "There is nothing else in this room" — you cannot know that. Do not.
+
+Record what the character managed. Never what the room contains.
