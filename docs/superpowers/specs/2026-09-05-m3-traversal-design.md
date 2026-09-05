@@ -159,8 +159,12 @@ lifetimes and have to come apart:
 | **Dressing** — name, overview, sensory, prop descriptions | **no** for a generated room, because a model wrote it | on first entry | folded from `RoomDressed` |
 | **Secrets** — `theSarcophagus`, `theDoor` | yes — authored, on disk | never made | on disk |
 
-Secrets are the third thing because they are neither: no generated room has them, no model writes
-them, and they are not state. They stay in `crypt.json` and stay out of the fold.
+Secrets are the third thing because they are neither: they are not state, and no model writes
+them. They stay in `crypt.json` and stay out of the fold.
+
+**"Authored only" describes M3, not secrets.** Whether the dress pass should invent them for a
+generated room is a live question, and it has a right answer and a wrong one — see §12a. The
+row is a statement about this milestone, which has no generated rooms in it.
 
 Eager structure is free — `LayoutGenerator` and `ShapeGenerator` are pure functions and the whole
 dungeon's geometry costs microseconds at boot. Eager *dressing* would be one model call per room
@@ -478,6 +482,47 @@ have non-overlapping rectangles for §8 to render. It inherits a working travers
 changes only where a `Dressing` comes from.
 
 M1's gate — *can the world be made rather than authored* — is answered there, not here.
+
+### 12a. Generated discovery, and the secret that is safe to invent
+
+Not M3 work. Recorded here because the question arrives the moment §5a's table is read, and
+because there is a real hole underneath it.
+
+**The hole.** `PropPlacer` hardcodes the hidden flag:
+
+```java
+placed.add(new Prop(
+        entry.type().name().toLowerCase() + "-" + i,
+        entry.type(),
+        square.x(), square.y(),
+        facing(random, shape, square, partyStart, entry.type()),
+        false));
+```
+
+So a generated room has no hidden props, and `ToolSchema` gates `reveal_prop` on
+`hiddenPropIds()` being non-empty — which means **the tool is never offered in a generated room
+at all.** The crypt has its alcove; a generated room has nothing whatsoever to find. Discovery
+does not exist in generated content today, and that is a larger gap than the missing secrets.
+
+**The wrong fix** is letting the dress pass write free-form secrets — a paragraph per room about
+what is buried under the flagstones. That is prompt text with no mechanism behind it, and the
+player who investigates finds that nothing can happen: there is no prop to reveal, and
+`SPAWNABLE_KINDS` is `List.of("goblin")` with `spawnGoblin` refusing a second, so "something
+waits inside" cannot cash out either. `DmService.worldState`'s own comment on the secrets block
+records what this costs — the prose model, told a goblin was inside the sarcophagus and would
+come out fighting, wrote it climbing out on a turn where nothing had spawned and no fight had
+started. m2-evaluation §4 caught the same shape again with the copper key: internally
+consistent, not on the board. Generating that per room is manufacturing the failure on purpose,
+at dungeon scale.
+
+**The right fix is the same change as the hole.** A secret with a mechanism is a hidden prop.
+`PropDefinition` already carries `hidden`, `revealHint` and `contains`, and
+`GeneratedRoom.toRoomDefinition` fills all three with `null`. Have the generator mark some props
+hidden and the dress pass write those fields, and the model invents what is concealed and why
+anyone would find it, while `reveal_prop` cashes it out against a closed enum and the renderer
+draws a prop that was always standing on a square. Invariant #7 is untouched, and the DM cannot
+promise anything the board will not deliver, because the thing it is being coy about already
+exists.
 
 ---
 
