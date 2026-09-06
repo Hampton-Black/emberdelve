@@ -10,6 +10,30 @@
         ],
         "matcher": ""
       }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{ bd list --status=in_progress --json 2>/dev/null || echo \"[]\"; } | jq -c \"if length>0 then {hookSpecificOutput:{hookEventName:\\\"PreCompact\\\",additionalContext:(\\\"Beads issues in progress — carry these ids and their status into the summary: \\\"+([.[]|.id+\\\" (\\\"+.title+\\\")\\\"]|join(\\\"; \\\")))}} else {} end\" 2>/dev/null || true",
+            "statusMessage": "Noting beads issues in progress"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bd prime --hook-json 2>/dev/null | jq -c \".hookSpecificOutput.hookEventName = \\\"PostCompact\\\"\" 2>/dev/null || true",
+            "statusMessage": "Restoring beads context"
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
