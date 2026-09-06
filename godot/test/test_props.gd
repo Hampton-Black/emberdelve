@@ -2,8 +2,10 @@ extends GutTest
 
 ## Prop table, spawn, hidden/reveal, and the sarcophagus silhouette. Game facts stay in Table.
 
+## DOOR is not here: its geometry is the wall segment at the exit, not a prop. See
+## prop_table.gd, and test_room.gd for the segment that carries it.
 const TYPES: Array[String] = [
-	"SARCOPHAGUS", "BRAZIER", "PILLAR", "RUBBLE", "ALCOVE", "DOOR",
+	"SARCOPHAGUS", "BRAZIER", "PILLAR", "RUBBLE", "ALCOVE",
 ]
 
 const CRYPT := {
@@ -15,7 +17,6 @@ const CRYPT := {
 		{"id": "fire", "type": "BRAZIER", "x": 2, "y": 8, "rotation": 0, "hidden": false},
 		{"id": "column", "type": "PILLAR", "x": 3, "y": 4, "rotation": 0, "hidden": false},
 		{"id": "pile", "type": "RUBBLE", "x": 2, "y": 2, "rotation": 45, "hidden": false},
-		{"id": "gate", "type": "DOOR", "x": 6, "y": 11, "rotation": 180, "hidden": false},
 		{"id": "niche", "type": "ALCOVE", "x": 9, "y": 6, "rotation": 270, "hidden": true},
 	],
 	"entities": [{"id": "fighter", "kind": "fighter", "name": "Roderick", "x": 2, "y": 2,
@@ -79,7 +80,7 @@ func test_hidden_props_are_not_instanced() -> void:
 	assert_not_null(holder, "World/Props")
 	if holder == null:
 		return
-	assert_eq(holder.get_child_count(), 5, "five visible props; the alcove stays hidden")
+	assert_eq(holder.get_child_count(), 4, "four visible props; the alcove stays hidden")
 	assert_not_null(_prop(world, "tomb"), "tomb")
 	assert_null(_prop(world, "niche"), "hidden alcove must not be in the tree")
 
@@ -90,7 +91,7 @@ func test_a_reveal_instances_the_prop() -> void:
 		"hidden": false}
 	Table.prop_revealed.emit(alcove)
 	assert_not_null(_prop(world, "niche"), "prop_revealed adds the alcove")
-	assert_eq(_props(world).get_child_count(), 6)
+	assert_eq(_props(world).get_child_count(), 5)
 
 
 func test_props_sit_at_grid_to_world() -> void:
@@ -114,11 +115,13 @@ func test_rotation_is_degrees() -> void:
 	if pile == null:
 		return
 	assert_almost_eq(pile.rotation.y, deg_to_rad(45.0), 0.0001, "rubble 45°")
-	var gate := _prop(world, "gate")
-	assert_not_null(gate, "gate")
-	if gate == null:
+	Table.prop_revealed.emit({"id": "niche", "type": "ALCOVE", "x": 9, "y": 6,
+		"rotation": 270, "hidden": false})
+	var niche := _prop(world, "niche")
+	assert_not_null(niche, "niche")
+	if niche == null:
 		return
-	assert_almost_eq(gate.rotation.y, deg_to_rad(180.0), 0.0001, "door 180°")
+	assert_almost_eq(niche.rotation.y, deg_to_rad(270.0), 0.0001, "alcove 270°")
 
 
 func test_entity_motion_does_not_rebuild_props() -> void:

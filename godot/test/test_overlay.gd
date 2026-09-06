@@ -354,57 +354,176 @@ func test_pick_at_reads_viewport_pixels_not_window_pixels() -> void:
 		assert_true(true, "window-space coords miss the board, which is also not the tile")
 
 
-func test_clicking_a_door_square_is_an_exit_not_a_move() -> void:
-	var world := _world_with_scene({
-		"roomId": "crypt",
-		"width": 12,
-		"height": 12,
-		"mode": "EXPLORATION",
-		"props": [],
-		"exits": [{
-			"id": "door-north",
-			"x": 6,
-			"y": 11,
-			"direction": "NORTH",
-			"toRoomId": "gallery",
-		}],
-		"entities": [{
-			"id": "fighter", "kind": "fighter", "name": "Roderick",
-			"x": 6, "y": 1, "hp": 12, "maxHp": 12, "isPlayerControlled": true,
-		}],
-		"combat": null,
-	})
+const DOORWAY := {
+	"roomId": "crypt", "width": 12, "height": 12, "mode": "EXPLORATION",
+	"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+	# The crypt's real furniture, not just the door. A fixture holding only the door is what let
+	# `brazier-east` — which stands between the camera and the north wall — go unnoticed while it
+	# swallowed every click on the doorway.
+	"props": [
+		{"id": "door-north", "type": "DOOR", "x": 6, "y": 11, "rotation": 180, "hidden": false},
+		{"id": "sarcophagus", "type": "SARCOPHAGUS", "x": 6, "y": 7, "rotation": 0,
+			"hidden": false},
+		{"id": "brazier-west", "type": "BRAZIER", "x": 2, "y": 8, "rotation": 0, "hidden": false},
+		{"id": "brazier-east", "type": "BRAZIER", "x": 9, "y": 8, "rotation": 0, "hidden": false},
+		{"id": "pillar-west", "type": "PILLAR", "x": 3, "y": 4, "rotation": 0, "hidden": false},
+		{"id": "pillar-east", "type": "PILLAR", "x": 8, "y": 4, "rotation": 0, "hidden": false},
+		{"id": "rubble", "type": "RUBBLE", "x": 2, "y": 2, "rotation": 45, "hidden": false},
+	],
+	"exits": [{"id": "door-north", "x": 6, "y": 11,
+		"direction": "NORTH", "toRoomId": "gallery"}],
+	"entities": [{"id": "fighter", "kind": "fighter", "name": "Roderick",
+		"x": 6, "y": 1, "hp": 12, "maxHp": 12, "isPlayerControlled": true}],
+	"combat": null,
+}
+
+
+func test_clicking_the_door_is_an_exit_and_the_square_under_it_is_not() -> void:
+	var world := _world_with_scene(DOORWAY.duplicate(true))
 	var overlay := _overlay(world)
 	assert_not_null(overlay, "Overlay")
 	if overlay == null:
 		return
 
-	var on_the_door: Dictionary = overlay.intent("", Vector2i(6, 11))
+	var on_the_door: Dictionary = overlay.intent("", Vector2i(6, 11), "door-north")
 	assert_eq(String(on_the_door.get("kind", "")), "exit")
 	assert_eq(String(on_the_door.get("exit_id", "")), "door-north")
+
+	# The square the door stands in is still floor. Leaving it an exit as well would keep the
+	# unintuitive click alive next to the intuitive one, and the two would drift.
+	var under_the_door: Dictionary = overlay.intent("", Vector2i(6, 11))
+	assert_eq(String(under_the_door.get("kind", "")), "move",
+		"a door is the thing you click, not the tile it stands on")
 
 	var plain_floor: Dictionary = overlay.intent("", Vector2i(4, 4))
 	assert_eq(String(plain_floor.get("kind", "")), "move",
 		"an ordinary square is still a move")
 
+	# A prop with nothing behind it must not swallow the click. Movement near the pillars is
+	# what would break first.
+	var pillar: Dictionary = overlay.intent("", Vector2i(4, 4), "pillar-west")
+	assert_eq(String(pillar.get("kind", "")), "move",
+		"a target the overlay has no intent for falls through to the square")
+
+
+func test_the_door_is_picked_by_pointing_at_it() -> void:
+	var world := _world_with_scene(DOORWAY.duplicate(true))
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	# The door is the wall segment, not a prop standing in the square (prop_table.gd). It is
+	# addressed by the exit's id, so what comes back is the same string either way.
+	var door: Node3D = null
+	for child in (world.get_node("Room/Walls") as Node3D).get_children():
+		if child.has_meta("exit_id"):
+			door = child as Node3D
+	assert_not_null(door, "a wall segment tagged with the exit")
+	if door == null:
+		return
+	assert_eq(String(door.get_meta("exit_id")), "door-north")
+
+	# Aimed at the middle of the leaf, not at the floor square — the whole point of the change
+	# is that the two are different targets.
+	var leaf := AABB()
+	var first := true
+	for mesh in door.find_children("*", "MeshInstance3D", true, false):
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		leaf = box if first else leaf.merge(box)
+		first = false
+	assert_false(first, "the doorway instanced a mesh")
+	if first:
+		return
+	var aim: Vector3 = leaf.get_center()
+	assert_lt(aim.z, world.grid_to_world("crypt", 6, 11).z,
+		"the door is in the wall, north of the square it is addressed by")
+
+	var picked: Dictionary = world.pick_at(cam.unproject_position(aim))
+	assert_eq(String(picked.get("target_id", "")), "door-north")
+
+	var overlay := _overlay(world)
+	if overlay == null:
+		return
+	var action: Dictionary = overlay.intent(
+		String(picked.get("entity_id", "")),
+		picked.get("square", null),
+		String(picked.get("target_id", "")))
+	assert_eq(String(action.get("kind", "")), "exit")
+
+
+func test_a_prop_does_not_swallow_a_click_meant_for_the_floor() -> void:
+	# The pillar is in the crypt's own layout and is 1.6 units tall, so an isometric ray to the
+	# floor behind it passes through its box. Picking must still land on the floor square the
+	# ray actually reaches first, or movement goes sticky around every column in the room.
+	var world := _world_with_scene(DOORWAY.duplicate(true))
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	if cam == null:
+		return
+
+	var square := Vector2i(3, 4)
+	var picked: Dictionary = world.pick_at(
+		cam.unproject_position(world.grid_to_world("crypt", square.x, square.y)))
+	assert_eq(picked.get("square", null), square, "the floor square is still reported")
+
+	var overlay := _overlay(world)
+	if overlay == null:
+		return
+	# Whatever the pick said about the pillar, the intent is a move — only a door takes over.
+	assert_eq(String(overlay.intent(
+		String(picked.get("entity_id", "")),
+		picked.get("square", null),
+		String(picked.get("target_id", ""))).get("kind", "")), "move")
+
+
+func test_a_real_click_on_the_door_sends_enter_exit() -> void:
+	# The whole path the game uses: Chrome forwards a viewport-local pointer to
+	# World.handle_pointer, which picks, asks the overlay, and commits. pick_at and intent are
+	# each covered above; this is the one that would catch them being wired together wrongly.
+	Net.outbound.clear()
+	var world := _world_with_scene(DOORWAY.duplicate(true))
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var door: Node3D = null
+	for child in (world.get_node("Room/Walls") as Node3D).get_children():
+		if child.has_meta("exit_id"):
+			door = child as Node3D
+	assert_not_null(door, "the tagged doorway")
+	if door == null:
+		return
+	var leaf := AABB()
+	var first := true
+	for mesh in door.find_children("*", "MeshInstance3D", true, false):
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		leaf = box if first else leaf.merge(box)
+		first = false
+	if first:
+		return
+
+	world.handle_pointer(cam.unproject_position(leaf.get_center()), true)
+
+	assert_eq(Net.outbound.size(), 1, "one message, and it is the crossing")
+	if Net.outbound.is_empty():
+		return
+	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
+	assert_eq(String(Net.outbound[0].get("exitId", "")), "door-north")
+
 
 func test_committing_an_exit_sends_enter_exit() -> void:
 	Net.outbound.clear()
-	var world := _world_with_scene({
-		"roomId": "crypt", "width": 12, "height": 12, "mode": "EXPLORATION",
-		"props": [],
-		"exits": [{"id": "door-north", "x": 6, "y": 11,
-			"direction": "NORTH", "toRoomId": "gallery"}],
-		"entities": [{"id": "fighter", "kind": "fighter", "name": "Roderick",
-			"x": 6, "y": 1, "hp": 12, "maxHp": 12, "isPlayerControlled": true}],
-		"combat": null,
-	})
+	var world := _world_with_scene(DOORWAY.duplicate(true))
 	var overlay := _overlay(world)
 	assert_not_null(overlay, "Overlay")
 	if overlay == null:
 		return
 
-	overlay.commit(overlay.intent("", Vector2i(6, 11)))
+	overlay.commit(overlay.intent("", Vector2i(6, 11), "door-north"))
 
 	assert_eq(Net.outbound.size(), 1)
 	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
@@ -430,7 +549,7 @@ func test_a_door_is_not_clickable_in_combat() -> void:
 	if overlay == null:
 		return
 
-	assert_true(overlay.intent("", Vector2i(6, 11)).is_empty())
+	assert_true(overlay.intent("", Vector2i(6, 11), "door-north").is_empty())
 
 
 func test_a_click_event_in_window_space_still_moves_the_right_square() -> void:

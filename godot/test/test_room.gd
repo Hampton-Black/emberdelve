@@ -203,7 +203,8 @@ func test_torchlit_rooms_light_the_walls() -> void:
 
 func test_carved_walls_differ_from_stone_in_geometry() -> void:
 	# Task 17 left wallType unread because Three.js did. KayKit finally has the
-	# pieces to honour it: cracked, broken, windows, gates — not the same slab.
+	# pieces to honour it: cracked, broken, windows — not the same slab. Nothing with a
+	# passage through it; those are exits, and exits are placed, not hashed.
 	var stone := CRYPT.duplicate(true)
 	stone["wallType"] = "STONE"
 	Table.set_scene(stone)
@@ -220,22 +221,8 @@ func test_carved_walls_differ_from_stone_in_geometry() -> void:
 		"CARVED is not STONE under another name")
 	assert_gt(int(stone_mix.get("wall", 0)), int(carved_mix.get("wall", 0)),
 		"STONE is mostly plain wall")
-	var carved_worked := (
-		int(carved_mix.get("wall_cracked", 0))
-		+ int(carved_mix.get("wall_broken", 0))
-		+ int(carved_mix.get("wall_window_open", 0))
-		+ int(carved_mix.get("wall_archedwindow_open", 0))
-		+ int(carved_mix.get("wall_gated", 0))
-		+ int(carved_mix.get("wall_doorway", 0))
-	)
-	var stone_worked := (
-		int(stone_mix.get("wall_cracked", 0))
-		+ int(stone_mix.get("wall_broken", 0))
-		+ int(stone_mix.get("wall_window_open", 0))
-		+ int(stone_mix.get("wall_archedwindow_open", 0))
-		+ int(stone_mix.get("wall_gated", 0))
-		+ int(stone_mix.get("wall_doorway", 0))
-	)
+	var carved_worked := _worked(carved_mix)
+	var stone_worked := _worked(stone_mix)
 	assert_gt(carved_worked, stone_worked, "CARVED spends its weight on worked faces")
 
 
@@ -291,6 +278,145 @@ func test_the_neighbour_is_registered_where_the_server_put_it() -> void:
 	await wait_frames(2)
 
 	assert_eq(world.room_origin("gallery"), Vector3(0.5, 0.0, -14.5))
+
+
+func test_the_only_hole_in_the_wall_is_the_way_out() -> void:
+	# Playtest 2026-09-06: the CARVED mix carried wall_gated and wall_doorway, so the crypt
+	# grew openings that led nowhere and the real door was one of several.
+	var crypt := CRYPT.duplicate(true)
+	crypt["wallType"] = "CARVED"
+	crypt["exits"] = [{"id": "door-north", "x": 6, "y": 11,
+		"direction": "NORTH", "toRoomId": "gallery"}]
+	Table.set_scene(crypt)
+	var mix := _wall_mix(_room())
+
+	assert_eq(int(mix.get("wall_gated", 0)), 0, "a barred gate is a way out that is not one")
+	assert_eq(int(mix.get("wall_doorway", 0)), 1, "one doorway, and it is the exit")
+	assert_eq(int(mix["total"]), 48, "cutting the doorway does not drop a segment")
+
+
+func test_a_room_with_no_exits_has_no_doorway_at_all() -> void:
+	var sealed := CRYPT.duplicate(true)
+	sealed["roomId"] = "sealed"
+	sealed["wallType"] = "CARVED"
+	sealed["exits"] = []
+	Table.set_scene(sealed)
+	assert_eq(int(_wall_mix(_room()).get("wall_doorway", 0)), 0)
+
+
+func test_the_doorway_is_cut_in_the_wall_the_exit_faces() -> void:
+	var crypt := CRYPT.duplicate(true)
+	crypt["wallType"] = "CARVED"
+	crypt["exits"] = [{"id": "door-north", "x": 6, "y": 11,
+		"direction": "NORTH", "toRoomId": "gallery"}]
+	Table.set_scene(crypt)
+	var room := _room()
+	var doorway := _segment_named(room, "wall_doorway")
+	assert_not_null(doorway, "the exit's segment")
+	if doorway == null:
+		return
+	# North wall of a 12x12 at the origin is z = -6; the door is column 6, x = 0.5.
+	assert_almost_eq(doorway.position.x, 0.5, 0.001)
+	assert_almost_eq(doorway.position.z, -6.0, 0.001)
+
+
+func test_a_neighbour_is_dark_stone_not_a_second_lit_room() -> void:
+	# Playtest 2026-09-06: withholding the torches was not enough — the ambient still lifted
+	# the kit textures far enough to read, so the gallery looked like somewhere already visited.
+	var world := _world_with_scene({
+		"roomId": "crypt", "width": 12, "height": 12,
+		"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+		"mode": "EXPLORATION", "props": [], "entities": [], "combat": null,
+		"exits": [{"id": "door-north", "x": 6, "y": 11,
+			"direction": "NORTH", "toRoomId": "gallery"}],
+		"neighbours": [{
+			"roomId": "gallery", "width": 10, "height": 16,
+			"floorType": "TILED", "wallType": "CARVED",
+			"offsetX": 0.0, "offsetZ": -14.0,
+			"back": {"id": "door-south", "x": 5, "y": 0,
+				"direction": "SOUTH", "toRoomId": "crypt"},
+		}],
+	})
+	await wait_frames(2)
+	var neighbour := world.get_node_or_null("Neighbours/gallery")
+	assert_not_null(neighbour, "Neighbours/gallery")
+	if neighbour == null:
+		return
+
+	var painted := 0
+	for mesh in neighbour.find_children("*", "MeshInstance3D", true, false):
+		var mat := mesh.material_override as StandardMaterial3D
+		assert_not_null(mat, "every surface is overridden, or the kit texture shows through")
+		if mat == null:
+			continue
+		painted += 1
+		assert_eq(mat.shading_mode, BaseMaterial3D.SHADING_MODE_UNSHADED,
+			"shaded, the crypt's torches would light the far room as you walked up to it")
+		assert_lt(mat.albedo_color.get_luminance(), 0.1, "a room you have not been in is dark")
+		assert_gt(mat.albedo_color.get_luminance(), 0.0, "and stone, not a hole in the render")
+	assert_gt(painted, 0, "the neighbour has surfaces to darken")
+
+	# The live room is untouched by any of that.
+	for mesh in (world.get_node("Room") as Node3D).find_children(
+			"*", "MeshInstance3D", true, false):
+		var mat := mesh.material_override as StandardMaterial3D
+		if mat != null:
+			assert_ne(mat.albedo_color, RoomScript.UNLIT_TINT,
+				"the room the party is standing in keeps its own surfaces")
+
+
+func test_a_neighbour_leaves_the_whole_shared_wall_to_the_room_you_are_in() -> void:
+	var world := _world_with_scene({
+		"roomId": "crypt", "width": 12, "height": 12,
+		"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+		"mode": "EXPLORATION", "props": [], "entities": [], "combat": null,
+		"exits": [{"id": "door-north", "x": 6, "y": 11,
+			"direction": "NORTH", "toRoomId": "gallery"}],
+		"neighbours": [{
+			"roomId": "gallery", "width": 10, "height": 16,
+			"floorType": "TILED", "wallType": "CARVED",
+			"offsetX": 0.0, "offsetZ": -14.0,
+			"back": {"id": "door-south", "x": 5, "y": 0,
+				"direction": "SOUTH", "toRoomId": "crypt"},
+		}],
+	})
+	await wait_frames(2)
+	var neighbour := world.get_node_or_null("Neighbours/gallery") as Node3D
+	assert_not_null(neighbour, "Neighbours/gallery")
+	if neighbour == null:
+		return
+
+	# The gallery's south wall is coplanar with the crypt's north one — the server lines the
+	# doors up, which puts both perimeters on one plane. Two walls fighting for one depth
+	# showed up in play as texture noise across the seam, and as a door with two ring handles.
+	var mix := _wall_mix(neighbour)
+	assert_eq(int(mix.get("wall_doorway", 0)), 0,
+		"the room you are standing in hangs the door; the room beyond leaves it alone")
+	assert_eq(int(mix["total"]), 2 * (10 + 16) - 10,
+		"the gallery's whole south run is missing, not just the door's square")
+
+	# And nothing of the neighbour stands on the shared plane at all. The gallery is north of
+	# the crypt, so its remaining walls are all further out than z = -6.
+	for child in (neighbour.get_node("Walls") as Node3D).get_children():
+		assert_gt(absf((child as Node3D).position.z - (-6.0)), 0.001,
+			"a segment on the crypt's north wall plane would fight it for depth")
+
+
+func _worked(mix: Dictionary) -> int:
+	return (int(mix.get("wall_cracked", 0))
+		+ int(mix.get("wall_broken", 0))
+		+ int(mix.get("wall_window_open", 0)))
+
+
+func _segment_named(room: Node, variant: String) -> Node3D:
+	var holder: Node = room.get_node_or_null("Walls")
+	if holder == null:
+		return null
+	for child in holder.get_children():
+		if child.has_meta("wall_variant") \
+				and String(child.get_meta("wall_variant")).get_file().get_basename() == variant:
+			return child as Node3D
+	return null
 
 
 func _omni_count(root: Node) -> int:

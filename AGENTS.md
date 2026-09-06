@@ -516,6 +516,47 @@ The full list is `docs/milestones/m3-evaluation.md` §8.
   free-form dress-pass secrets with no mechanism; the right fix is hidden props the generator
   already knows how to place.
 
+### Fixed after the M3 gate — playtest 2026-09-06
+
+Three complaints from the first played session on the traversal branch, and what each one turned
+out to be.
+
+- **A hole in the wall is a way out, and there are no other holes.** The CARVED wall mix hashed
+  `wall_gated`, `wall_doorway` and `wall_archedwindow_open` around the perimeter, so the crypt
+  grew openings that led nowhere and the real door was one of several. All three are gone from
+  the mix; `room.gd` places a `wall_doorway` at the squares the server's `exits` list names and
+  nowhere else. `wall_window_open` stays — a small barred opening high on the wall reads as a
+  window, and a window is allowed to lead nowhere.
+- **The door is the wall, not a prop standing in front of it.** KayKit's `wall_doorway` arrives
+  with a banded wooden door already hung in it, so the `DOOR` prop drew a second door in the same
+  hole — visibly, as two ring handles. `DOOR` is out of `prop_table.tres`; the prop still exists
+  server-side because the DM and the `Exit` both address it by id, and the wall segment carries
+  that id as an `exit_id` meta so the pointer addresses the same thing. **The thing you see and
+  the thing you click are one object.**
+- **A door is clicked, not walked onto.** `pick_at` resolves the doorway under the ray and
+  returns its id; `Table.exit_at(square)` is gone. A target the overlay has no intent for falls
+  through to the floor square, so nothing can swallow a move.
+- **Only things you can act on are pick targets.** The first cut made every prop a target, on
+  the theory the seam would be wanted later. It broke the door on the first real room: picking
+  takes the nearest hit, and `brazier-east` — a 1x1 box around a narrow bowl, standing between
+  the camera corner and the north wall — won the ray, had no intent to offer, and fell through
+  to a square that was `null` because the ray had already left the room. The click did nothing
+  and the failure was silent. **A thing with nothing behind it must not shadow a thing that has
+  something behind it.** Props get added to `_target_under` when they gain actions, ranked
+  against each other deliberately — not on spec.
+- **A one-prop fixture will not find a picking bug.** The test that missed this held only the
+  door, so nothing was ever in front of it. `DOORWAY` in `test_overlay.gd` now carries the
+  crypt's real furniture, and re-adding props to the picker turns it red.
+- **The room the party is standing in owns the shared wall.** The server places a neighbour so
+  the two doors line up, which puts both perimeters on one plane. Drawing both is two walls
+  fighting for one depth — it showed as a door with two handles, then as texture noise across the
+  seam. A neighbour omits the whole wall run its answering door is in, not just that segment:
+  matching segment against segment can half-work when the rooms' widths differ in parity.
+- **Withholding the torches did not make a neighbour dark.** The ambient still lifted the kit
+  textures far enough to read, so the gallery looked like somewhere already visited.
+  `Room.build_unlit` paints every surface near-black and **unshaded** — shaded, the crypt's own
+  torches would light the far room by degrees as the party walked up to the door.
+
 **`TurnMetrics` mislabels its counter** — see the latency section. One line; left alone so the
 numbers in `m0-evaluation.md` match the logs as they were written.
 

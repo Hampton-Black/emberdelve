@@ -126,9 +126,17 @@ func _rebuild_neighbours() -> void:
 		var node := Room.new()
 		node.name = room_id
 		holder.add_child(node)
+		# The one thing the outline says about the inside of that room: which wall its
+		# answering door is in. Without it the far room is drawn with an unbroken perimeter
+		# and the doorway you are looking through is backed by stone.
+		var openings: Array = []
+		var back: Variant = outline.get("back", null)
+		if typeof(back) == TYPE_DICTIONARY:
+			openings.append(back)
 		node.build_unlit(room_id, size,
 			String(outline.get("floorType", "STONE")),
-			String(outline.get("wallType", "STONE")))
+			String(outline.get("wallType", "STONE")),
+			openings)
 
 
 func _on_prop_revealed(prop: Dictionary) -> void:
@@ -347,15 +355,16 @@ func viewport_from_window(window_pos: Vector2) -> Vector2:
 ## floor square it lands on. Tokens first — an isometric ray through a figure's
 ## head meets the floor a square or two behind it.
 func pick_at(viewport_pos: Vector2) -> Dictionary:
+	var nothing := {"entity_id": "", "target_id": "", "square": null}
 	var cam := rig
 	if cam == null:
 		cam = get_node_or_null("Camera3D") as CameraRigScript
 	if cam == null:
-		return {"entity_id": "", "square": null}
+		return nothing
 	var origin := cam.project_ray_origin(viewport_pos)
 	var dir := cam.project_ray_normal(viewport_pos)
 	if dir.is_zero_approx():
-		return {"entity_id": "", "square": null}
+		return nothing
 
 	var best_id := ""
 	var best_t := INF
@@ -374,15 +383,80 @@ func pick_at(viewport_pos: Vector2) -> Dictionary:
 		var square: Variant = world_to_grid(holder.get_node(NodePath(best_id)).position)
 		if not entity.is_empty():
 			square = Vector2i(int(entity["x"]), int(entity["y"]))
-		return {"entity_id": best_id, "square": square}
+		return {"entity_id": best_id, "target_id": "", "square": square}
 
+	# The square under the ray is still worked out when something is hit, and it is still what
+	# a move commits to.
+	var floor_square: Variant = null
+	var floor_t := INF
 	var hit: Variant = Plane(Vector3.UP, 0.0).intersects_ray(origin, dir)
-	if hit == null:
-		return {"entity_id": "", "square": null}
-	var at := world_to_grid(hit)
-	if at.x < 0 or at.y < 0 or at.x >= _room_width() or at.y >= _room_height():
-		return {"entity_id": "", "square": null}
-	return {"entity_id": "", "square": at}
+	if hit != null:
+		var at := world_to_grid(hit)
+		if at.x >= 0 and at.y >= 0 and at.x < _room_width() and at.y < _room_height():
+			floor_square = at
+			floor_t = origin.distance_to(hit)
+
+	return {"entity_id": "", "target_id": _target_under(origin, dir, floor_t),
+		"square": floor_square}
+
+
+## The doorway under the pointer, if one is nearer than the floor. "" otherwise.
+##
+## Only things that can be acted on are pick targets, and today that is exactly the doorways.
+## Scenery is not: an earlier cut made every prop a target on the theory that the seam would be
+## useful later, and it broke the door on the first real room. Picking takes the nearest hit, so
+## `brazier-east` — a 1x1 box around a narrow bowl, standing between the camera and the north
+## wall — swallowed the click, had no intent to offer, and left the player standing still. A
+## thing with nothing behind it must not shadow a thing that has something behind it. When props
+## gain actions they are added here deliberately, ranked against each other, not on spec.
+##
+## A doorway is addressed by the id of the exit in it, and an Exit carries the id of the DOOR
+## prop in its square (dm.model.Exit), so the id means the same thing everywhere.
+##
+## `floor_t` is what keeps the door from stealing ordinary moves: every floor square in the room
+## is nearer to the camera than the wall behind it, so the doorway only wins when the ray leaves
+## the room without touching floor — which is what pointing at a door in a wall looks like.
+func _target_under(origin: Vector3, dir: Vector3, floor_t: float) -> String:
+	var walls := get_node_or_null("Room/Walls") as Node3D
+	if walls == null:
+		return ""
+	var best_id := ""
+	var best_t := floor_t
+	for child in walls.get_children():
+		if not (child is Node3D) or not child.has_meta("exit_id"):
+			continue
+		var box := _visual_aabb(child as Node3D)
+		if box.size == Vector3.ZERO:
+			continue
+		var t := _ray_aabb_t(origin, dir, box)
+		if t < best_t:
+			best_t = t
+			best_id = String(child.get_meta("exit_id"))
+	return best_id
+
+
+func _visual_aabb(node: Node3D) -> AABB:
+	var boxes: Array[AABB] = []
+	for mesh in _visuals(node):
+		boxes.append(mesh.global_transform * mesh.get_aabb())
+	if boxes.is_empty():
+		return AABB()
+	var acc := boxes[0]
+	for i in range(1, boxes.size()):
+		acc = acc.merge(boxes[i])
+	return acc
+
+
+func _visuals(root: Node) -> Array[VisualInstance3D]:
+	var found: Array[VisualInstance3D] = []
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node is VisualInstance3D:
+			found.append(node as VisualInstance3D)
+		for child in node.get_children():
+			stack.append(child)
+	return found
 
 
 func _route_pointer(mouse: InputEventMouse, clicked: bool) -> void:
@@ -400,14 +474,17 @@ func handle_pointer(viewport_pos: Vector2, clicked: bool) -> void:
 	var action: Dictionary = overlay.intent(
 		String(picked.get("entity_id", "")),
 		picked.get("square", null),
+		String(picked.get("target_id", "")),
 	)
+	var hover_square: Variant = action.get("square", null) if not action.is_empty() else null
+	var hover_kind := String(action.get("kind", "")) if not action.is_empty() else ""
 	if clicked:
 		overlay.commit(action)
-		overlay.set_hover(action.get("square", null) if not action.is_empty() else null)
+		overlay.set_hover(hover_square, hover_kind)
 		if get_viewport():
 			get_viewport().set_input_as_handled()
 	else:
-		overlay.set_hover(action.get("square", null) if not action.is_empty() else null)
+		overlay.set_hover(hover_square, hover_kind)
 
 
 func _token_aabb(token: Token) -> AABB:

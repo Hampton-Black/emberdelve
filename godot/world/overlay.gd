@@ -12,6 +12,9 @@ const OVERLAY_Y := 0.03
 const MOVE_TINT := Color8(0x5c, 0x86, 0xc4)
 const TARGET_TINT := Color8(0xc0, 0x45, 0x3c)
 const HOVER_TINT := Color8(0xe8, 0xdc, 0xc0)
+## Warmer than the hover, because what is on the other side of the door is the only light in
+## this scene that is not a brazier. A door is not a square you are about to step on.
+const EXIT_TINT := Color8(0xd8, 0x9a, 0x4a)
 
 const MOVE_SIZE := 0.86
 const HOVER_SIZE := 0.92
@@ -19,6 +22,7 @@ const HOVER_SIZE := 0.92
 var _move_mat: StandardMaterial3D
 var _target_mat: StandardMaterial3D
 var _hover_mat: StandardMaterial3D
+var _exit_mat: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -31,7 +35,7 @@ func _ready() -> void:
 ##
 ## Actor is `combat.activeId` in a fight, or the first living player-controlled
 ## entity out of one. Never a hardcoded creature id.
-func intent(entity_id: String, square: Variant = null) -> Dictionary:
+func intent(entity_id: String, square: Variant = null, target_id: String = "") -> Dictionary:
 	var scene := Table.scene
 	if scene.is_empty():
 		return {}
@@ -57,6 +61,14 @@ func intent(entity_id: String, square: Variant = null) -> Dictionary:
 			}
 		return {}
 
+	# A door is a decision, not a move that happens to end somewhere, so it is the door you
+	# click and not the square it stands in. The combat branch above has already returned, so
+	# this is only ever reachable out of combat — which matches the server, where crossExit
+	# refuses while a fight is running.
+	var door := _exit_intent(target_id)
+	if not door.is_empty():
+		return door
+
 	# Out of combat there is no turn and nothing to spend, so anywhere on the
 	# floor will do. The server still refuses squares with something solid on them.
 	var player := _first_player(scene)
@@ -68,14 +80,26 @@ func intent(entity_id: String, square: Variant = null) -> Dictionary:
 	if at.x == int(player["x"]) and at.y == int(player["y"]):
 		return {}
 
-	# A door is a decision, not a move that happens to end somewhere. The combat branch above
-	# has already returned, so this is only ever reachable out of combat — which matches the
-	# server, where crossExit refuses while a fight is running.
-	var exit := Table.exit_at(at)
-	if not exit.is_empty():
-		return {"kind": "exit", "exit_id": String(exit.get("id", "")), "square": at}
-
 	return {"kind": "move", "actor_id": String(player["id"]), "square": at}
+
+
+## The door you clicked, or {} if the pick was not a door.
+##
+## Split out of [method intent] because it runs before the square branch and before the player
+## is looked up: a door is a decision about the room, not something the fighter does to a floor
+## tile. An {@code Exit} and its {@code DOOR} prop share an id on purpose (dm.model.Exit), which
+## is the whole of the lookup.
+func _exit_intent(target_id: String) -> Dictionary:
+	if target_id.is_empty():
+		return {}
+	var exit := Table.exit_by_id(target_id)
+	if exit.is_empty():
+		return {}
+	return {
+		"kind": "exit",
+		"exit_id": String(exit.get("id", "")),
+		"square": Vector2i(int(exit.get("x", 0)), int(exit.get("y", 0))),
+	}
 
 
 ## Sent, never applied locally. The token does not budge until the server says
@@ -93,7 +117,10 @@ func commit(action: Dictionary) -> void:
 			Net.enter_exit(String(action["exit_id"]))
 
 
-func set_hover(square: Variant = null) -> void:
+## `kind` is the intent the hover is previewing, so a door does not look like a floor tile you
+## are about to walk to. Defaulted, because a caller that has no intent to show still wants the
+## square lit.
+func set_hover(square: Variant = null, kind: String = "") -> void:
 	_ensure()
 	var hover := $Hover as MeshInstance3D
 	if not (square is Vector2i):
@@ -106,6 +133,7 @@ func set_hover(square: Variant = null) -> void:
 	var at: Vector2i = square
 	var pos: Vector3 = world.grid_to_world(world.current_room_id(), at.x, at.y)
 	hover.position = Vector3(pos.x, OVERLAY_Y + 0.004, pos.z)
+	hover.material_override = _exit_mat if kind == "exit" else _hover_mat
 	hover.visible = true
 
 
@@ -173,6 +201,7 @@ func _ensure() -> void:
 		_move_mat = _tint_material(MOVE_TINT, 0.3)
 		_target_mat = _tint_material(TARGET_TINT, 0.42)
 		_hover_mat = _tint_material(HOVER_TINT, 0.5)
+		_exit_mat = _tint_material(EXIT_TINT, 0.62)
 	if get_node_or_null("Moves") == null:
 		var moves := Node3D.new()
 		moves.name = "Moves"

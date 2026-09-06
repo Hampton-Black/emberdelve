@@ -96,10 +96,14 @@ func prop(id: String) -> Dictionary:
 	return {}
 
 
-## The exit standing on a square, or {} if none does. Mirrors dm.model.Exit.
-func exit_at(square: Vector2i) -> Dictionary:
+## The exit with this id, or {} if there is none. Mirrors dm.model.Exit.
+##
+## By id and not by square: an Exit carries the id of the DOOR prop standing in it, so the
+## renderer, the DM and this lookup all address one thing. Clicking the floor square a door
+## happens to stand on is a move, and reads like one.
+func exit_by_id(exit_id: String) -> Dictionary:
 	for e in scene.get("exits", []):
-		if int(e.get("x", -1)) == square.x and int(e.get("y", -1)) == square.y:
+		if String(e.get("id", "")) == exit_id:
 			return e
 	return {}
 
