@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -64,6 +65,22 @@ public final class DmService {
             + "One or two sentences. Do not say whose turn it is. "
             + "Describe only what the facts state — no swing they do not mention, "
             + "no wound they do not report.";
+
+    /**
+     * What the narrator is asked for on arriving somewhere new. A reworded {@code OPENING} — the
+     * beat is the same and the room is not.
+     */
+    static final String ARRIVAL_FIRST = "The party has just come through into this room. "
+            + "Open it: what they walk into.";
+
+    /**
+     * And on coming back. The six-turn window has dropped the first visit, so without this the
+     * narrator rebuilds the room from its dressing as though it had never been here — which is
+     * the fault `## Established` warns against, in a room the transcript has entirely forgotten.
+     */
+    static final String ARRIVAL_RETURN = "The party has come back into a room they have been "
+            + "here before. They know this place. Do not describe it again from scratch — say "
+            + "what has changed, or what they came back for, in a sentence or two.";
 
     /** §7: reject, let it retry once, then take the tools away. */
     private static final int REJECTIONS_BEFORE_DEGRADING = 2;
@@ -256,6 +273,9 @@ public final class DmService {
         var failed = new boolean[]{false};
 
         long toolStart = System.nanoTime();
+        String previousRoomId = engine.room().roomId();
+        String previousRoomName = engine.room().name();
+        var visitedBefore = Set.copyOf(engine.state().visitedRoomIds());
         var mechanics = runToolPhase(text, sink, failed);
         long toolPhaseMs = (System.nanoTime() - toolStart) / 1_000_000;
 
@@ -263,12 +283,21 @@ public final class DmService {
             return;
         }
 
+        String arrival = null;
+        if (!engine.room().roomId().equals(previousRoomId)) {
+            history.add(DmClient.ChatMessage.user(
+                    thresholdMarker(previousRoomName, engine.room().name())));
+            arrival = visitedBefore.contains(engine.room().roomId())
+                    ? ARRIVAL_RETURN
+                    : ARRIVAL_FIRST;
+        }
+
         long proseStart = System.nanoTime();
         // A creature does not get the benefit of the doubt on an unmarked quotation when the
         // player might also be talking. When they plainly are not, it does.
         boolean playerMightBeSpeaking = soundsLikeSpeech(text);
         var prose = runProsePhase(text, mechanics.results(), sink, failed,
-                !playerMightBeSpeaking);
+                !playerMightBeSpeaking, arrival);
         long proseMs = (System.nanoTime() - proseStart) / 1_000_000;
 
         if (failed[0]) {
@@ -399,6 +428,12 @@ public final class DmService {
      */
     private Prose runProsePhase(String text, List<String> mechanics, TurnSink sink,
                                 boolean[] failed, boolean inferUnmarkedQuotes) {
+        return runProsePhase(text, mechanics, sink, failed, inferUnmarkedQuotes, null);
+    }
+
+    private Prose runProsePhase(String text, List<String> mechanics, TurnSink sink,
+                                boolean[] failed, boolean inferUnmarkedQuotes,
+                                String arrivalDirective) {
         var narrated = new StringBuilder();
         var seed = inferUnmarkedQuotes ? soleCreature() : null;
         var parser = new NarrationParser(liveSpeakers(), seed, segment -> {
@@ -449,6 +484,9 @@ public final class DmService {
         // that a real voice reads it: three sentences is about fifteen seconds of audio and the
         // whole world waits behind it.
         var directive = new StringBuilder();
+        if (arrivalDirective != null) {
+            directive.append(arrivalDirective).append("\n\n");
+        }
         if (!mechanics.isEmpty()) {
             directive.append("The engine has already resolved this action. Every line below "
                             + "happened, in this order. Narrate all of them as one continuous "
@@ -671,6 +709,9 @@ public final class DmService {
 
         sb.append("# Current state\n\n");
         sb.append("## Room: ").append(room.name()).append("\n\n");
+        if (engine.state().hasVisited(room.roomId())) {
+            sb.append("The party has been in this room before.\n\n");
+        }
         sb.append(room.dmNotes().overview()).append("\n\n");
         sb.append(room.dmNotes().sensory()).append("\n\n");
 
@@ -749,7 +790,7 @@ public final class DmService {
         }
 
         sb.append("## Entities present\n\n");
-        for (var entity : engine.state().entities().values()) {
+        for (var entity : engine.state().entitiesHere()) {
             sb.append("- `").append(entity.id()).append("` — ").append(entity.name())
                     .append(", ").append(entity.hp()).append("/").append(entity.maxHp())
                     .append(" hp, at (").append(entity.x()).append(",").append(entity.y())
@@ -795,12 +836,42 @@ public final class DmService {
 
         sb.append(established(engine.state()));
 
+        sb.append(waysOut(room));
+
         sb.append("\n## Grid\n\n")
                 .append("- size: ").append(room.width()).append("x").append(room.height())
                 .append("\n- axes: x eastward, y northward")
                 .append("\n- mode: ").append(engine.mode()).append("\n");
 
         return sb.toString();
+    }
+
+    /**
+     * The ways out of a room, by the wall they are in.
+     *
+     * <p>Never the destination and never the exit id — spec §7a. The player can see there is a
+     * door and cannot see what is behind it; the client renders the room beyond unlit for exactly
+     * that reason. A room id in the prompt is a string the narrator can read aloud, which is
+     * m2-evaluation §8's grid-coordinate finding wearing a different hat.
+     *
+     * <p>Empty when there are none, heading included. A "## Ways out" with nothing under it is an
+     * invitation to invent one, the same way an empty tool enum is.
+     */
+    static String waysOut(RoomDefinition room) {
+        if (room.exits().isEmpty()) {
+            return "";
+        }
+        var sb = new StringBuilder("\n## Ways out\n\n");
+        for (var exit : room.exits()) {
+            sb.append("- a way out in the ").append(exit.direction().lowerName())
+                    .append(" wall\n");
+        }
+        return sb.toString();
+    }
+
+    static String thresholdMarker(String fromRoomName, String toRoomName) {
+        return "[The party left " + fromRoomName + " and is now in " + toRoomName
+                + ". Everything described before this line happened in a different room.]";
     }
 
     /**
