@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -116,8 +117,14 @@ public final class WsHandler {
             // A room change replaces everything, so it answers with a whole Scene rather than
             // diffs. The client already rebuilds props and tokens when roomId changes.
             case "enterExit" -> {
+                String fromName = engine.room().name();
+                var visitedBefore = Set.copyOf(engine.state().visitedRoomIds());
                 engine.crossExit(message.path("exitId").asText(""));
                 send(ctx, new ServerMessage.Scene(engine.scene()));
+                if (dm != null) {
+                    dm.noteCrossing(fromName, engine.room().name(),
+                            visitedBefore.contains(engine.room().roomId()));
+                }
             }
 
             case "attack" -> act(ctx, sink -> engine.combat().attack(

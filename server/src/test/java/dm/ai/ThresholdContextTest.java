@@ -1,6 +1,11 @@
 package dm.ai;
 
+import dm.ScriptedDmClient;
 import dm.content.ContentLoader;
+import dm.engine.GameEngine;
+import dm.engine.Rooms;
+import dm.engine.ScriptedDiceRoller;
+import dm.state.EventLog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -67,5 +72,41 @@ class ThresholdContextTest {
         // six-turn window is still full of room 1. Spec §7b.
         assertTrue(line.toLowerCase().contains("different room")
                         || line.toLowerCase().contains("somewhere else"), line);
+    }
+
+    @Test
+    @DisplayName("a click crossing marks the seam and defers arrival to the next typed turn")
+    void noteCrossingDefersArrivalToNextProsePhase() {
+        var log = new EventLog();
+        var engine = new GameEngine(CONTENT, log, new ScriptedDiceRoller(10, 10, 10, 10),
+                Rooms.authored(CONTENT, "crypt", "gallery"));
+        engine.start();
+
+        var tools = new ScriptedDmClient();
+        var prose = new ScriptedDmClient("Cold stone underfoot.");
+        var dm = new DmService(tools, prose, engine,
+                CONTENT.prompt("dm-tools"), CONTENT.prompt("dm"), CONTENT.prompt("dm-reconcile"));
+
+        dm.noteCrossing("The Ashen Crypt", "The Long Gallery", false);
+        dm.handleFreeText("fighter", "I look around", new TurnSink() {
+            @Override public void narration(dm.model.NarrationSegment segment) {}
+            @Override public void diffs(java.util.List<dm.model.Diff> diffs) {}
+            @Override public void roll(dm.model.RollResult roll) {}
+            @Override public void error(Throwable error) {}
+            @Override public void complete() {}
+        });
+
+        var conversation = prose.conversations().getLast();
+        var directive = conversation.stream()
+                .filter(m -> "user".equals(m.role()))
+                .map(DmClient.ChatMessage::content)
+                .filter(c -> c != null && c.contains("Three sentences at most."))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(directive.contains(DmService.ARRIVAL_FIRST), directive);
+        assertTrue(conversation.stream()
+                .anyMatch(m -> m.content() != null
+                        && m.content().contains(DmService.thresholdMarker(
+                                "The Ashen Crypt", "The Long Gallery"))));
     }
 }

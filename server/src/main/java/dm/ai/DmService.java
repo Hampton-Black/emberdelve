@@ -108,6 +108,12 @@ public final class DmService {
             new java.util.concurrent.atomic.AtomicBoolean();
 
     /**
+     * Arrival directive chosen at a crossing. Consumed on the next free-text prose phase — a click
+     * crossing marks the seam immediately but does not narrate until the player types.
+     */
+    private String pendingArrival;
+
+    /**
      * One narration at a time, across every path that produces any.
      *
      * <p>Two narrations in flight interleave their sentences into nonsense, and the transcript is
@@ -283,14 +289,11 @@ public final class DmService {
             return;
         }
 
-        String arrival = null;
         if (!engine.room().roomId().equals(previousRoomId)) {
-            history.add(DmClient.ChatMessage.user(
-                    thresholdMarker(previousRoomName, engine.room().name())));
-            arrival = visitedBefore.contains(engine.room().roomId())
-                    ? ARRIVAL_RETURN
-                    : ARRIVAL_FIRST;
+            noteCrossing(previousRoomName, engine.room().name(),
+                    visitedBefore.contains(engine.room().roomId()));
         }
+        String arrival = takePendingArrival();
 
         long proseStart = System.nanoTime();
         // A creature does not get the benefit of the doubt on an unmarked quotation when the
@@ -484,9 +487,6 @@ public final class DmService {
         // that a real voice reads it: three sentences is about fifteen seconds of audio and the
         // whole world waits behind it.
         var directive = new StringBuilder();
-        if (arrivalDirective != null) {
-            directive.append(arrivalDirective).append("\n\n");
-        }
         if (!mechanics.isEmpty()) {
             directive.append("The engine has already resolved this action. Every line below "
                             + "happened, in this order. Narrate all of them as one continuous "
@@ -494,6 +494,9 @@ public final class DmService {
                             + "attempt failed AND the something else happened anyway.\n\n")
                     .append(String.join("\n", mechanics))
                     .append("\n\n");
+        }
+        if (arrivalDirective != null) {
+            directive.append(arrivalDirective).append("\n\n");
         }
         // The failure this is aimed at, seen in full: late in a session a player sent something
         // close to what they had sent earlier, and the model replied with its own narration from
@@ -915,6 +918,22 @@ public final class DmService {
     public void reset() {
         history.clear();
         opened.set(false);
+        pendingArrival = null;
+    }
+
+    /**
+     * Records that the party crossed a threshold: a seam line in the transcript, and an arrival
+     * directive for the next free-text prose phase.
+     */
+    public void noteCrossing(String fromRoomName, String toRoomName, boolean returning) {
+        history.add(DmClient.ChatMessage.user(thresholdMarker(fromRoomName, toRoomName)));
+        pendingArrival = returning ? ARRIVAL_RETURN : ARRIVAL_FIRST;
+    }
+
+    private String takePendingArrival() {
+        String arrival = pendingArrival;
+        pendingArrival = null;
+        return arrival;
     }
 
     /**
