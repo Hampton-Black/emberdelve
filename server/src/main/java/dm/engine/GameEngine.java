@@ -6,6 +6,7 @@ import dm.content.RoomDefinition;
 import dm.model.Diff;
 import dm.model.Entity;
 import dm.model.Event;
+import dm.model.Exit;
 import dm.model.Mode;
 import dm.model.Prop;
 import dm.model.RollRequest;
@@ -13,6 +14,7 @@ import dm.model.RollResult;
 import dm.model.Skill;
 import dm.model.Difficulty;
 import dm.model.SceneState;
+import dm.model.Square;
 import dm.state.EventLog;
 import dm.state.WorldState;
 
@@ -169,10 +171,10 @@ public final class GameEngine {
      * revealed, so a curious player cannot read the secrets out of a websocket frame.
      */
     public SceneState scene() {
-        var room = room();
+        var here = room();
         var revealed = state().revealedHere();
 
-        List<Prop> visible = room.props().stream()
+        List<Prop> visible = here.props().stream()
                 .filter(p -> !p.hidden() || revealed.contains(p.id()))
                 .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false))
                 .toList();
@@ -182,9 +184,9 @@ public final class GameEngine {
                 .map(Entity::toView)
                 .toList();
 
-        return new SceneState(room.roomId(), room.width(), room.height(),
-                room.floorType(), room.wallType(), visible, entities, room.lighting(),
-                state().mode(), combat.view());
+        return new SceneState(here.roomId(), here.width(), here.height(),
+                here.floorType(), here.wallType(), visible, here.exits(), entities,
+                here.lighting(), state().mode(), combat.view());
     }
 
     public Mode mode() {
@@ -192,6 +194,68 @@ public final class GameEngine {
     }
 
     // ---- Mutations. Each returns the diffs the client needs to catch up. ----
+
+    /**
+     * Take the party through a door.
+     *
+     * <p>The whole party, always — spec §6a. {@code PartyMoved} carries a list of movers so that
+     * splitting is a policy change rather than a schema bump, but M3's policy is that the list is
+     * everyone still standing.
+     *
+     * <p>No adjacency requirement. Crossing implies walking to the door, everyone lands on
+     * {@link Exit#inward}, and where anyone stood beforehand has no consequence — a rule here
+     * would only ever produce a rejection the player finds annoying.
+     */
+    public List<Diff> crossExit(String exitId) {
+        if (combat.isActive()) {
+            // Fleeing is a rules milestone. Without this the fight's initiative order survives
+            // in a room nobody is standing in.
+            throw new IllegalArgumentException(
+                    "You cannot leave in the middle of a fight.");
+        }
+
+        var here = room();
+        var exit = here.exits().stream()
+                .filter(e -> e.id().equals(exitId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No exit '" + exitId + "' in " + here.roomId()));
+
+        if (!rooms.has(exit.toRoomId())) {
+            throw new IllegalArgumentException(
+                    "'" + exitId + "' leads to " + exit.toRoomId() + ", which is not in this "
+                            + "session");
+        }
+
+        var destination = rooms.structure(exit.toRoomId());
+        var arrival = destination.exits().stream()
+                .filter(e -> e.toRoomId().equals(here.roomId()))
+                .findFirst()
+                .map(back -> back.inward(destination.width(), destination.height()))
+                .orElseGet(() -> {
+                    // A one-way exit is legal and has no answering door to land beside, so the
+                    // destination's authored party start is the fallback.
+                    var at = destination.startPositions().party().getFirst();
+                    return new Square(at.x(), at.y());
+                });
+
+        var movers = state().party().stream()
+                .map(member -> state().find(member.entityId()))
+                .flatMap(Optional::stream)
+                .filter(Entity::isAlive)
+                .map(Entity::id)
+                .toList();
+
+        // Dressed before the move, so anything reading state() after this call finds a room
+        // that already knows what it looks like.
+        recordDressing(exit.toRoomId());
+        log.append(new Event.PartyMoved(Instant.now(), movers, here.roomId(),
+                exit.toRoomId(), exitId, arrival.x(), arrival.y()));
+
+        // A room change replaces everything, which is what a fresh Scene is for. The caller
+        // sends one; there is no diff small enough to be worth inventing. Spec §9.
+        return List.of();
+    }
 
     /**
      * In combat this is the same call the goblin makes, spending the same movement and checked
