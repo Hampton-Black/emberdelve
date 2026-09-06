@@ -27,7 +27,7 @@ Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22).
 `docs/m2-evaluation.md` first — it is the most recent gate and its §8 lists what M2 handed
 forward. `docs/superpowers/specs/2026-08-23-m2-spine-design.md` is the architecture everything
 now sits on. `docs/ai-dm-system-design.md` is the long-range design. **Amended 2026-09-05** against
-three gates: its §2a lists the five decisions play reversed and why, and §14 carries both the
+three gates: its §2a lists the four decisions play reversed and why, and §14 carries both the
 real milestone history and the original ordering it superseded. Where it and this file
 disagree, this file wins — it is the operational one.
 

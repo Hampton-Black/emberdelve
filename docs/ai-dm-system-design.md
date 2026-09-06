@@ -57,7 +57,7 @@ Updated to what is true as of 2026-09-05. Reversals are explained in §2a.
 | Ruleset | **Full-SRD-shaped engine, trimmed content** — *deferred, not reduced* | 4 classes, levels 1–5, ~30 monsters CR 0–3. Keeps reaction hooks and concentration. Today's ~40 lines of attack resolution are a proxy standing in for it, not a replacement — see §6. |
 | Combat | **Grid movement, one melee attack, initiative, Chebyshev distance** | No reach, cover, AoE, or opportunity attacks. Terrain belongs to the room, not to combat. |
 | Exploration | **Narrative. The grid is rendered, and only exits are clickable** | Avoids the interactable-object content pipeline entirely. M3 adds an explicit door click — one verb, not free walking. |
-| Monster tactics | **Fully deterministic. No model in the path at all** | Tightened from "LLM sets stance only" — the stance call was never built and is not missed. |
+| Monster tactics | **Deterministic execution, LLM sets stance only** — *stance layer deferred, not dropped* | Latency, testability, tunability, no spatial hallucination. `GoblinAi` is the execution half, shipped and working; the stance call above it is not built yet — see §8. |
 | Dungeon generation | **Procedural shape → prop placement → one LLM dress pass, at room-build time** | Shipped in M1. The JIT-with-prefetch scheme was not needed — generation is fast, and a room is dressed once at build time rather than at the door. |
 | Model hosting | **Venice.ai, OpenAI-compatible, behind an interface** | Simplest for solo. Swap to local is config, not code. |
 | Model count | **Two: a fast tool-caller and a good writer** | Not in the original design, and the single most valuable structural change since. See §10. |
@@ -70,7 +70,7 @@ Updated to what is true as of 2026-09-05. Reversals are explained in §2a.
 
 ### 2a. What play reversed, and why
 
-Five decisions were overturned by playing the thing. Each is worth keeping because the *reason* it
+Four decisions were overturned by playing the thing. Each is worth keeping because the *reason* it
 was wrong generalises.
 
 **Postgres → an event log on disk.** The original design gave persistence a schema before it gave
@@ -94,11 +94,6 @@ a render, an audio queue built by hand, and a store to keep game state out of Re
 scene tree, one audio bus, and one place for state to live — and the boundary the original design
 was most careful about (game state never lives in a UI node) is *easier* to hold there, not harder.
 Migrated 2026-08-23 behind a parity gate. (`specs/2026-08-22-chrome-direction-design.md`.)
-
-**The stance model → no model.** Monster tactics were to be deterministic with an LLM assigning a
-stance per round. The stance call was never built, `GoblinAi` picks its move with no model in the
-path, and nothing about combat is poorer for it. The general lesson: *a model in the loop has to
-earn its latency*, and "picks between aggressive and defensive" does not.
 
 **One model → two.** Not a reversal so much as a discovery, and the most valuable one. The original
 design assumed one narrator and warned against fragmenting narration across models — which is still
@@ -124,7 +119,7 @@ disqualified models usable and cut a measured 44-second turn to 8.9 seconds. See
 │  WsHandler ── one session                                             │
 │      ├── GameEngine ── authoritative. Emits events, folds WorldState  │
 │      ├── CombatEngine ── pure, sync, no I/O, injected DiceRoller      │
-│      ├── GoblinAi ── deterministic. No model in this path             │
+│      ├── GoblinAi ── deterministic execution. Stance layer not built  │
 │      ├── RoomGenerator ── shape → props → one LLM dress pass          │
 │      ├── DmService ─┬── mechanics model  (tools)     ┐                │
 │      │              ├── prose model      (narration) ├─ Venice.ai     │
@@ -248,6 +243,10 @@ Diff         { EntityAdded | EntityRemoved | EntityMoved | StatChanged
              | ModeChanged | PropRevealed | CombatChanged }
 PlayerAction { FreeText | MoveTo | AttackTarget | EndTurn }
 Narration    { segments: [{ speakerId | NARRATOR, text }] }
+
+Stance       { Aggressive | Defensive | Flee | Protect(id) | Focus(id) | Environmental }
+             -- not built. Listed because it is a closed enum by design, and the
+             -- shape it has to be when the stance layer arrives. See §8.
 ```
 
 Java records are the source; the GDScript side is hand-mirrored. At this size that is cheaper than a
@@ -483,12 +482,33 @@ own words gate it.
 2. **Player turns:** UI-driven. The server ships the *legal sets* — `legalMoves`, `legalTargets` —
    already decided; the client asks whether a clicked square is in a list that arrived over the wire,
    and that is the entire client-side movement rule. No model call.
-3. **Enemy turns:** `GoblinAi` resolves them deterministically and instantly. No model call, and no
-   stance assignment — see §2a.
+3. **Enemy turns:** one model call assigns a `Stance` per monster; the tactical AI then resolves
+   *all* enemy actions deterministically and instantly. **Today only the second half exists** —
+   `GoblinAi` picks its move with no model in the path. See below.
 4. **One narration call per enemy turn**, move and swing together. Measured 708–782ms to first token,
    1.3–1.6s total. The animation is the cover, exactly as the dice cover an exploration turn.
 5. The player's own swings are narrated only on a kill, a crit or a fumble — decided structurally
    from the roll outcome and the diffs, never by reading the beat text.
+
+### The stance layer, and why it is worth the model call
+
+The split — **the model picks intent, the engine executes it** — is the same governing principle as
+everywhere else in this system, applied to monsters. It buys three things a fully deterministic AI
+cannot: monsters that read the *fiction* rather than the board (a wounded cultist flees, a bodyguard
+interposes because of who it is guarding, not because of a hit point threshold), a fight that can
+change character mid-combat when the situation does, and a place to put behaviour that would
+otherwise be a growing pile of hand-tuned heuristics.
+
+It stays cheap because `Stance` is a closed enum and the output is a handful of tokens — one call
+per round for the whole enemy side, never one per monster, and never per action. The model never
+picks a square, a target's position, or a roll. Spatial reasoning stays with the engine, which is
+where the original design put it and why it put it there.
+
+**Not built, and not missed yet, for a reason that expires.** There is one enemy kind and it has one
+thing it can do, so there is no intent to pick — a stance call today would be a model round trip to
+choose between aggressive and aggressive. It becomes worth building the moment a second monster kind
+exists and a fight can be coordinated or not. `GoblinAi` is the execution half and is not throwaway:
+the stance layer sits *above* it and constrains what it does, rather than replacing it.
 
 **The engine states facts; the model writes prose.** `CombatSink.beat` carries plain sentences —
 "Vessk hits Roderick for 7 damage" — and never a word of description. A wound is described, not
@@ -597,6 +617,7 @@ tactical 5e is terrain, objectives, and composition.
 | **Reconcile** | Every player turn, after narration | Same as mechanics | No — it corrects state, never retracts displayed text |
 | **Room dresser** | Once per generated room, at build time | Mid-tier | No |
 | **Arc planner** | Once per arc — *not built* | Best available | No (pre-play) |
+| **Stance assigner** | Once per combat round — *not built* | Small/fast | Yes, but a handful of tokens |
 | **Encounter builder** | Per encounter — *not built* | Mid-tier | No |
 | **Synthesis worker** | Session end — *not built* | Big context, batch | No. Also owns quest graph revision. |
 
@@ -757,10 +778,12 @@ has since been thrown away as intended. M2 is the foundation M0 deliberately did
 **Dungeon generation.** `LayoutGenerator`, `ExitPlacer`, spatial validation, and world-space packing
 so a dungeon's rooms have non-overlapping rectangles to render. Answers M1's outstanding half.
 
-**Content and the rules engine, together.** More than one enemy, more than one attack, more than one
-party member — and the SRD-shaped engine of §6 that adjudicates them. One milestone, not two: an
-effect interpreter with a single attack to interpret is a tax, and the same interpreter with four
-classes and thirty monsters is what makes them cheap.
+**Content, the rules engine, and the stance layer, together.** More than one enemy, more than one
+attack, more than one party member — the SRD-shaped engine of §6 that adjudicates them, and the
+stance call of §8 that gives monsters something to decide. One milestone, not three, because each is
+a tax on its own and they only pay off in each other's company: an effect interpreter with a single
+attack to interpret, or a stance call choosing between aggressive and aggressive, is overhead. With
+four classes and thirty monsters, both are what make the content cheap.
 
 **Persistence and resume.** Sessions are written today and nothing resumes from one; resume is the
 expensive half. Snapshotting and schema migration arrive with it, or the log-refusal rule in §4 stops
@@ -798,7 +821,7 @@ anything needs it".
 | Resume from a session log | Sessions get long enough that losing one hurts |
 | Schema migration | Resume exists. Until then, refusing an old log is free |
 | The SRD engine of §6 (effects, conditions, reactions) | The content it adjudicates exists — more than one enemy, more than one attack, a spell list |
-| The stance model | A monster exists whose behaviour is genuinely ambiguous |
+| The stance layer above `GoblinAi` (§8) | A second monster kind exists, so there is a choice to make and a fight can read as coordinated |
 | An IDL | Two clients, or a second consumer of the wire types |
 | Multiplayer | The solo game is fun and someone asks to play |
 | Grid-walkable exploration | Combat is polished and you want interactable props |
