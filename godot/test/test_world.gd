@@ -28,39 +28,53 @@ func _world() -> Node3D:
 	return node
 
 
-func test_grid_to_world_centres_the_room_on_the_origin() -> void:
-	var world := _world()
-	if not world.has_method("grid_to_world"):
-		assert_true(world.has_method("grid_to_world"))
-		return
-	# 12×12: square (0, 0) sits at (-5.5, 0, +5.5) — north-west, +Z is south.
-	assert_eq(world.grid_to_world(0, 0), Vector3(-5.5, 0.0, 5.5))
-	assert_eq(world.grid_to_world(11, 11), Vector3(5.5, 0.0, -5.5))
-	assert_eq(world.grid_to_world(2, 2), Vector3(-3.5, 0.0, 3.5))
+func _world_with_room(w: int, h: int) -> Node3D:
+	var scene := CRYPT.duplicate(true)
+	scene["width"] = w
+	scene["height"] = h
+	Table.set_scene(scene)
+	return _world()
 
 
-func test_world_to_grid_inverts_grid_to_world() -> void:
-	var world := _world()
-	if not world.has_method("world_to_grid"):
-		assert_true(world.has_method("world_to_grid"))
-		return
-	for x in 12:
-		for y in 12:
-			var point: Vector3 = world.grid_to_world(x, y)
+func test_the_current_room_is_still_centred_on_the_origin() -> void:
+	var world := _world_with_room(12, 12)
+	# Unchanged behaviour for the room the party is in — the whole point of taking the room id
+	# as an argument now is that a second room can exist without moving the first.
+	assert_eq(world.grid_to_world("crypt", 0, 0), Vector3(-5.5, 0.0, 5.5))
+	assert_eq(world.grid_to_world("crypt", 11, 11), Vector3(5.5, 0.0, -5.5))
+	assert_eq(world.grid_to_world("crypt", 2, 2), Vector3(-3.5, 0.0, 3.5))
+
+
+func test_a_registered_neighbour_sits_where_it_was_put() -> void:
+	var world := _world_with_room(12, 12)
+	world.register_room("gallery", Vector2i(10, 16), Vector3(0.0, 0.0, -14.0))
+
+	# Its own centre, offset by its origin: a 10x16 room's (5, 8) is its middle.
+	assert_eq(world.grid_to_world("gallery", 5, 8), Vector3(0.5, 0.0, -14.5))
+	assert_eq(world.room_origin("gallery"), Vector3(0.0, 0.0, -14.0))
+
+
+func test_an_unregistered_room_falls_back_to_the_current_one() -> void:
+	var world := _world_with_room(12, 12)
+	# A diff naming a room the client has not been told about must not put a token at NaN.
+	assert_eq(world.grid_to_world("nowhere", 2, 2), world.grid_to_world("crypt", 2, 2))
+
+
+func test_world_to_grid_still_inverts_the_current_room() -> void:
+	var world := _world_with_room(12, 12)
+	for x in range(12):
+		for y in range(12):
+			var point: Vector3 = world.grid_to_world("crypt", x, y)
 			assert_eq(world.world_to_grid(point), Vector2i(x, y), "square (%d, %d)" % [x, y])
 
 
 func test_grid_conversion_reads_the_live_room_size_from_table() -> void:
-	var world := _world()
+	var world := _world_with_room(7, 5)
 	if not world.has_method("grid_to_world"):
 		assert_true(world.has_method("grid_to_world"))
 		return
-	var odd := CRYPT.duplicate(true)
-	odd["width"] = 7
-	odd["height"] = 5
-	Table.set_scene(odd)
 	# Odd width: the centre of square (3, 2) is the origin.
-	assert_eq(world.grid_to_world(3, 2), Vector3.ZERO)
+	assert_eq(world.grid_to_world("crypt", 3, 2), Vector3.ZERO)
 	assert_eq(world.world_to_grid(Vector3.ZERO), Vector2i(3, 2))
 
 
@@ -251,14 +265,14 @@ func test_exploration_follow_is_the_party_centroid_not_the_fighter() -> void:
 	if world.rig == null:
 		assert_not_null(world.rig, "Camera3D")
 		return
-	var a: Vector3 = world.grid_to_world(1, 1)
-	var b: Vector3 = world.grid_to_world(7, 3)
+	var a: Vector3 = world.grid_to_world("crypt", 1, 1)
+	var b: Vector3 = world.grid_to_world("crypt", 7, 3)
 	var expected := (a + b) * 0.5
 	assert_almost_eq(world.rig._follow_point.x, expected.x, 0.0001)
 	assert_almost_eq(world.rig._follow_point.z, expected.z, 0.0001)
 	assert_false(world.rig._follow_point.is_equal_approx(a),
 		"must not follow a single party member")
-	assert_false(world.rig._follow_point.is_equal_approx(world.grid_to_world(10, 10)),
+	assert_false(world.rig._follow_point.is_equal_approx(world.grid_to_world("crypt", 10, 10)),
 		"must not follow the entity whose id is fighter")
 
 

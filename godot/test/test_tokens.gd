@@ -100,8 +100,8 @@ func test_the_world_spawns_every_entity_from_the_scene() -> void:
 	assert_not_null(goblin, "goblin")
 	if fighter == null or goblin == null:
 		return
-	assert_eq(fighter.position, world.grid_to_world(2, 2))
-	assert_eq(goblin.position, world.grid_to_world(8, 6))
+	assert_eq(fighter.position, world.grid_to_world("crypt", 2, 2))
+	assert_eq(goblin.position, world.grid_to_world("crypt", 8, 6))
 
 
 func test_entity_added_instances_a_token() -> void:
@@ -112,7 +112,7 @@ func test_entity_added_instances_a_token() -> void:
 	assert_not_null(goblin, "entity_added spawns the goblin")
 	if goblin == null:
 		return
-	assert_eq(goblin.position, world.grid_to_world(8, 6))
+	assert_eq(goblin.position, world.grid_to_world("crypt", 8, 6))
 
 
 func test_a_move_slides_over_sfx_move_seconds() -> void:
@@ -125,7 +125,7 @@ func test_a_move_slides_over_sfx_move_seconds() -> void:
 	if not fighter.has_method("slide_to"):
 		return
 	var from: Vector3 = fighter.position
-	var dest: Vector3 = world.grid_to_world(4, 2)
+	var dest: Vector3 = world.grid_to_world("crypt", 4, 2)
 	assert_true(FileAccess.get_file_as_string("res://world/tokens/token.gd").contains("Sfx.move_seconds"),
 		"duration is Sfx.move_seconds, not a second copy of the formula")
 	assert_false(FileAccess.get_file_as_string("res://world/tokens/token.gd").contains("0.18 +"),

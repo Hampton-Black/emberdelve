@@ -382,7 +382,7 @@ func _weight_total(variants: Array) -> int:
 func _to_world(gx: int, gy: int) -> Vector3:
 	var world := get_parent() as World
 	if world != null:
-		return world.grid_to_world(gx, gy)
+		return world.grid_to_world(world.current_room_id(), gx, gy)
 	var width := float(_width())
 	var height := float(_height())
 	return Vector3(gx - width / 2.0 + 0.5, 0.0, -(gy - height / 2.0 + 0.5))

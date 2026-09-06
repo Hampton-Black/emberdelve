@@ -13,6 +13,12 @@ const TOKEN_SCENE := preload("res://world/tokens/token.tscn")
 
 var rig: CameraRigScript
 var _room_id := ""
+## Where each room sits in world space, and how big it is. The room the party is in is always
+## at the origin; a neighbour is offset so its answering door lines up with the one you came
+## through. Invariant #4 is untouched — this is one scene with two rectangles in it, not two
+## scenes.
+var _origins: Dictionary = {}
+var _sizes: Dictionary = {}
 
 
 func _ready() -> void:
@@ -32,16 +38,37 @@ func _process(_delta: float) -> void:
 	_fit_world_viewport()
 
 
-func grid_to_world(x: int, y: int) -> Vector3:
-	var width := float(_room_width())
-	var height := float(_room_height())
-	return Vector3(
-		x - width / 2.0 + 0.5,
+func register_room(room_id: String, size: Vector2i, origin: Vector3) -> void:
+	_sizes[room_id] = size
+	_origins[room_id] = origin
+
+
+func room_origin(room_id: String) -> Vector3:
+	return _origins.get(room_id, Vector3.ZERO)
+
+
+func current_room_id() -> String:
+	return _room_id
+
+
+## A square's centre in world space.
+##
+## Takes the room because there is more than one now. A room the client has not been told about
+## falls back to the current one rather than to NaN — a diff naming an unknown room is a bug
+## worth seeing as a token in the wrong place, not as a token that has vanished.
+func grid_to_world(room_id: String, x: int, y: int) -> Vector3:
+	var size: Vector2i = _sizes.get(room_id, Vector2i(_room_width(), _room_height()))
+	var origin: Vector3 = _origins.get(room_id, Vector3.ZERO)
+	return origin + Vector3(
+		x - float(size.x) / 2.0 + 0.5,
 		0.0,
-		-(y - height / 2.0 + 0.5),
+		-(y - float(size.y) / 2.0 + 0.5),
 	)
 
 
+## The inverse, for the room the party is in — which is the only room anything is picked in.
+## A neighbour is scenery until you walk into it, and clicking one is not a move the server
+## would accept.
 func world_to_grid(point: Vector3) -> Vector2i:
 	var width := float(_room_width())
 	var height := float(_room_height())
@@ -59,6 +86,9 @@ func _on_scene_changed() -> void:
 	# a reveal is Table.prop_revealed, not a second pass over the list.
 	if room_id != _room_id:
 		_room_id = room_id
+		_origins.clear()
+		_sizes.clear()
+		register_room(room_id, Vector2i(_room_width(), _room_height()), Vector3.ZERO)
 		_rebuild_props()
 		_rebuild_tokens()
 		_follow_party()
@@ -104,7 +134,7 @@ func _instance_prop(prop: Dictionary) -> void:
 	if node == null:
 		return
 	node.name = id
-	node.position = grid_to_world(int(prop.get("x", 0)), int(prop.get("y", 0)))
+	node.position = grid_to_world(_room_id, int(prop.get("x", 0)), int(prop.get("y", 0)))
 	node.rotation.y = deg_to_rad(float(prop.get("rotation", 0.0)))
 	holder.add_child(node)
 	if node.has_method("configure"):
@@ -163,7 +193,7 @@ func _instance_token(entity: Dictionary) -> void:
 	if token == null:
 		return
 	token.name = id
-	token.position = grid_to_world(int(entity.get("x", 0)), int(entity.get("y", 0)))
+	token.position = grid_to_world(_room_id, int(entity.get("x", 0)), int(entity.get("y", 0)))
 	holder.add_child(token)
 	token.configure(entity)
 	token.set_bar_visible(Table.mode == "COMBAT")
@@ -219,7 +249,7 @@ func _follow_party() -> void:
 	var count := 0
 	for e in Table.scene.get("entities", []):
 		if bool(e.get("isPlayerControlled", false)):
-			centre += grid_to_world(int(e["x"]), int(e["y"]))
+			centre += grid_to_world(_room_id, int(e["x"]), int(e["y"]))
 			count += 1
 	if count == 0:
 		return

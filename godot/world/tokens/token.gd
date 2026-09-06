@@ -94,7 +94,7 @@ func slide_to(square: Vector2i) -> void:
 	var world := _host_world()
 	if world == null:
 		return
-	var to: Vector3 = world.grid_to_world(square.x, square.y)
+	var to: Vector3 = world.grid_to_world(world.current_room_id(), square.x, square.y)
 	var from := position
 	if from.distance_squared_to(to) < 1e-6:
 		return

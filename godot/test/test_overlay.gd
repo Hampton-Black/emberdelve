@@ -220,6 +220,7 @@ func test_legal_move_quads_sit_at_overlay_y_in_the_move_tint() -> void:
 		assert_almost_eq(mesh.position.y, OVERLAY_Y, 0.0001, "OVERLAY_Y 0.03 — coplanar z-fights")
 		_almost_tint(_albedo(mesh), MOVE_TINT, "MOVE_TINT 5c86c4")
 		var want: Vector3 = world.grid_to_world(
+			"crypt",
 			roundi(world.world_to_grid(mesh.position).x),
 			roundi(world.world_to_grid(mesh.position).y))
 		assert_almost_eq(mesh.position.x, want.x, 0.001)
@@ -330,7 +331,7 @@ func test_pick_at_reads_viewport_pixels_not_window_pixels() -> void:
 		return
 	await wait_process_frames(2)
 	var square := Vector2i(4, 3)
-	var ground: Vector3 = world.grid_to_world(square.x, square.y)
+	var ground: Vector3 = world.grid_to_world("crypt", square.x, square.y)
 	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
 	assert_not_null(cam, "Camera3D")
 	if cam == null:
@@ -462,7 +463,7 @@ func test_a_click_event_in_window_space_still_moves_the_right_square() -> void:
 		return
 
 	var square := Vector2i(4, 3)
-	var ground: Vector3 = world.grid_to_world(square.x, square.y)
+	var ground: Vector3 = world.grid_to_world("crypt", square.x, square.y)
 	var cam: Camera3D = world.get_node("Camera3D") as Camera3D
 	var viewport_pos: Vector2 = cam.unproject_position(ground)
 	var window_pos: Vector2 = world.get_parent().get_parent().get_global_transform_with_canvas() * viewport_pos

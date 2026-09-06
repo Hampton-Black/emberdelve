@@ -99,12 +99,12 @@ func test_props_sit_at_grid_to_world() -> void:
 	assert_not_null(tomb, "tomb")
 	if tomb == null:
 		return
-	assert_eq(tomb.position, world.grid_to_world(6, 7))
+	assert_eq(tomb.position, world.grid_to_world("crypt", 6, 7))
 	var fire := _prop(world, "fire")
 	assert_not_null(fire, "fire")
 	if fire == null:
 		return
-	assert_eq(fire.position, world.grid_to_world(2, 8))
+	assert_eq(fire.position, world.grid_to_world("crypt", 2, 8))
 
 
 func test_rotation_is_degrees() -> void:
@@ -157,7 +157,7 @@ func test_a_new_room_rebuilds_props() -> void:
 	if rebuilt == null:
 		return
 	assert_ne(rebuilt.get_instance_id(), old_id, "a new roomId rebuilds the props")
-	assert_eq(rebuilt.position, world.grid_to_world(4, 4))
+	assert_eq(rebuilt.position, world.grid_to_world("crypt-2", 4, 4))
 	assert_eq(_props(world).get_child_count(), 1)
 
 

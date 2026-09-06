@@ -104,7 +104,7 @@ func set_hover(square: Variant = null) -> void:
 		hover.visible = false
 		return
 	var at: Vector2i = square
-	var pos: Vector3 = world.grid_to_world(at.x, at.y)
+	var pos: Vector3 = world.grid_to_world(world.current_room_id(), at.x, at.y)
 	hover.position = Vector3(pos.x, OVERLAY_Y + 0.004, pos.z)
 	hover.visible = true
 
@@ -120,14 +120,14 @@ func refresh() -> void:
 	if world == null:
 		return
 	for cell in combat.get("legalMoves", []):
-		_add_quad($Moves, world.grid_to_world(int(cell["x"]), int(cell["y"])), _move_mat, MOVE_SIZE)
+		_add_quad($Moves, world.grid_to_world(world.current_room_id(), int(cell["x"]), int(cell["y"])), _move_mat, MOVE_SIZE)
 	for id in combat.get("legalTargets", []):
 		var entity := Table.entity(String(id))
 		if entity.is_empty():
 			continue
 		_add_quad(
 			$Targets,
-			world.grid_to_world(int(entity["x"]), int(entity["y"])),
+			world.grid_to_world(world.current_room_id(), int(entity["x"]), int(entity["y"])),
 			_target_mat,
 			MOVE_SIZE,
 		)

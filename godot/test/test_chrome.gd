@@ -615,7 +615,7 @@ func test_a_click_on_the_world_view_sends_move_to() -> void:
 	if cam == null or not world.has_method("grid_to_world"):
 		return
 	var square := Vector2i(4, 3)
-	var ground: Vector3 = world.grid_to_world(square.x, square.y)
+	var ground: Vector3 = world.grid_to_world("crypt", square.x, square.y)
 	var viewport_pos: Vector2 = cam.unproject_position(ground)
 	var view: SubViewportContainer = chrome.get_node("WorldView")
 	var window_pos: Vector2 = view.get_global_transform_with_canvas() * viewport_pos
@@ -656,7 +656,7 @@ func test_hover_uses_control_local_position() -> void:
 	if cam == null:
 		return
 	var square := Vector2i(4, 3)
-	var ground: Vector3 = world.grid_to_world(square.x, square.y)
+	var ground: Vector3 = world.grid_to_world("crypt", square.x, square.y)
 	var viewport_pos: Vector2 = cam.unproject_position(ground)
 	var motion := InputEventMouseMotion.new()
 	motion.position = viewport_pos
