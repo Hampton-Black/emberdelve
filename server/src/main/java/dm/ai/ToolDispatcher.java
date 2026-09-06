@@ -117,7 +117,7 @@ public final class ToolDispatcher {
         if (!hidden) {
             return Result.rejected("'" + propId + "' is not a hidden prop in this room");
         }
-        if (engine.state().revealedPropIds().contains(propId)) {
+        if (engine.state().revealedHere().contains(propId)) {
             return Result.rejected("'" + propId + "' has already been revealed");
         }
 

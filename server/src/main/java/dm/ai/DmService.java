@@ -662,7 +662,7 @@ public final class DmService {
      */
     private String worldState(boolean forProse) {
         RoomDefinition room = engine.room();
-        var revealed = engine.state().revealedPropIds();
+        var revealed = engine.state().revealedHere();
         var sb = new StringBuilder();
 
         sb.append("# Current state\n\n");

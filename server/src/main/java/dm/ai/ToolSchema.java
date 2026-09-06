@@ -95,7 +95,7 @@ public final class ToolSchema {
         // Only offered while something is actually hidden — a tool with an empty enum is not
         // a valid schema, and one with nothing to reveal is an invitation to hallucinate.
         var hidden = engine.room().hiddenPropIds().stream()
-                .filter(id -> !engine.state().revealedPropIds().contains(id))
+                .filter(id -> !engine.state().revealedHere().contains(id))
                 .toList();
         if (!hidden.isEmpty()) {
             tools.add(tool(REVEAL_PROP,

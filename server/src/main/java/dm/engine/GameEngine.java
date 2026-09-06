@@ -123,7 +123,7 @@ public final class GameEngine {
      * revealed, so a curious player cannot read the secrets out of a websocket frame.
      */
     public SceneState scene() {
-        var revealed = state().revealedPropIds();
+        var revealed = state().revealedHere();
 
         List<Prop> visible = room.props().stream()
                 .filter(p -> !p.hidden() || revealed.contains(p.id()))
@@ -189,7 +189,7 @@ public final class GameEngine {
     public List<Diff> revealProp(String propId) {
         var definition = room.prop(propId);
 
-        if (state().revealedPropIds().contains(propId)) {
+        if (state().revealedHere().contains(propId)) {
             return List.of();
         }
         log.append(new Event.PropRevealed(Instant.now(), ROOM_ID, propId));
