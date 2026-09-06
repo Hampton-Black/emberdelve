@@ -127,4 +127,28 @@ class CrossExitTest {
         assertEquals(engine.room().exits(), engine.scene().exits());
         assertFalse(engine.scene().exits().isEmpty());
     }
+
+    @Test
+    @DisplayName("a hostile left in another room is not in this fight")
+    void combatIgnoresHostilesInOtherRooms() {
+        var engine = started(new EventLog());
+        engine.spawnGoblin(6, 6);
+        var goblinBefore = engine.state().find("goblin").orElseThrow();
+
+        engine.crossExit("door-north");
+
+        var sink = new CombatSink.Buffer();
+        engine.combat().start(sink);
+
+        assertFalse(engine.combat().isActive(),
+                "only the fighter is here — start() treats that as nothing to fight");
+        assertTrue(sink.collectedRolls().stream()
+                .noneMatch(r -> "goblin".equals(r.request().actorId())),
+                "a goblin in another room must not roll initiative");
+
+        var goblinAfter = engine.state().find("goblin").orElseThrow();
+        assertEquals("crypt", goblinAfter.roomId());
+        assertEquals(goblinBefore.x(), goblinAfter.x());
+        assertEquals(goblinBefore.y(), goblinAfter.y());
+    }
 }

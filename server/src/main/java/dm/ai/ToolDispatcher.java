@@ -145,7 +145,7 @@ public final class ToolDispatcher {
                     x, y, engine.room().width(), engine.room().height()));
         }
 
-        boolean occupied = engine.state().entities().values().stream()
+        boolean occupied = engine.state().entitiesHere().stream()
                 .anyMatch(e -> e.x() == x && e.y() == y);
         if (occupied) {
             return Result.rejected("(" + x + "," + y + ") is already occupied — pick another square");
@@ -171,8 +171,8 @@ public final class ToolDispatcher {
         if (engine.mode() == Mode.COMBAT) {
             return Result.rejected("combat has already started");
         }
-        boolean hostilePresent = engine.state().entities().values().stream()
-                .anyMatch(e -> !e.isPlayerControlled());
+        boolean hostilePresent = engine.state().entitiesHere().stream()
+                .anyMatch(e -> e.isAlive() && !e.isPlayerControlled());
         if (!hostilePresent) {
             return Result.rejected(
                     "there is nothing to fight — spawn a creature before starting combat");

@@ -440,7 +440,7 @@ public final class CombatEngine {
      * faces to a different combatant on different runs.
      */
     List<Entity> livingEntities() {
-        return state().entities().values().stream()
+        return state().entitiesHere().stream()
                 .filter(Entity::isAlive)
                 .sorted(Comparator.comparing(Entity::id))
                 .toList();

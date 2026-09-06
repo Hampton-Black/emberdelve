@@ -6,6 +6,7 @@ import dm.engine.GameEngine;
 import dm.engine.Rooms;
 import dm.engine.ScriptedDiceRoller;
 import dm.model.Event;
+import dm.model.Mode;
 import dm.state.EventLog;
 import dm.wire.Json;
 import org.junit.jupiter.api.DisplayName;
@@ -189,6 +190,24 @@ class TraversalToolsTest {
 
         assertFalse(result.ok());
         assertTrue(result.message().startsWith("REJECTED:"), result.message());
+    }
+
+    @Test
+    @DisplayName("start_combat is rejected when the only hostile is in another room")
+    void startCombatRejectsHostileElsewhere() {
+        var engine = started(new EventLog());
+        engine.spawnGoblin(6, 6);
+        engine.crossExit("door-north");
+
+        var result = new ToolDispatcher(engine).dispatch(new DmClient.ToolCall(
+                "1", ToolSchema.START_COMBAT, "{}"));
+
+        assertFalse(result.ok());
+        assertTrue(result.message().startsWith("REJECTED:"), result.message());
+        assertTrue(result.message().contains("nothing to fight"), result.message());
+        assertEquals(Mode.EXPLORATION, engine.state().mode());
+        var goblin = engine.state().find("goblin").orElseThrow();
+        assertEquals("crypt", goblin.roomId());
     }
 
     @Test
