@@ -17,19 +17,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{ bd list --status=in_progress --json 2>/dev/null || echo \"[]\"; } | jq -c \"if length>0 then {hookSpecificOutput:{hookEventName:\\\"PreCompact\\\",additionalContext:(\\\"Beads issues in progress — carry these ids and their status into the summary: \\\"+([.[]|.id+\\\" (\\\"+.title+\\\")\\\"]|join(\\\"; \\\")))}} else {} end\" 2>/dev/null || true",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-compact.sh\"",
             "statusMessage": "Noting beads issues in progress"
           }
         ]
       }
     ],
-    "PostCompact": [
+    "UserPromptSubmit": [
       {
-        "matcher": "manual|auto",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "bd prime --hook-json 2>/dev/null | jq -c \".hookSpecificOutput.hookEventName = \\\"PostCompact\\\"\" 2>/dev/null || true",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/user-prompt-submit.sh\"",
             "statusMessage": "Restoring beads context"
           }
         ]
