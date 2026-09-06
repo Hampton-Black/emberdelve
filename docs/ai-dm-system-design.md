@@ -47,14 +47,14 @@ Updated to what is true as of 2026-09-05. Reversals are explained in §2a.
 | Area | Decision | Rationale |
 |---|---|---|
 | Backend language | **Java 25** | Sealed interfaces + records + exhaustive pattern matching are the right fit for a rules engine's tagged unions. Virtual threads make the streaming orchestration layer read as blocking code. |
-| Rules engine style | **Content-as-data for rooms and creatures; no effect interpreter** | Rooms, entities and kits are JSON evaluated at boot. The spell/effect layer the original design specified was never built — see §6. |
+| Rules engine style | **Content-as-data** | Spells, monsters and effects are declarative content files evaluated by a small interpreter. Testable in isolation; modding for free. Already true of rooms, entities and kits; the spell/effect layer is not built yet — see §6. |
 | Persistence | **Append-only event log, JSONL on disk. No database.** | State is a fold over the log. Postgres buys nothing until something needs to be queried rather than replayed. |
 | Job runner | **None** | The one async job the original design named (synthesis) does not exist yet. TTS is a synchronous call behind an interface. |
 | Transport | **Single websocket** (`/ws`) | Server pushes state diffs; client sends actions. HTTP only for assets. |
 | Client | **Godot 4.7, Forward Plus** (originally React + Zustand + Three.js) | One engine for chrome, renderer and audio, instead of three libraries and a bridge between them. |
 | Renderer | **Orthographic isometric 3D at native resolution.** KayKit-class meshes, linear filtering, real lights. No low-res nearest-neighbour pass | Z-buffer solves depth sorting. 3D kit content scales far better than sprites for an infinite-variety game — the reason this is not 2D isometric pixel art. |
 | Schema source of truth | **Java records, hand-mirrored into GDScript. No IDL.** | The IDL was the highest-leverage structural bet in the original design and it did not pay — see §5. |
-| Ruleset | **~40 lines of attack resolution. No effect system, no conditions, no concentration.** | Reversed from "full-SRD-shaped engine". See §6. |
+| Ruleset | **Full-SRD-shaped engine, trimmed content** — *deferred, not reduced* | 4 classes, levels 1–5, ~30 monsters CR 0–3. Keeps reaction hooks and concentration. Today's ~40 lines of attack resolution are a proxy standing in for it, not a replacement — see §6. |
 | Combat | **Grid movement, one melee attack, initiative, Chebyshev distance** | No reach, cover, AoE, or opportunity attacks. Terrain belongs to the room, not to combat. |
 | Exploration | **Narrative. The grid is rendered, and only exits are clickable** | Avoids the interactable-object content pipeline entirely. M3 adds an explicit door click — one verb, not free walking. |
 | Monster tactics | **Fully deterministic. No model in the path at all** | Tightened from "LLM sets stance only" — the stance call was never built and is not missed. |
@@ -70,7 +70,7 @@ Updated to what is true as of 2026-09-05. Reversals are explained in §2a.
 
 ### 2a. What play reversed, and why
 
-Six decisions were overturned by playing the thing. Each is worth keeping because the *reason* it
+Five decisions were overturned by playing the thing. Each is worth keeping because the *reason* it
 was wrong generalises.
 
 **Postgres → an event log on disk.** The original design gave persistence a schema before it gave
@@ -88,13 +88,6 @@ engine state* — the hidden props in this room, the entities that are still ali
 IDL cannot express. `ToolSchema.build(engine)` reads the world and emits the enum, every turn. The
 principle the IDL existed to serve survived intact and became invariant #7; the mechanism did not.
 See §5.
-
-**The rules engine → forty lines.** Sealed `Effect` and `Trigger` hierarchies, a reaction hook in
-the turn loop from day one, concentration as a first-class effect — all specified up front on the
-argument that retrofitting an interrupt point later is a rewrite. That argument is still correct
-and it was still the wrong call, because the thing that had to be proven first was whether an LLM
-can run a game, and none of that machinery moves that question an inch. It is now an explicit
-anti-goal. See §6.
 
 **React + Zustand + Three.js → Godot.** Three libraries, a canvas that must never be re-created by
 a render, an audio queue built by hand, and a store to keep game state out of React. Godot has one
@@ -262,36 +255,96 @@ generator, and the websocket is the only place the two ever meet.
 
 ---
 
-## 6. The rules engine that isn't
+## 6. Rules engine
 
-The original design specified a pure, synchronous, exhaustively testable rules core: sealed `Effect`
-and `Trigger` hierarchies, a reaction hook in the turn loop from day one, concentration as a
-first-class effect, conditions modelled as effects rather than booleans. The argument for building
-it early was that retrofitting an interrupt point later is a rewrite.
+**The end state is a full-SRD-shaped engine with trimmed content, and that has not changed.** What
+has changed is when it gets built. Everything shipped so far stands in for it — deliberately, to
+keep the questions coming in the order they have to be asked — and none of it is the design.
 
-**That argument is correct and it was still the wrong thing to build.** Counterspell, Shield and
-Hellish Rebuke all need an interrupt point — and none of them tells you whether an LLM can run a
-game, which was the only question worth answering first. Every hour spent on the effect interpreter
-would have been an hour not spent on the question the project exists to ask.
+### The engine this is heading toward
 
-What exists instead is about forty lines in `CombatEngine.resolveAttack`: `d20 + bonus >= AC`, and a
-natural 20 doubles the dice. No conditions, no resistances, no crit tables, no reach, no cover, no
-opportunity attacks. **This is now an explicit anti-goal** — "do not build a rules engine" is in
-`AGENTS.md`, and the instruction to stop if you find yourself modelling conditions is meant
-literally.
+Pure, synchronous, no I/O, seeded RNG. This is the part that must be exhaustively testable.
 
-The parts of the original prescription that *did* survive are the ones that were about testability
-rather than about 5e:
+```java
+sealed interface Effect
+    permits Damage, Heal, ApplyCondition, RemoveCondition, Move, Concentration, Summon {}
+
+sealed interface Trigger
+    permits OnHit, OnDamaged, OnEnterSquare, OnTurnStart, OnConcentrationCheck {}
+
+record CombatState(List<Entity> entities, Grid grid, TurnOrder order, long rngSeed) {}
+```
+
+Three properties to build in from the start of that work, even if barely used at first:
+
+- **A reaction/interrupt hook in the turn loop.** Opportunity attacks first. Counterspell, Shield
+  and Hellish Rebuke all need the same interrupt point, and it is the one piece of structure that
+  is genuinely painful to add late — see the cost below.
+- **Concentration as a first-class effect**, with a holder and break conditions.
+- **Conditions as effects**, never booleans on a character.
+
+Content trim: Fighter, Rogue, Cleric, Wizard; levels 1–5; ~30 monsters CR 0–3; only the spells those
+classes get. Roughly 10% of SRD volume, 100% of a playable game. The trim is a content decision and
+says nothing about the engine's shape — a trimmed-content SRD engine is still an SRD engine.
+
+Content-as-data applies here the same way it already does to rooms and creatures: spells, monsters
+and effects are declarative content files evaluated by a small interpreter. Testable in isolation,
+and modding for free.
+
+### What stands in for it today, and why
+
+About forty lines in `CombatEngine.resolveAttack`: `d20 + bonus >= AC`, natural 20 doubles the
+damage dice, natural 1 misses. No conditions, no resistances, no crit tables, no reach, no cover, no
+opportunity attacks.
+
+That is a **proxy, not a verdict.** It exists because the questions the project has been answering —
+does this feel like a DM running a game, can the world be made rather than authored, can a fault
+found in play be turned into a test — are all answerable with one attack and one enemy, and none of
+them gets clearer with an effect interpreter underneath. Forward progress on those questions was
+worth more than completeness on this one.
+
+`AGENTS.md` carries "do not build a rules engine" as an anti-goal, and it means it — but it is a
+**milestone-scoped instruction, not a design position.** Read it as "not yet, and not while you are
+in the middle of something else," not as "never." The design is this section.
+
+### What the proxy is costing, stated plainly
+
+The original design's argument for building the interrupt point early was that retrofitting one is a
+rewrite. That argument is correct, it has not been refuted, and deferring it was a decision to pay
+that cost later rather than a decision that the cost is not real. Two places where the bill will
+come due, both worth knowing before the work starts:
+
+- **`CombatEngine.attack` resolves and applies in one call.** There is no point between "an attack is
+  declared" and "the attack resolves" for anything to fire in. That gap *is* the interrupt point, and
+  opening it is the first task of the real engine, not a detail of it.
+- **`Event.AttackResolved` is one coarse event** carrying the to-hit roll, the damage roll, the
+  damage applied, and whether the target died. That coarseness is deliberate and well-reasoned —
+  split into separate damage and death events, the beat handed to the narrator loses its attacker,
+  and `m0-evaluation.md` §4.4 records what that cost the first time. But a reaction fires *between*
+  the parts of that event, so the interrupt work and the narration's need for a whole beat are on a
+  collision course. Solve it by keeping the coarse event as a *projection* over finer ones rather
+  than by making the narrator reassemble a swing from fragments.
+
+### What already holds, and should keep holding
+
+These were specified up front for testability rather than for 5e, and they were built:
 
 - **Pure, synchronous, no I/O, injected RNG.** `CombatEngine` has no clock and no network. A
-  `ScriptedDiceRoller` makes any fight assertable, and that is what turns a bad turn into a test.
-- **Content-as-data** for rooms, entities and kits. Not for spells and effects, which do not exist.
+  `ScriptedDiceRoller` makes any fight assertable, which is what turns a bad turn into a test.
+- **Content-as-data** for rooms, entities and kits — the same pattern the spell and effect layer
+  will use, already proven on simpler content.
 - **Modern Java idioms pinned in the project rules file** — records over classes, sealed hierarchies,
-  pattern matching over visitor, no Spring, no `AbstractXFactory`. This one earned its place: agents
-  drift toward 2011 Java hard on a domain model shaped like this, and the pin is what keeps it out.
+  pattern matching over visitor, no Spring, no `AbstractXFactory`. Agents drift toward 2011 Java hard
+  on a domain model shaped like this, and the pin is what keeps it out. This matters more, not less,
+  once `Effect` and `Trigger` exist: a sealed hierarchy with exhaustive pattern matching is the whole
+  reason this is Java, and it is exactly what an unpinned agent will turn into a visitor.
 
-The effect system re-enters the design when the game has more than one enemy kind and more than one
-attack, and not before.
+### When it gets built
+
+When the content it adjudicates exists — more than one enemy kind, more than one attack, a spell
+list. An effect interpreter with one attack to interpret is a tax; the same interpreter with four
+classes and thirty monsters is the thing that makes them cheap. §14 puts it with **Content**, and the
+two are one milestone rather than two.
 
 ---
 
@@ -704,8 +757,10 @@ has since been thrown away as intended. M2 is the foundation M0 deliberately did
 **Dungeon generation.** `LayoutGenerator`, `ExitPlacer`, spatial validation, and world-space packing
 so a dungeon's rooms have non-overlapping rectangles to render. Answers M1's outstanding half.
 
-**Content.** More than one enemy, more than one attack, more than one party member. The point at which
-the anti-goal in §6 expires and an effect system is worth having.
+**Content and the rules engine, together.** More than one enemy, more than one attack, more than one
+party member — and the SRD-shaped engine of §6 that adjudicates them. One milestone, not two: an
+effect interpreter with a single attack to interpret is a tax, and the same interpreter with four
+classes and thirty monsters is what makes them cheap.
 
 **Persistence and resume.** Sessions are written today and nothing resumes from one; resume is the
 expensive half. Snapshotting and schema migration arrive with it, or the log-refusal rule in §4 stops
@@ -728,8 +783,10 @@ most testable part of this system is completely deterministic, and you should bu
 
 The instinct was right and the sequencing was wrong. The deterministic parts that got built early —
 dice, the fold, replay, `GoblinAi` — are exactly the ones that have never needed rewriting. The
-deterministic part that was *skipped* early, the effect interpreter, turned out not to be needed at
-all yet. That is the difference between "build the testable part first" and "build all of it".
+deterministic part that was *deferred*, the effect interpreter, is still coming and is still the
+design; what changed is that it now arrives alongside the content it adjudicates rather than years
+ahead of it. That is the difference between "build the testable part first" and "build it before
+anything needs it".
 
 ---
 
@@ -740,7 +797,7 @@ all yet. That is the difference between "build the testable part first" and "bui
 | Postgres | Something needs a query rather than a replay |
 | Resume from a session log | Sessions get long enough that losing one hurts |
 | Schema migration | Resume exists. Until then, refusing an old log is free |
-| An effect/condition system | There is more than one enemy and more than one attack |
+| The SRD engine of §6 (effects, conditions, reactions) | The content it adjudicates exists — more than one enemy, more than one attack, a spell list |
 | The stance model | A monster exists whose behaviour is genuinely ambiguous |
 | An IDL | Two clients, or a second consumer of the wire types |
 | Multiplayer | The solo game is fun and someone asks to play |
@@ -772,8 +829,10 @@ top of it.
 4. **Java agent drift toward legacy idioms.** Mitigated by project rules, not eliminated.
 5. **The gap between "works" and "feels alive"** is mostly animation and audio timing, and it is wider
    than it looks. M0 existed to measure it early, and it was right to.
-6. **Scope creep via the rules engine.** The trim list is a commitment, not a suggestion — and it has
-   since been trimmed far further than this document originally proposed. See §6.
+6. **Scope creep via the rules engine.** 5e's long tail is infinite. The content trim list — 4
+   classes, levels 1–5, ~30 monsters — is a commitment, not a suggestion. The risk runs the other
+   way too: the ~40-line proxy is easy to mistake for the design and leave in place, and §6 exists
+   so that mistake has something to be corrected against.
 7. **Mushy generated content.** The real failure mode of this genre: everything medium, no stakes,
    nothing lands. Defended against by structure — quest graph, persistent antagonist, encounter
    templates — not by better prompts.

@@ -27,7 +27,7 @@ Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22).
 `docs/m2-evaluation.md` first — it is the most recent gate and its §8 lists what M2 handed
 forward. `docs/superpowers/specs/2026-08-23-m2-spine-design.md` is the architecture everything
 now sits on. `docs/ai-dm-system-design.md` is the long-range design. **Amended 2026-09-05** against
-three gates: its §2a lists the six decisions play reversed and why, and §14 carries both the
+three gates: its §2a lists the five decisions play reversed and why, and §14 carries both the
 real milestone history and the original ordering it superseded. Where it and this file
 disagree, this file wins — it is the operational one.
 
@@ -269,7 +269,10 @@ else.
 
 These are the things most likely to eat week two.
 
-- **Do not build a rules engine.** ~40 lines of attack resolution. If you are modeling conditions, stop.
+- **Do not build a rules engine** *yet*. ~40 lines of attack resolution. If you are modeling
+  conditions, stop. This is scoped to the current milestone, not a design position: the end state
+  is a full SRD-shaped engine with reaction hooks and concentration, and it arrives with the
+  content it adjudicates. See `docs/ai-dm-system-design.md` §6.
 - **Do not tune lighting and post-processing for more than one evening.** Timebox it. This is the
   single largest time sink in the project and it will consume as much as you give it.
 - **Do not add a second room.** The impulse will be strong. One room.
