@@ -1,0 +1,101 @@
+{
+  "roomId": "gallery",
+  "name": "The Long Gallery",
+  "width": 10,
+  "height": 16,
+  "floorType": "TILED",
+  "wallType": "CARVED",
+  "lighting": "DIM",
+  "props": [
+    {
+      "id": "door-south",
+      "type": "DOOR",
+      "x": 5,
+      "y": 0,
+      "rotation": 0,
+      "hidden": false,
+      "description": "The slab door back to the crypt, standing open on a dark stair-head. Its iron bands are the same work as the lamp's runes."
+    },
+    {
+      "id": "pillar-near-west",
+      "type": "PILLAR",
+      "x": 2,
+      "y": 4,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A fluted pillar, first of a line of four. Something has been chiselled off it at shoulder height, thoroughly, leaving a pale scar."
+    },
+    {
+      "id": "pillar-near-east",
+      "type": "PILLAR",
+      "x": 7,
+      "y": 4,
+      "rotation": 0,
+      "hidden": false,
+      "description": "Its partner across the aisle, scarred in the same place and the same way."
+    },
+    {
+      "id": "pillar-far-west",
+      "type": "PILLAR",
+      "x": 2,
+      "y": 11,
+      "rotation": 0,
+      "hidden": false,
+      "description": "The third pillar. This one still carries its carving: a procession of small robed figures, all walking south."
+    },
+    {
+      "id": "pillar-far-east",
+      "type": "PILLAR",
+      "x": 7,
+      "y": 11,
+      "rotation": 0,
+      "hidden": false,
+      "description": "The fourth. Its figures walk south too, and the last of them has no head."
+    },
+    {
+      "id": "brazier-head",
+      "type": "BRAZIER",
+      "x": 5,
+      "y": 14,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A cold brazier at the head of the gallery, choked with grey ash. Whatever burned here burned out a long time before the green fires downstairs were lit."
+    },
+    {
+      "id": "ceiling-fall",
+      "type": "RUBBLE",
+      "x": 8,
+      "y": 8,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A cone of fallen ceiling, tiles and mortar, with the dust long settled into it."
+    },
+    {
+      "id": "niche",
+      "type": "ALCOVE",
+      "x": 0,
+      "y": 9,
+      "rotation": 0,
+      "hidden": true,
+      "revealHint": "The west wall's tiling runs in a straight course except where it does not — one section is set a finger's width proud of the rest, and the grout there is a different grey.",
+      "description": "A niche behind a facing stone, at knee height. It holds a stack of six clay tokens, each stamped with the same procession as the far pillars."
+    }
+  ],
+  "exits": [
+    {
+      "id": "door-south",
+      "x": 5,
+      "y": 0,
+      "direction": "SOUTH",
+      "toRoomId": "crypt"
+    }
+  ],
+  "startPositions": {
+    "party": [{ "x": 5, "y": 1 }],
+    "goblinSpawn": { "x": 5, "y": 8 }
+  },
+  "dmNotes": {
+    "overview": "A processional gallery, long and narrow, running north from the crypt stair. Four pillars line the aisle. The far end is a dead end with a cold brazier at it — there is no other way on from here.",
+    "sensory": "Dry where the crypt was damp, and much colder. Dust hangs in the air where the ceiling has come down. Footsteps carry the whole length and come back."
+  }
+}

@@ -107,7 +107,7 @@
     "overview": "A single burial chamber beneath a ruined chapel. Cold, close, and lit green by two braziers that should have burned out centuries ago. The only exit the party knows of is the stair behind them to the south.",
     "sensory": "Air like a held breath. The braziers hiss. Every sound arrives a half-second late, as if the room is deciding whether to allow it.",
     "theSarcophagus": "A goblin scavenger named Vessk crawled in through a collapsed shaft two days ago, levered the lid aside looking for grave-goods, and got trapped when it settled back. It is hungry, frightened, and will come out fighting. The scratches on the seam are its work.",
-    "theDoor": "The north door is sealed and will not open in this session. Handle it in fiction \u2014 the mechanism is broken, the stone has settled, something heavy rests against it on the far side. Do not tell the player the room is unfinished.",
+    "theDoor": "The north door opens onto a stair up into a long gallery. It is heavy and it sticks, and the copper lamp-key turns its lock — but it opens. Anything the player was told earlier about it being sealed was true of a door that had not been unlocked yet; do not restate it as though it still cannot open.",
     "theSarcophagusOpened": "Vessk is out and on the grid. However he got out is whatever the narration said \u2014 do not contradict it, and do not put him back. The sarcophagus held nothing else: no body, no occupant, no second thing clawing at the lid, just grave-dust in the bottom of a stone box. If the player looks inside or listens at it, that is what they find. The scratching has stopped, because the thing making it is in the room with them."
   }
 }
