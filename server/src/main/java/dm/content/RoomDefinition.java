@@ -1,6 +1,7 @@
 package dm.content;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import dm.model.Exit;
 import dm.model.FloorType;
 import dm.model.LightingPreset;
 import dm.model.Prop;
@@ -8,6 +9,7 @@ import dm.model.PropType;
 import dm.model.WallType;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * A hand-authored room as it appears on disk. Carries more than the client needs — the
@@ -23,9 +25,18 @@ public record RoomDefinition(
         WallType wallType,
         LightingPreset lighting,
         List<PropDefinition> props,
+        List<Exit> exits,
         StartPositions startPositions,
         DmNotes dmNotes
 ) {
+
+    /**
+     * Defensive, and null-tolerant because a room file written before exits existed omits the
+     * key entirely and Jackson hands us null rather than an empty list.
+     */
+    public RoomDefinition {
+        exits = exits == null ? List.of() : List.copyOf(exits);
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record PropDefinition(
@@ -70,6 +81,11 @@ public record RoomDefinition(
                 .filter(p -> p.id().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No such prop: " + id));
+    }
+
+    /** The exit standing on this square, if one does. */
+    public Optional<Exit> exitAt(int x, int y) {
+        return exits.stream().filter(e -> e.x() == x && e.y() == y).findFirst();
     }
 
     /**

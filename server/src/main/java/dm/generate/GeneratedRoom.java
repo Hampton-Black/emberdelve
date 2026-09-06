@@ -44,6 +44,7 @@ public record GeneratedRoom(
                 shape.wallType(),
                 shape.lighting(),
                 definitions,
+                List.of(),
                 new RoomDefinition.StartPositions(
                         List.of(new RoomDefinition.Point(partyStart.x(), partyStart.y())),
                         new RoomDefinition.Point(goblinSpawn.x(), goblinSpawn.y())),
@@ -73,6 +74,7 @@ public record GeneratedRoom(
                 plain.wallType(),
                 plain.lighting(),
                 definitions,
+                List.of(),
                 plain.startPositions(),
                 new RoomDefinition.DmNotes(
                         dressing.overview(), dressing.sensory(), null, null, null));

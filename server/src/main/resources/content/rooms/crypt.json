@@ -82,6 +82,15 @@
       "description": "A shallow alcove behind a displaced stone, holding a clay votive lamp and a bundle of grave-cloth gone black with age."
     }
   ],
+  "exits": [
+    {
+      "id": "door-north",
+      "x": 6,
+      "y": 11,
+      "direction": "NORTH",
+      "toRoomId": "gallery"
+    }
+  ],
   "startPositions": {
     "party": [
       {
