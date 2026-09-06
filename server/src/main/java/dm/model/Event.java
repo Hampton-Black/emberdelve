@@ -21,6 +21,7 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = Event.PartySpawned.class, name = "party_spawned"),
         @JsonSubTypes.Type(value = Event.EntitySpawned.class, name = "entity_spawned"),
         @JsonSubTypes.Type(value = Event.EntityMoved.class, name = "entity_moved"),
+        @JsonSubTypes.Type(value = Event.PartyMoved.class, name = "party_moved"),
         @JsonSubTypes.Type(value = Event.AttackResolved.class, name = "attack_resolved"),
         @JsonSubTypes.Type(value = Event.CheckResolved.class, name = "check_resolved"),
         @JsonSubTypes.Type(value = Event.PropRevealed.class, name = "prop_revealed"),
@@ -78,6 +79,21 @@ public sealed interface Event {
      */
     record EntityMoved(Instant at, String entityId, int fromX, int fromY, int x, int y,
                        int movementSpent) implements Event {}
+
+    /**
+     * The party crossed a threshold. The one event that changes which room anything is in.
+     *
+     * <p>{@code entityIds} is a list although M3's policy is that it is everyone. Collapsing it
+     * later is free; un-collapsing it is a schema bump and a refused log — the same argument that
+     * made {@code RollResult.faces} a list from day one.
+     *
+     * <p>{@code x} and {@code y} are the landing square, carried rather than recomputed from
+     * {@code Exit.inward()}: the fold has no {@code ContentLoader} and must not grow one, and a
+     * recomputed square would silently change if a room file were edited after the session was
+     * recorded.
+     */
+    record PartyMoved(Instant at, List<String> entityIds, String fromRoomId, String toRoomId,
+                      String throughExitId, int x, int y) implements Event {}
 
     /**
      * One attack, whole. Coarse on purpose: split into damage and death, the beat handed to the

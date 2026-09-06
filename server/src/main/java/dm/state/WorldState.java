@@ -33,6 +33,7 @@ public record WorldState(
         List<PartyMember> party,
         Mode mode,
         Set<PropRef> revealedProps,
+        Set<String> visitedRoomIds,
         Optional<CombatRecord> combat,
         List<Fact> facts,
         int consecutiveFailedChecks
@@ -42,13 +43,14 @@ public record WorldState(
     public static final int MAX_FACTS_PER_ROOM = 30;
 
     public static final WorldState EMPTY = new WorldState(
-            "crypt", Map.of(), List.of(), Mode.EXPLORATION, Set.of(),
+            "crypt", Map.of(), List.of(), Mode.EXPLORATION, Set.of(), Set.of("crypt"),
             Optional.empty(), List.of(), 0);
 
     public WorldState {
         entities = Map.copyOf(entities);
         party = List.copyOf(party);
         revealedProps = Set.copyOf(revealedProps);
+        visitedRoomIds = Set.copyOf(visitedRoomIds);
         facts = List.copyOf(facts);
     }
 
@@ -73,6 +75,18 @@ public record WorldState(
         return facts.stream().filter(f -> f.roomId().equals(roomId)).toList();
     }
 
+    /** Rooms the party has stood in. Feeds the arrival directive — spec §7b. */
+    public boolean hasVisited(String otherRoomId) {
+        return visitedRoomIds.contains(otherRoomId);
+    }
+
+    /** The occupants of the room the party is standing in. Joins {@link #factsHere()}. */
+    public List<Entity> entitiesHere() {
+        return entities.values().stream()
+                .filter(e -> e.roomId().equals(roomId))
+                .toList();
+    }
+
     /**
      * The whole of the write path.
      *
@@ -84,6 +98,7 @@ public record WorldState(
             case Event.PartySpawned e -> withParty(e.members());
             case Event.EntitySpawned e -> withEntity(e.entity());
             case Event.EntityMoved e -> moved(e);
+            case Event.PartyMoved e -> partyMoved(e);
             case Event.AttackResolved e -> attacked(e);
             case Event.CheckResolved e -> checked(e);
             case Event.PropRevealed e -> revealed(new PropRef(e.roomId(), e.propId()));
@@ -107,13 +122,14 @@ public record WorldState(
         var next = new LinkedHashMap<>(entities);
         members.forEach(m -> next.put(m.id(), m));
         return copy(next, members.stream().map(m -> new PartyMember(m.id())).toList(),
-                mode, revealedProps, combat, facts, consecutiveFailedChecks);
+                mode, revealedProps, visitedRoomIds, combat, facts, consecutiveFailedChecks);
     }
 
     private WorldState withEntity(Entity entity) {
         var next = new LinkedHashMap<>(entities);
         next.put(entity.id(), entity);
-        return copy(next, party, mode, revealedProps, combat, facts, consecutiveFailedChecks);
+        return copy(next, party, mode, revealedProps, visitedRoomIds, combat, facts,
+                consecutiveFailedChecks);
     }
 
     private WorldState moved(Event.EntityMoved e) {
@@ -123,9 +139,24 @@ public record WorldState(
         }
         var next = new LinkedHashMap<>(entities);
         next.put(e.entityId(), entity.movedTo(e.x(), e.y()));
-        return copy(next, party, mode, revealedProps,
+        return copy(next, party, mode, revealedProps, visitedRoomIds,
                 combat.map(c -> c.spendMovement(e.movementSpent())),
                 facts, consecutiveFailedChecks);
+    }
+
+    private WorldState partyMoved(Event.PartyMoved e) {
+        var next = new LinkedHashMap<>(entities);
+        for (var entityId : e.entityIds()) {
+            var entity = next.get(entityId);
+            if (entity != null) {
+                next.put(entityId, entity.movedToRoom(e.toRoomId(), e.x(), e.y()));
+            }
+        }
+        var visited = new LinkedHashSet<>(visitedRoomIds);
+        visited.add(e.toRoomId());
+
+        return new WorldState(e.toRoomId(), next, party, mode, revealedProps, visited,
+                combat, facts, consecutiveFailedChecks);
     }
 
     private WorldState attacked(Event.AttackResolved e) {
@@ -134,7 +165,7 @@ public record WorldState(
         if (target != null && e.damageDealt() > 0) {
             next.put(e.targetId(), target.damaged(e.damageDealt()));
         }
-        return copy(next, party, mode, revealedProps,
+        return copy(next, party, mode, revealedProps, visitedRoomIds,
                 combat.map(CombatRecord::spendAction), facts, consecutiveFailedChecks);
     }
 
@@ -142,14 +173,15 @@ public record WorldState(
         // Deliberately not keyed by skill, exactly as GameEngine had it: shoving a lid, failing,
         // then searching a wall and failing again is one player who is stuck.
         boolean succeeded = e.outcome() == Outcome.SUCCESS || e.outcome() == Outcome.CRIT;
-        return copy(entities, party, mode, revealedProps, combat, facts,
+        return copy(entities, party, mode, revealedProps, visitedRoomIds, combat, facts,
                 succeeded ? 0 : consecutiveFailedChecks + 1);
     }
 
     private WorldState revealed(PropRef ref) {
         var next = new LinkedHashSet<>(revealedProps);
         next.add(ref);
-        return copy(entities, party, mode, next, combat, facts, consecutiveFailedChecks);
+        return copy(entities, party, mode, next, visitedRoomIds, combat, facts,
+                consecutiveFailedChecks);
     }
 
     /**
@@ -166,23 +198,23 @@ public record WorldState(
     private WorldState combatStarted(List<Combatant> order) {
         String activeId = order.getFirst().entityId();
         var record = new CombatRecord(order, activeId, 1, speedOf(activeId), true);
-        return copy(entities, party, Mode.COMBAT, revealedProps,
+        return copy(entities, party, Mode.COMBAT, revealedProps, visitedRoomIds,
                 Optional.of(record), facts, consecutiveFailedChecks);
     }
 
     private WorldState turnAdvanced(Event.TurnAdvanced e) {
-        return copy(entities, party, mode, revealedProps,
+        return copy(entities, party, mode, revealedProps, visitedRoomIds,
                 combat.map(c -> c.beginTurn(e.activeId(), e.round(), speedOf(e.activeId()))),
                 facts, consecutiveFailedChecks);
     }
 
     private WorldState combatEnded() {
-        return copy(entities, party, Mode.EXPLORATION, revealedProps,
+        return copy(entities, party, Mode.EXPLORATION, revealedProps, visitedRoomIds,
                 Optional.empty(), facts, consecutiveFailedChecks);
     }
 
     private WorldState withMode(Mode newMode) {
-        return copy(entities, party, newMode, revealedProps, combat, facts,
+        return copy(entities, party, newMode, revealedProps, visitedRoomIds, combat, facts,
                 consecutiveFailedChecks);
     }
 
@@ -197,7 +229,7 @@ public record WorldState(
                     .findFirst()
                     .ifPresent(next::remove);
         }
-        return copy(entities, party, mode, revealedProps, combat, next,
+        return copy(entities, party, mode, revealedProps, visitedRoomIds, combat, next,
                 consecutiveFailedChecks);
     }
 
@@ -206,10 +238,10 @@ public record WorldState(
     }
 
     private WorldState copy(Map<String, Entity> newEntities, List<PartyMember> newParty,
-                            Mode newMode, Set<PropRef> newRevealed,
+                            Mode newMode, Set<PropRef> newRevealed, Set<String> newVisited,
                             Optional<CombatRecord> newCombat, List<Fact> newFacts,
                             int newFailedChecks) {
-        return new WorldState(roomId, newEntities, newParty, newMode, newRevealed,
+        return new WorldState(roomId, newEntities, newParty, newMode, newRevealed, newVisited,
                 newCombat, newFacts, newFailedChecks);
     }
 }
