@@ -16,7 +16,10 @@ the decision, not the component.
 | [0006](0006-godot-replaces-the-web-client.md) | Godot replaces the Vite/Three.js client | Accepted 2026-08-23 |
 | [0007](0007-venice-ai-as-the-provider.md) | Venice.ai as the single LLM provider | Accepted 2026-08-20 |
 | [0008](0008-model-picks-come-from-played-sessions.md) | Model picks come from played sessions, not benchmarks | Accepted 2026-09-05 |
+| [0009](0009-the-world-frame-is-anchored-at-the-entrance.md) | The world frame is server-owned and anchored at the entrance | Accepted 2026-09-06 |
+| [0010](0010-the-room-nearer-the-entrance-owns-the-shared-wall.md) | The room nearer the entrance owns the shared wall | Accepted 2026-09-06 |
+| [0011](0011-visible-is-not-addressable.md) | Visible is not addressable | Proposed |
 
-These were back-filled on 2026-09-06 from decisions already recorded in `AGENTS.md`. Where an ADR
+0001–0008 were back-filled on 2026-09-06 from decisions already recorded in `AGENTS.md`. Where an ADR
 and `AGENTS.md` disagree, `AGENTS.md` is the operational document and wins; open a new ADR rather
 than editing an accepted one to match.
