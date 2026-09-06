@@ -162,6 +162,22 @@ class ReplayRunnerTest {
     }
 
     @Test
+    @DisplayName("the played multi-room session replays, and comes back to what it left behind")
+    void theGateSessionReplays() {
+        var session = Path.of("../docs/evidence/session-m3-traversal.jsonl");
+
+        var result = ReplayRunner.replay(session);
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
+
+        var state = EventLog.load(session).state();
+        assertTrue(state.visitedRoomIds().containsAll(java.util.Set.of("crypt", "gallery")),
+                "the gate session must have been in both rooms");
+        assertTrue(EventLog.load(session).events().stream()
+                        .filter(Event.PartyMoved.class::isInstance).count() >= 3,
+                "at least one crossing, one return, and one crossing back");
+    }
+
+    @Test
     @DisplayName("running out of recorded dice is loud, not a fresh random roll")
     void exhaustedDiceThrow() {
         var roller = new ReplayDiceRoller(java.util.List.of());

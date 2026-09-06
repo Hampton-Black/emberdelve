@@ -2,38 +2,41 @@
 
 AI Dungeon Master. Java backend, Godot desktop client.
 
-**Current milestone: M2 — gate PASSED 2026-09-05.** State is a fold over an append-only event
-log, every session writes itself to JSONL, and a recorded session replays offline in the test
-suite. The gate was a 30-turn played session whose callbacks survived the context window:
-`docs/m2-evaluation.md`.
+**Current milestone: M3 — gate PASSED 2026-09-06.** A room is a place you can leave and come
+back to. The gate was a 19-turn played session that crossed four times, spent ≥7 turns in each
+room, found the gallery niche as it was left, and replayed identical:
+`docs/m3-evaluation.md`.
 
-**Next: dungeon navigation**, re-planned against `EventLog` and `WorldState`. The plan at
-`docs/superpowers/plans/2026-08-21-m1-dungeon-navigation.md` is **stale in both halves** — its
-client tasks are React/Three.js, and its Java tasks are built around a `GameRepository` that no
-longer exists. Its `LayoutGenerator`, `ExitPlacer`, and `SpatialValidator` tasks survive.
+**Next: the generator plan** — M1's remaining half, *can the world be made rather than authored*.
+The plan at `docs/superpowers/plans/2026-08-21-m1-dungeon-navigation.md` is **stale in its
+traversal half** (superseded by this milestone) **and in its client/Java foundation** — those
+tasks are React/Three.js, and a `GameRepository` that no longer exists. Its `LayoutGenerator`,
+`ExitPlacer`, and `SpatialValidator` tasks still lift.
 
 ### Milestones, and what each one settled
 
 | | Gate | Verdict | Where |
 |---|---|---|---|
 | **M0** | Does this feel like a DM running a game? | PASS 2026-08-20 | `docs/m0-evaluation.md` |
-| **M1** | Can the world be made rather than authored? | **Half done.** Room generation merged; navigation outstanding | `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` |
+| **M1** | Can the world be made rather than authored? | **Half done.** Single-room generation merged; a generated dungeon is the remaining half | `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` |
 | **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `docs/m2-evaluation.md` |
+| **M3** | Is a room a place you can leave and come back to? | PASS 2026-09-06 | `docs/m3-evaluation.md` |
 
 Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22).
 
 ### Reading order
 
-`docs/m2-evaluation.md` first — it is the most recent gate and its §8 lists what M2 handed
-forward. `docs/superpowers/specs/2026-08-23-m2-spine-design.md` is the architecture everything
-now sits on. `docs/ai-dm-system-design.md` is the long-range design. **Amended 2026-09-05** against
-three gates: its §2a lists the four decisions play reversed and why, and §14 carries both the
-real milestone history and the original ordering it superseded. Where it and this file
-disagree, this file wins — it is the operational one.
+`docs/m3-evaluation.md` first — it is the most recent gate and its §8 lists what M3 handed
+forward. `docs/superpowers/specs/2026-09-05-m3-traversal-design.md` is the traversal architecture.
+`docs/m2-evaluation.md` and `docs/superpowers/specs/2026-08-23-m2-spine-design.md` are the spine
+everything still sits on. `docs/ai-dm-system-design.md` is the long-range design. **Amended
+2026-09-05** against three gates: its §2a lists the four decisions play reversed and why, and
+§14 carries both the real milestone history and the original ordering it superseded. Where it
+and this file disagree, this file wins — it is the operational one.
 
 `docs/m0-build-plan.md` and `docs/m0-evaluation.md` are history. They are still worth reading for
 *why* things are the way they are, and their shortcuts table no longer describes this codebase.
-Where M0 and M2 disagree, **M2 wins**.
+Where M0 and M2 disagree, **M2 wins**. Where M2 and M3 disagree, **M3 wins**.
 
 ---
 
@@ -44,9 +47,9 @@ everything that contributed to *correctness, scale, or persistence* was hardcode
 M0 code was expected to be thrown away, and much of it has been.
 
 **M2 is the foundation M0 deliberately did not build.** The persistence and correctness shortcuts
-are gone: state is a fold, the log is durable, the context is bounded. The rest of M0's
-shortcuts — one room, one goblin, forty lines of attack resolution — are still in force and still
-deliberate. The table below says which is which.
+are gone: state is a fold, the log is durable, the context is bounded. M3 retired the one-room
+shortcut. The rest of M0's shortcuts — one goblin, forty lines of attack resolution — are still
+in force and still deliberate. The table below says which is which.
 
 The instinct M0 warned against still applies to everything M2 did not touch. If you are
 generalising the *rules* or the *content*, stop. If you are making the *spine* correct, that is
@@ -222,7 +225,7 @@ Two disqualifiers found by measuring rather than reasoning:
 
 | Shortcut | Value |
 |---|---|
-| Room | One, `content/rooms/crypt.json`, hand-authored |
+| Rooms | Two authored: `content/rooms/crypt.json` and `gallery.json`. No generated dungeon. |
 | Party | `List<PartyMember>` containing one member |
 | Fighter | AC 16, HP 12, +5 to hit, 1d8+3 damage, speed 30ft, STR +3 |
 | Goblin | AC 15, HP 7, +4 to hit, 1d6+2 damage, speed 30ft |
@@ -243,15 +246,21 @@ Two disqualifiers found by measuring rather than reasoning:
 
 **Still deliberately absent:** Postgres, resume-from-log, snapshotting, and schema migrations. A
 log written at an older `Event.SCHEMA_VERSION` is **refused, never upgraded** — discarding an old
-log is free and an upgrader is a tax paid forever.
+log is free and an upgrader is a tax paid forever. No party splits (the whole party moves). No
+fleeing (exits are illegal in combat).
 
-## LLM tools — exactly these five
+## LLM tools — exactly these seven
 
 On the **mechanics** pass: `roll_check` (skill + difficulty enums), `reveal_prop` (per-room closed
-enum of hidden prop ids), `spawn_entity` (kind: `goblin` only), `start_combat`.
+enum of hidden prop ids), `spawn_entity` (kind: `goblin` only), `start_combat`, `use_exit`
+(current room's exits; withheld in combat), `move_entity` (living `entitiesHere()`, bounds of
+this room).
 
-On the **reconcile** pass only: `reveal_prop`, `spawn_entity`, `start_combat`, and `assert_fact`.
-No dice in that phase — the outcome has already been narrated.
+On the **reconcile** pass only: `reveal_prop`, `spawn_entity`, `start_combat`, `assert_fact`, and
+`move_entity`. No dice in that phase — the outcome has already been narrated. **`use_exit` is
+mechanics-only; `move_entity` is both phases.** A tool belongs in reconcile when a false positive
+is cheap to live with and the narrator is the one holding the information — walking to a pillar
+is; leaving the room is not.
 
 Every enum is closed and validated server-side. Invalid calls are rejected with a structured
 error; the model retries once, then the turn degrades to narration-only.
@@ -275,10 +284,11 @@ These are the things most likely to eat week two.
   content it adjudicates. See `docs/ai-dm-system-design.md` §6.
 - **Do not tune lighting and post-processing for more than one evening.** Timebox it. This is the
   single largest time sink in the project and it will consume as much as you give it.
-- **Do not add a second room.** The impulse will be strong. One room.
+- **Do not add a third room, and do not generate a dungeon.** Two authored rooms is the M3
+  shortcut. The generator plan is next.
 - **Do not build save/load.** Sessions are *written* — that is the replay harness — but nothing
   resumes from one, and resume is the expensive half. Restarting the process is still fine.
-- **Do not optimize anything.** One room, two entities.
+- **Do not optimize anything.** Two authored rooms, two entities.
 - **Do not generalize.** Every abstraction in M0 is written against a sample size of one.
 - **Do not build a character sheet UI.** HP and AC as text is sufficient.
 
@@ -543,7 +553,8 @@ the reconcile pass correctly declined to invent a mechanism and the goblin went 
 least stays **consistent** about its own hotdog rather than forgetting it next turn. What it
 cannot do is make the board agree. The M2 gate produced the same class of thing with a straight
 face: a copper key in a lamp's fat, asserted, durable, and turning a lock in a door that still
-cannot open (`m2-evaluation.md` §4).
+cannot open (`m2-evaluation.md` §4). The M3 session did it again: breathing inside a shut
+sarcophagus, never spawned (`m3-evaluation.md` §4).
 
 ### Carried out of M2 — findings, not tasks
 
@@ -551,12 +562,28 @@ The full list is `docs/m2-evaluation.md` §8. The ones that will bite first:
 
 - **Talking to yourself can start a fight.** A spoken aside on turn 11 of the gate session had the
   mechanics model spawn Vessk and call `start_combat`. The two-failure escalation rule in
-  `dm-tools.md` is doing that. It ate the parley the session needed.
-- **`roll_check` twice on one action** still happens despite the tools prompt.
+  `dm-tools.md` is doing that. It ate the parley the session needed. Did not recur in the M3
+  gate session (no spawn, no `start_combat`, no `use_exit`).
+- **`roll_check` twice on one action** still happens despite the tools prompt. M3 turn 1 did it.
 - **Grid coordinates leak into `## Established`** (`alcove at (9,6)`). They will be read aloud the
   moment a writer is sloppier than Gemini, against the standing "never say a grid coordinate" rule.
-- **Invented content is now durable**, which is the spine working and a content problem. Do not
-  add a second room to cash in an asserted key.
+- **Invented content is now durable**, which is the spine working and a content problem. The north
+  door opens now; the copper key is no longer a slab that cannot move. Invented lanterns still
+  travel (`m3-evaluation.md` §4).
+
+### Carried out of M3 — findings, not tasks
+
+The full list is `docs/m3-evaluation.md` §8.
+
+- **`reveal_prop` can beat the sentence.** A look-around was enough to put the gallery niche on
+  the board before the prose named it.
+- **Authored secrets still have no spawn.** Listening at the lid produced a fact and no goblin.
+- **Dark neighbour unread.** The gate session was headless. Whether the unlit room through the
+  doorway reads as a dungeon or as a hole is still a Godot judgement.
+- **Generated rooms have nothing to find** (spec §12a). `PropPlacer` marks nothing hidden, so
+  `reveal_prop` is never offered. A generated room has no alcove and no niche. The wrong fix is
+  free-form dress-pass secrets with no mechanism; the right fix is hidden props the generator
+  already knows how to place.
 
 **`TurnMetrics` mislabels its counter** — see the latency section. One line; left alone so the
 numbers in `m0-evaluation.md` match the logs as they were written.
@@ -701,20 +728,25 @@ cd server && ./gradlew run          # server on :7070
 cd server && ./gradlew test         # the whole suite, including the replayed fixture session
 cd server && ./gradlew run --args='--demo'    # scripted dice, reproducible
 cd server && ./gradlew run --args='--generate 7'   # boot a seeded generated room
+cd server && ./gradlew recordFixture            # re-record crypt-fight.jsonl after a schema bump
 cd godot && godot .                 # the Godot editor
 cd godot && godot --headless -d -s addons/gut/gut_cmdln.gd -gdir=res://test -gexit   # godot tests
 ```
 
+A log written at an older `Event.SCHEMA_VERSION` is **refused, never upgraded**. After a schema
+bump, `./gradlew recordFixture` regenerates the fight fixture; copy a new played session into
+`docs/evidence/` (and the suite) rather than trying to migrate the old one.
+
 Replaying a session — no network, no key, exit 0 on an identical event stream:
 
 ```bash
-cd server && ./gradlew run --args='--replay sessions/20260905-205347-b4a16f95.jsonl'
+cd server && ./gradlew run --args='--replay ../docs/evidence/session-m3-traversal.jsonl'
 ```
 
 Every session writes itself to `server/sessions/` (gitignored). A session worth keeping gets
-copied into `server/src/test/resources/sessions/` and replays on every build. **That is the
-workflow the whole of M2 exists for:** when something goes wrong in play, the file that proves it
-is already on disk.
+copied into `docs/evidence/` or `server/src/test/resources/sessions/` and replays on every build.
+**That is the workflow M2 built and M3 used:** when something goes wrong in play, the file that
+proves it is already on disk.
 
 ## Secrets
 
