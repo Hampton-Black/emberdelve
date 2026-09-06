@@ -4,9 +4,12 @@
 milestone gates played against real sessions. Roughly half the decisions below survived contact.
 The ones that did not are corrected in place and explained in §2a — nothing is deleted, because a
 reversed decision is more useful with its original reasoning attached than without it.
+**Amended again 2026-09-06** to add §9 — the delve, the region, and the clocks that run them. That
+section is the missing tier between a turn and a campaign, and its absence was the largest structural
+gap in this document rather than a gap in the code.
 
 **How to read this.** This is the long-range design: the shape of the thing and why it is that
-shape. `AGENTS.md` is the operational file — what an agent must actually do today — and it wins on
+shape. `../AGENTS.md` is the operational file — what an agent must actually do today — and it wins on
 any conflict. Each milestone's own reasoning lives in its spec under `docs/superpowers/specs/`.
 
 **Scope:** Personal single-player toy, architected so multiplayer is a feature and not a rewrite.
@@ -38,6 +41,12 @@ line is what made each of them a bug you can name rather than a game that quietl
 sense. Where the design has been reversed, it has almost always been *toward* this principle and
 never away from it.
 
+**Three loops, not one.** The turn loop (§8) runs in seconds and is built. The delve (§9) runs for a
+sitting and is not. The campaign (§10) runs across sessions and is not. This document described the
+first and third for three weeks without naming the second, which is the one the player actually
+inhabits — a perfectly narrated turn in which nothing is at stake is a demo, and a campaign layer with
+no delve under it has nothing to be a campaign *of*.
+
 ---
 
 ## 2. Locked decisions
@@ -56,16 +65,19 @@ Updated to what is true as of 2026-09-05. Reversals are explained in §2a.
 | Schema source of truth | **Java records, hand-mirrored into GDScript. No IDL.** | The IDL was the highest-leverage structural bet in the original design and it did not pay — see §5. |
 | Ruleset | **Full-SRD-shaped engine, trimmed content** — *deferred, not reduced* | 4 classes, levels 1–5, ~30 monsters CR 0–3. Keeps reaction hooks and concentration. Today's ~40 lines of attack resolution are a proxy standing in for it, not a replacement — see §6. |
 | Combat | **Grid movement, one melee attack, initiative, Chebyshev distance** | No reach, cover, AoE, or opportunity attacks. Terrain belongs to the room, not to combat. |
-| Exploration | **Narrative. The grid is rendered, and only exits are clickable** | Avoids the interactable-object content pipeline entirely. M3 adds an explicit door click — one verb, not free walking. |
+| Exploration | **Narrative, with clickable props, doors and exits** (originally exits only) | The exits-only rule was a prototype dodge around the interactable content pipeline. A delve needs the objective to be *takeable*; see §9 and §2a. Free walking outside combat stays deferred. |
+| Site structure | **Bounded, quest-linked sites with optional depth inside. Not endless** | A cleared site is a durable fact the campaign layer can consume; an endless hole never produces one. See §9. |
+| Resources | **Session-scoped party state, scarce healing, consumables as a counter map** | The engine has to impose scarcity because the narrator never will. Not an inventory system — see §9. |
+| Clocks | **One primitive at three scales: delve, watch, front** | A counter that ticks on a defined unit and fires a table when it fills. Built once, used by §9 and §10. |
 | Monster tactics | **Deterministic execution, LLM sets stance only** — *stance layer deferred, not dropped* | Latency, testability, tunability, no spatial hallucination. `GoblinAi` is the execution half, shipped and working; the stance call above it is not built yet — see §8. |
 | Dungeon generation | **Procedural shape → prop placement → one LLM dress pass, at room-build time** | Shipped in M1. The JIT-with-prefetch scheme was not needed — generation is fast, and a room is dressed once at build time rather than at the door. |
 | Model hosting | **Venice.ai, OpenAI-compatible, behind an interface** | Simplest for solo. Swap to local is config, not code. |
-| Model count | **Two: a fast tool-caller and a good writer** | Not in the original design, and the single most valuable structural change since. See §10. |
+| Model count | **Two: a fast tool-caller and a good writer** | Not in the original design, and the single most valuable structural change since. See §11. |
 | Character creation | **Pregens from content JSON** | Same schema a builder would later write to. One fighter exists today. |
 | Voice | **Persistent narrator + per-NPC voices, cast by a closed table** | NPCs must sound the same across sessions. ElevenLabs Flash v2.5 behind `TtsClient`; OS TTS is the dev default. |
 | Session boundary | **Not built.** Sessions are written; nothing resumes from one | The explicit End Session button and the idle timeout both wait on synthesis, which does not exist yet. |
 | Dice | **Hand-rolled domain model, injected `DiceRoller`, results logged as events** | Notation parsing is the least interesting part; per-die faces and replay-from-log are the requirements. |
-| Dice renderer | **No physics library. `godot/dice/tumble.gd` animates a decided result** | The server is authoritative, so there is nothing for a solver to solve. See §7. |
+| Dice renderer | **No physics library. `../godot/dice/tumble.gd` animates a decided result** | The server is authoritative, so there is nothing for a solver to solve. See §7. |
 | Deployment | **`localhost`, one process, no container** | No auth, no multi-tenancy, no hosting. |
 
 ### 2a. What play reversed, and why
@@ -95,11 +107,19 @@ scene tree, one audio bus, and one place for state to live — and the boundary 
 was most careful about (game state never lives in a UI node) is *easier* to hold there, not harder.
 Migrated 2026-08-23 behind a parity gate. (`specs/2026-08-22-chrome-direction-design.md`.)
 
+**Exits-only exploration → clickable props and doors.** The original rule kept the interactable-object
+content pipeline out of the prototype, and for a one-room slice with no objective in it that was the
+right trade. It stops being right the moment a delve has something to find: an objective the player
+cannot pick up is not an objective, and routing "take the relic" through free text alone puts a
+mechanical outcome back on the narrator's side of the governing principle. The pipeline this was
+avoiding turned out to be smaller than it looked, because props are *handles* rather than depictions —
+see §9. Reversed 2026-09-06.
+
 **One model → two.** Not a reversal so much as a discovery, and the most valuable one. The original
 design assumed one narrator and warned against fragmenting narration across models — which is still
 right. What it missed is that *mechanics is not narration*. Splitting the tool-calling phase onto a
 fast non-reasoning model and leaving prose on the best writer available made two previously
-disqualified models usable and cut a measured 44-second turn to 8.9 seconds. See §10.
+disqualified models usable and cut a measured 44-second turn to 8.9 seconds. See §11.
 
 ---
 
@@ -302,7 +322,7 @@ found in play be turned into a test — are all answerable with one attack and o
 them gets clearer with an effect interpreter underneath. Forward progress on those questions was
 worth more than completeness on this one.
 
-`AGENTS.md` carries "do not build a rules engine" as an anti-goal, and it means it — but it is a
+`../AGENTS.md` carries "do not build a rules engine" as an anti-goal, and it means it — but it is a
 **milestone-scoped instruction, not a design position.** Read it as "not yet, and not while you are
 in the middle of something else," not as "never." The design is this section.
 
@@ -342,7 +362,7 @@ These were specified up front for testability rather than for 5e, and they were 
 
 When the content it adjudicates exists — more than one enemy kind, more than one attack, a spell
 list. An effect interpreter with one attack to interpret is a tax; the same interpreter with four
-classes and thirty monsters is the thing that makes them cheap. §14 puts it with **Content**, and the
+classes and thirty monsters is the thing that makes them cheap. §15 puts it with **Content**, and the
 two are one milestone rather than two.
 
 ---
@@ -420,7 +440,7 @@ a predetermined outcome rather than produce one, and picked `@3d-dice/dice-box-t
 
 **The right answer turned out to be none of them.** If the server has already decided the result,
 there is nothing for a solver to solve, and a physics engine's entire value is the part being thrown
-away. `godot/dice/tumble.gd` is a pure function of time: tumbling faces are noise, and the instant a
+away. `../godot/dice/tumble.gd` is a pure function of time: tumbling faces are noise, and the instant a
 die settles it shows `result.faces[i]`. It has no dependency, and it cannot desync from the server,
 because it was never computing anything.
 
@@ -520,11 +540,173 @@ coming out. It's a feature.
 
 ---
 
-## 9. Campaign layer
+## 9. The delve
 
-**Unbuilt, and unamended.** Nothing in this section has been contradicted by play, because nothing in
-it has been attempted. It is the design as written on day one, and it is where the project goes after
-the dungeon is a place rather than a room.
+**Unbuilt. This section is a bet, not a record.** Everything above it has been reshaped by play;
+this has not, and neither has §10. Written at that lower confidence deliberately — it states a shape
+to aim at and a gate question to aim it with, and it should expect to collect reversals in §2a like
+everything else did.
+
+### The loop
+
+Enter unknown space → gather information → decide under incomplete information → spend resources →
+carry the consequences into the next unknown space → choose to push deeper or get out.
+
+**The load-bearing word is *spend*.** The turn loop is proven and it is also the loop that means the
+least on its own: adjudication, dice and narration make a decision *legible*, they do not make it
+*cost* anything. Everything in this section exists to give the turn loop something to be about.
+
+### Bounded sites, not endless depth
+
+Sites are finite: a handful of rooms, an objective, an exit, an ending. Quest-linked, scattered
+across the region, many of them. Not a hole that generates downward forever.
+
+Three reasons, in order of weight:
+
+- **A cleared site is a durable fact.** "The party burned out the barrow and the cult lost its relic"
+  is world state the campaign layer can consume — a front reacts to it, a quest node resolves on it.
+  An endless dungeon never produces that fact, so §10 has nothing to eat. Endless depth and narrative
+  resolution are structurally at odds, and this project committed to resolution on day one.
+- **A session boundary that falls where the fiction does.** One delve, one sitting, one natural place
+  for the synthesis worker to run.
+- **It gives the region a reason to exist.** If one dungeon goes forever, nobody travels.
+
+The cost is real and worth stating: bounded sites means *many* sites, so generation quality carries
+more weight than it would in a roguelike, and short sites risk sameness. That is the bill for this
+decision and §10's encounter design is most of how it gets paid.
+
+**What is imported from extraction games, and what is not.** The greed decision is worth having: the
+objective sits shallow and there is more worth taking deeper, so the player *can* leave the moment
+they have what they came for. That is tension for free, inside a bounded space, with an ending. What
+is not imported is meta-progression — stash, upgrades, escalating tiers — because that system would
+compete with the campaign layer for exactly the same design space, and the campaign layer is the one
+this project is for.
+
+### Attrition is where the stakes come from
+
+**The model always says yes.** That is not a prompt failure to be tuned out; it is what a narrator
+trained to be agreeable does, and it means the engine is the only thing in this system that can make
+something scarce. If it does not, every player decision is free, and free decisions are not decisions
+regardless of how well they are narrated. Novelty covers this for about twenty minutes.
+
+Four things, none of which is a rules-engine feature:
+
+- **Party state is session-scoped, not room-scoped.** Today entities are built from room content,
+  which makes hit points implicitly reset at a room boundary. Rooms should contribute their occupants
+  and props and nothing else. Small refactor, and everything else here depends on it.
+- **Healing is scarce**, and rests are a clock tick rather than a free reset (below).
+- **Consumables are a counter map, not an inventory.** `Map<Consumable, Integer>` on `PartyMember`
+  over a closed enum — potion, torch, rope — and one `use_item` tool. No item entities, no equipping,
+  no weight, no UI beyond a count. The instinct to build inventory here drags in an item pipeline, a
+  screen, and an enum that grows forever, in service of three numbers. Inventory is deferred in §16
+  with a re-entry condition.
+- **A delve can be lost**, and losing it costs the run rather than a click.
+
+### The delve clock
+
+Without pressure, "go deeper" costs nothing and the greed decision is fake. A clock is the pressure.
+
+Light burning down, wandering-monster checks, a rising alert level. It ticks on rooms entered, rests
+taken, and noisy failures, and when it fills it fires a table — which is the same
+constrain-the-model pattern as the DC bands in §7 and the prop enum in §5. The DM narrates what the
+table produced; it never decides that the torch went out.
+
+### One primitive, three scales
+
+**The delve clock, the hex-crawl watch, and the campaign fronts are the same mechanism.** A counter
+that ticks on a defined unit and fires a table when it fills. Build it once.
+
+```java
+record Clock(
+    ClockId id,
+    ClockScale scale,        // DELVE | WATCH | FRONT
+    int filled,
+    int segments,
+    ClockKind kind,          // LIGHT | ALERT | WANDERING | TRAVEL | AGENDA
+    ConsequenceId consequence
+) {}
+```
+
+- **Delve scale** — light, alert, wandering monsters. Ticks per room or per rest.
+- **Region scale** — the watch loop below. Ticks per watch.
+- **Campaign scale** — fronts. The ritual, the siege, the rival's plan. Ticks per session or per
+  resolved quest node. See §10.
+
+The payoff at campaign scale is the one worth naming here: a clock converts synthesis from
+open-ended graph rewriting into bounded state mutation. *Tick this clock two segments and fire its
+consequence* is something a model does reliably. *Revise the quest graph so it stays coherent* is
+not, and it is the one genuinely unbounded surface this design would otherwise have.
+
+### The region
+
+Absent from this document until now. Sites sit on a hex map; travel between them is the loop above
+the delve and below the campaign.
+
+The procedure is borrowed from OSR hex-crawl practice rather than invented, and the reason to borrow
+is that it is **already a state machine**: every step is a discrete branch with a roll and a table,
+which is exactly the division of labour this project runs on everywhere else. The engine owns the
+loop and the rolls; the model never decides whether the party got lost, only how being lost feels.
+
+Per watch — the day split into four or six blocks:
+
+1. Declare direction.
+2. **Navigation check**, terrain-keyed. Failure veers the party a hex face, usually silently.
+3. **Movement**, terrain-costed. Pace modifies both this and the check above.
+4. **Encounter check**, typically 1-in-6, on a terrain-keyed table.
+5. **Reaction roll**, then distance and surprise.
+6. **Reveal hex contents** — landmark, site, or nothing.
+7. **Resource depletion**, then camp and night watches.
+
+Two pieces are worth taking specifically:
+
+- **Reaction rolls.** 2d6 on a bell curve, hostile through friendly, rolled *before* the model
+  narrates the meeting. The single most valuable table here: it is what stops the DM defaulting to
+  combat every time something appears, because the disposition arrives pre-decided. Same shape as the
+  DC enum — the model picks a band or nothing at all, never a number.
+- **Signs before encounters.** Spoor, smoke, tracks, rolled a watch ahead of the meeting itself.
+  Gives the player a chance to avoid it and gives the narrator something to foreshadow, which is the
+  cheapest available source of the thing generated content is usually worst at.
+
+Six-mile hexes are the convention — roughly what you can see from the centre to the edge, which is
+why the number stuck. KayKit's hex tiles are the settled kit per §14, and the rule from §5 applies
+unchanged: **the tileset defines the terrain enum.**
+
+### Props are handles, not depictions
+
+With §2a's reversal in place, the interactable pipeline is in scope, and the thing that keeps it
+small is that a rendered prop does not mean *here is a barrel*. It means *there is something here
+worth touching*. Click it, the engine hands the model the prop id and its closed-enum tags, the model
+returns prose. One generic container mesh does an enormous amount of work that way, and it is why
+this costs less than the original exits-only rule assumed.
+
+**The failure mode to design against is the pixel hunt.** If only rendered props are interactable,
+the player learns to ignore everything the narrator improvises — which is the exact opposite of what
+this game is for. The fix is the one `assert_fact` already uses: let the model place a marker. It
+emits a position and a closed-enum tag, the engine drops a generic interaction glyph there, and the
+scorched patch the prose just mentioned becomes touchable. A fact you can click is a fact the board
+can back, which is a partial answer to §17's second risk.
+
+**The objective is engine-owned, never narrator-asserted.** It is a prop with an id, taking it emits
+an event, and the exit checks for it. This is the difference between an objective and a copper key.
+
+### Gate question
+
+**Can you lose a delve, and does losing it sting?**
+
+Stated as something to feel rather than to measure, on purpose, and in the same spirit as M0's: you
+should be able to stand in front of a door at 5 hit points and genuinely not know whether to open it.
+If you can, the loop exists. If you cannot, no amount of narration quality substitutes — and that is
+a better gate for the next milestone than any latency number, for the same reason §17's closing note
+gives.
+
+---
+
+## 10. Campaign layer
+
+**Unbuilt, and largely unamended.** Nothing here has been contradicted by play, because nothing here
+has been attempted — the same caveat §9 opens with, and it applies more strongly to this section
+because this one is older. It is the design as written on day one, plus the fronts and clocks below,
+and it is where the project goes once a delve is a run you can fail.
 
 Three tiers of authorship. The governing property is that the top tier is **living state, not a
 plan** — it gets revised as play diverges from it.
@@ -565,7 +747,7 @@ backstory_hook (id, entity_id, quest_node_id, consumed_at)
 `ready_nodes(arc_id)` is a recursive CTE over unsatisfied blockers. **Readiness is derived, never
 stored.** The DM prompt receives a computed "available threads" block every turn rather than
 inferring quest state from prose — which is where naive versions of this get it wrong. It is the
-same shape as the engine-owned world-state projection that already works; see §11.
+same shape as the engine-owned world-state projection that already works; see §12.
 
 ### Adaptation — the part that actually matters
 
@@ -589,6 +771,40 @@ Two cheap player-input mechanisms, both high value:
 arcs; foiled plans change their behavior. One table, and it is most of what separates "campaign" from
 "sequence of dungeons."
 
+### Fronts and clocks
+
+**The quest graph is what the party can do. A front is what happens if they don't.**
+
+A front is a threat with an agenda and a clock on it: the cult's ritual, the siege, the plague, the
+rival crew. It advances on its own schedule, ticked by the synthesis worker at session boundaries and
+by resolved quest nodes in between, and when a clock fills it fires a stated consequence into the
+world. Player inaction advances it; player action ticks it back.
+
+The persistent antagonist described above is already most of a front. What it lacks is a tick.
+
+Two things this buys, and the second is the important one:
+
+- **Consequences become legible.** A filling clock is something the DM can foreshadow honestly,
+  because the engine actually holds it. This is the same reason the world-state projection in §12
+  works: the DM cannot contradict a board that is in front of it.
+- **Synthesis gets a bounded job.** Without fronts, "reconcile the quest graph against what happened"
+  is open-ended rewriting by a model — the one unbounded surface in a design that has closed every
+  other one. With them, most of a synthesis pass is *tick this clock, fire this consequence, mark
+  this node invalidated*: bounded mutations against named state, which is a thing a model does
+  reliably and a thing a test can assert. Graph surgery remains available for the cases that need it,
+  but it stops being the default path.
+
+The clock record is §9's, unchanged, at `FRONT` scale. The tables it needs:
+
+```sql
+front   (id, arc_id, name, agenda, antagonist_entity_id, state)
+clock   (id, scale, front_id, site_id, kind, segments, filled, consequence_id)
+```
+
+**A world that moves when the party does not is most of what separates a campaign from a queue of
+quests**, and it is the cheapest available defence against §17's mushy-content risk — not because the
+prose gets better, but because something is happening whether or not the prose earns it.
+
 ### Encounter design
 
 Combat is the part of this game that has to be *good*, so encounter generation gets more structure
@@ -608,7 +824,7 @@ tactical 5e is terrain, objectives, and composition.
 
 ---
 
-## 10. LLM roles
+## 11. LLM roles
 
 | Role | When | Model class | On critical path? |
 |---|---|---|---|
@@ -655,12 +871,12 @@ Measured findings that should outlive the current model picks:
 - **A single-shot benchmark against a multi-tenant provider measures a moment, not a steady state.**
   Every early figure collected in one burst had its rankings overturned by a second burst.
 
-The full measurement tables and the current picks live in `AGENTS.md`, which is where they belong.
+The full measurement tables and the current picks live in `../AGENTS.md`, which is where they belong.
 They change faster than this document should.
 
 ---
 
-## 11. Memory
+## 12. Memory
 
 Two separate jobs that are easy to conflate. The original design named both; only the first exists.
 
@@ -696,7 +912,7 @@ and a checker only has prose-level lore drift left to handle.
 
 ---
 
-## 12. Frontend
+## 13. Frontend
 
 ```
 websocket ──► Table (autoload) ──► Chrome (Control nodes)
@@ -726,7 +942,7 @@ elsewhere — agents can't see what they made.
 
 ---
 
-## 13. Content pipeline
+## 14. Content pipeline
 
 **Do this before writing code:** pick the asset kit, then design the scene schema around exactly what
 that kit can express.
@@ -736,8 +952,16 @@ your renderer but they will not make your game look good. Locking the kit first 
 tile types, and room dimensions are all constrained by something real from day one.
 
 **Settled:** Kenney CC0 for M0, KayKit for the Godot table — Adventurers Knight, Skeletons Warrior,
-Dungeon kit. The advice was followed and it worked; the prop enum is the kit's contents, which is why
-the model cannot ask for an asset that does not exist.
+Dungeon kit, and the hex tiles that §9's region layer will read as its terrain enum. The advice was
+followed and it worked; the prop enum is the kit's contents, which is why the model cannot ask for an
+asset that does not exist.
+
+**The same rule extends to props now that they are clickable** (§2a). A prop's interaction tags are a
+closed enum over what the kit actually contains, so "search the sarcophagus" resolves against a mesh
+that exists and "search the reliquary" does not resolve at all. Modular kits help here in a way
+sprite sheets would not: one container mesh, tinted and scaled and tagged, covers a great deal of
+described variety without a new asset — which is most of why the renderer decision in §2 was made
+this way.
 
 One thing the advice did not anticipate: **each kit needs its own folder.** Kit GLBs reference
 textures by relative path, and mixing two kits in one directory silently paints one of them with the
@@ -748,7 +972,7 @@ keep D&D branding out.
 
 ---
 
-## 14. Milestones
+## 15. Milestones
 
 **The original ordering below was superseded twice, both times for the same reason**, and the reason
 is worth stating once because it will come up again: *build the thing that answers a question, in the
@@ -761,10 +985,11 @@ could turn into a test, and every milestone after it would have paid that cost.
 
 | | Gate question | Verdict | Where |
 |---|---|---|---|
-| **M0** | Does this feel like a DM running a game? | PASS 2026-08-20 | `docs/m0-evaluation.md` |
+| **M0** | Does this feel like a DM running a game? | PASS 2026-08-20 | `m0-evaluation.md` |
 | **M1** | Can the world be made rather than authored? | **Half done** — room generation merged; the dungeon is outstanding | `specs/2026-08-20-m1-procedural-generation-design.md` |
-| **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `docs/m2-evaluation.md` |
+| **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `m2-evaluation.md` |
 | **M3** | Is a room a place you can leave and come back to? | Planned 2026-09-05 | `specs/2026-09-05-m3-traversal-design.md` |
+| **M4** | Can you lose a delve, and does losing it sting? | Not started | §9 |
 
 The Godot migration sits between M1 and M2, gated on parity rather than on a question of its own
 (`specs/2026-08-22-chrome-direction-design.md`).
@@ -778,6 +1003,13 @@ has since been thrown away as intended. M2 is the foundation M0 deliberately did
 **Dungeon generation.** `LayoutGenerator`, `ExitPlacer`, spatial validation, and world-space packing
 so a dungeon's rooms have non-overlapping rectangles to render. Answers M1's outstanding half.
 
+**The delve.** §9, and the reason M4 has a gate question: session-scoped party state, the objective
+and exit events, the delve clock, consumables as a counter map, and clickable props. Mostly wiring
+already-working systems into a sequence rather than new systems — the expensive part is the
+projection work that carries hurt, clock and objective state across a room boundary as fiction, which
+is the same problem M3 is already inside. **Prove it on authored rooms before generated ones**, or a
+generator bug and a game-feel problem are indistinguishable.
+
 **Content, the rules engine, and the stance layer, together.** More than one enemy, more than one
 attack, more than one party member — the SRD-shaped engine of §6 that adjudicates them, and the
 stance call of §8 that gives monsters something to decide. One milestone, not three, because each is
@@ -789,10 +1021,10 @@ four classes and thirty monsters, both are what make the content cheap.
 expensive half. Snapshotting and schema migration arrive with it, or the log-refusal rule in §4 stops
 being free.
 
-**Campaign layer.** §9, entire: session-zero intake, arc skeletons, the quest graph with derived
+**Campaign layer.** §10, entire: session-zero intake, arc skeletons, the quest graph with derived
 readiness, backstory hooks, the synthesis worker, the persistent antagonist.
 
-**Encounter depth.** §9's encounter design: terrain features in the scene schema, encounter templates,
+**Encounter depth.** §10's encounter design: terrain features in the scene schema, encounter templates,
 composition rules, objective-based encounters. This is the one that makes the part you actually care
 about good.
 
@@ -813,7 +1045,7 @@ anything needs it".
 
 ---
 
-## 15. Deferred, with re-entry conditions
+## 16. Deferred, with re-entry conditions
 
 | Deferred | Revisit when |
 |---|---|
@@ -824,7 +1056,11 @@ anything needs it".
 | The stance layer above `GoblinAi` (§8) | A second monster kind exists, so there is a choice to make and a fight can read as coordinated |
 | An IDL | Two clients, or a second consumer of the wire types |
 | Multiplayer | The solo game is fun and someone asks to play |
-| Grid-walkable exploration | Combat is polished and you want interactable props |
+| Free walking outside combat | Click-to-interact proves insufficient. Interactable props themselves are now in scope — §2a |
+| Inventory, equipment, encumbrance | Consumables exist as a counter map and something needs an item to be an *object* |
+| The region and the watch loop (§9) | Enough sites exist that travelling between them means something |
+| Fronts and clocks at campaign scale (§10) | With the campaign layer. The `Clock` record arrives earlier, at delve scale |
+| Meta-progression — stash, upgrades, run tiers | Never. It competes with the campaign layer for the same design space |
 | Vector search | ~50 sessions in, and an anchorless query actually fails |
 | Off-screen world simulation | Probably never. This is where projects in this genre die. |
 | Local models | Sharing it with others makes per-user cost a constraint |
@@ -834,7 +1070,7 @@ anything needs it".
 
 ---
 
-## 16. Open risks
+## 17. Open risks
 
 Reordered by what play actually showed. The first one was not on the original list and belongs at the
 top of it.
@@ -842,28 +1078,34 @@ top of it.
 1. **Tool-calling reliability is the load-bearing dependency**, not prose quality and not price, and
    its failure mode is silent. A described goblin that never spawns looks like a rendering bug.
    Mitigated structurally by the reconcile pass and by closed enums; never eliminated.
-2. **The narrator can describe a world change nothing can back.** A player asked for the goblin to
+2. **Nothing is scarce, so nothing is at stake.** The model always says yes — that is what an
+   agreeable narrator does, and it is not tunable. The engine is the only thing here that can make
+   something cost something, and until it does, every decision is free and the game runs on novelty,
+   which decays in about twenty minutes. This risk was invisible while there was one room to be in.
+   Defended by §9's attrition and clocks, and by nothing else; a better prose model makes it worse
+   rather than better, by making the free decisions more pleasant to make.
+3. **The narrator can describe a world change nothing can back.** A player asked for the goblin to
    become an immense steaming hotdog and the narrator obliged. `assert_fact` now makes the DM
    *consistent* about its own hotdog; it cannot make the board agree. The M2 gate produced the same
    shape with a straight face — a copper key, asserted and durable, turning a lock in a door with no
    mechanism behind it. **Invented content is now durable, which is the spine working and a content
    problem.**
-3. **3D polish is a time sink.** Timebox it or it eats the project. Unchanged, and still true.
-4. **Java agent drift toward legacy idioms.** Mitigated by project rules, not eliminated.
-5. **The gap between "works" and "feels alive"** is mostly animation and audio timing, and it is wider
+4. **3D polish is a time sink.** Timebox it or it eats the project. Unchanged, and still true.
+5. **Java agent drift toward legacy idioms.** Mitigated by project rules, not eliminated.
+6. **The gap between "works" and "feels alive"** is mostly animation and audio timing, and it is wider
    than it looks. M0 existed to measure it early, and it was right to.
-6. **Scope creep via the rules engine.** 5e's long tail is infinite. The content trim list — 4
+7. **Scope creep via the rules engine.** 5e's long tail is infinite. The content trim list — 4
    classes, levels 1–5, ~30 monsters — is a commitment, not a suggestion. The risk runs the other
    way too: the ~40-line proxy is easy to mistake for the design and leave in place, and §6 exists
    so that mistake has something to be corrected against.
-7. **Mushy generated content.** The real failure mode of this genre: everything medium, no stakes,
+8. **Mushy generated content.** The real failure mode of this genre: everything medium, no stakes,
    nothing lands. Defended against by structure — quest graph, persistent antagonist, encounter
    templates — not by better prompts.
-8. **The BG3 comparison.** BG3's budget was authored content: dialogue, VO, cinematics, hand-built
+9. **The BG3 comparison.** BG3's budget was authored content: dialogue, VO, cinematics, hand-built
    levels. This project inverts that ratio deliberately — systems heavy, authored content near zero.
    Every BG3 feature you find yourself wanting is authored content, which is the one thing this
    project cannot afford. **Not BG3.**
-9. **Tactical monotony.** Combat is the reason this project exists. If encounters are four goblins in
+10. **Tactical monotony.** Combat is the reason this project exists. If encounters are four goblins in
    an empty room, the whole thing fails at the part that matters most.
 
 ### The risk that was not on the list
