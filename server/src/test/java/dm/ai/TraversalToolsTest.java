@@ -159,6 +159,24 @@ class TraversalToolsTest {
     }
 
     @Test
+    @DisplayName("move_entity on someone left behind in another room is rejected, not rewritten")
+    void moveEntityRejectsNotHere() {
+        var engine = started(new EventLog());
+        engine.spawnGoblin(6, 6);
+        engine.crossExit("door-north");
+
+        var result = new ToolDispatcher(engine).dispatch(new DmClient.ToolCall(
+                "1", ToolSchema.MOVE_ENTITY, "{\"actor_id\":\"goblin\",\"x\":3,\"y\":5}"));
+
+        assertFalse(result.ok());
+        assertTrue(result.message().startsWith("REJECTED:"), result.message());
+        var goblin = engine.state().find("goblin").orElseThrow();
+        assertEquals("crypt", goblin.roomId());
+        assertEquals(6, goblin.x());
+        assertEquals(6, goblin.y());
+    }
+
+    @Test
     @DisplayName("move_entity onto something solid is rejected with a reason")
     void moveEntityRefusesObstruction() {
         var engine = started(new EventLog());

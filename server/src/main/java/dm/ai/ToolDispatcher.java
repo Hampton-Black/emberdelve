@@ -217,8 +217,10 @@ public final class ToolDispatcher {
 
     private Result moveEntity(JsonNode args) {
         String actorId = args.path("actor_id").asText("");
-        if (engine.state().find(actorId).isEmpty()) {
-            return Result.rejected("no entity '" + actorId + "' is present");
+        boolean here = engine.state().entitiesHere().stream()
+                .anyMatch(e -> e.id().equals(actorId) && e.isAlive());
+        if (!here) {
+            return Result.rejected("'" + actorId + "' is not in this room");
         }
         int x = args.path("x").asInt(-1);
         int y = args.path("y").asInt(-1);
