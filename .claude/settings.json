@@ -16,6 +16,7 @@
     "superpowers@claude-plugins-official": false
   },
   "attribution": {
-    "commit": ""
+    "commit": "",
+    "pr": ""
   }
 }
