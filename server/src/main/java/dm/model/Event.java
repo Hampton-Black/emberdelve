@@ -36,8 +36,11 @@ public sealed interface Event {
     /**
      * Bumped whenever a recorded log stops being readable by this build. Old logs are refused,
      * never upgraded — spec §3. Discarding one is free; an upgrader is a tax paid forever.
+     *
+     * <p>2 (M3): entities carry a {@code roomId}, so every {@code party_spawned} and
+     * {@code entity_spawned} line written at schema 1 describes an entity standing nowhere.
      */
-    int SCHEMA_VERSION = 1;
+    int SCHEMA_VERSION = 2;
 
     Instant at();
 

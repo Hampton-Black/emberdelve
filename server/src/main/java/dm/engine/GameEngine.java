@@ -67,7 +67,7 @@ public final class GameEngine {
             var at = starts.get(i);
             // One member in M0, but the loop is the point — see invariant #2.
             String entityId = starts.size() == 1 ? fighter.id() : fighter.id() + "-" + i;
-            members.add(fighter.spawn(entityId, at.x(), at.y()));
+            members.add(fighter.spawn(entityId, room.roomId(), at.x(), at.y()));
         }
 
         log.append(new Event.PartySpawned(Instant.now(), List.copyOf(members)));
@@ -222,7 +222,7 @@ public final class GameEngine {
                     : existing.get().name() + " is dead. A spawn does not raise the dead.");
         }
 
-        var goblin = definition.spawn(definition.id(), x, y);
+        var goblin = definition.spawn(definition.id(), room.roomId(), x, y);
         log.append(new Event.EntitySpawned(Instant.now(), goblin));
         return List.of(new Diff.EntityAdded(goblin.toView()));
     }

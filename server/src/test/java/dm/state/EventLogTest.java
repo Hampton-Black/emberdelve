@@ -26,7 +26,7 @@ class EventLogTest {
     private static final Instant T = Instant.parse("2026-08-23T12:00:00Z");
 
     private static Entity goblin() {
-        return new Entity("goblin", "goblin", "Vessk", 15, 7, 7, 4, "1d6", 2, 30, 2,
+        return new Entity("goblin", "goblin", "Vessk", 15, 7, 7, 4, "1d6", 2, 30, 2, "crypt",
                 2, 2, false, Map.of());
     }
 

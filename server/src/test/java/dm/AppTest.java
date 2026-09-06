@@ -32,7 +32,7 @@ class AppTest {
     @DisplayName("a spawned creature's kind wins over its id")
     void spawnedKindWins() {
         var goblin = new Entity("goblin-1", "goblin", "Vessk",
-                15, 7, 7, 4, "1d6", 2, 30, 2, 3, 3, false, Map.of());
+                15, 7, 7, 4, "1d6", 2, 30, 2, "crypt", 3, 3, false, Map.of());
         var state = WorldState.fold(List.of(new Event.EntitySpawned(T, goblin)));
 
         assertEquals("goblin", App.kindForVoice(state, "goblin-1"));

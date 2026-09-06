@@ -37,3 +37,12 @@ tasks.test {
     useJUnitPlatform()
     testLogging { events("passed", "failed", "skipped") }
 }
+
+// Regenerates src/test/resources/sessions/crypt-fight.jsonl after a schema bump.
+// Old logs are refused rather than migrated, so the fixture must be reproducible.
+tasks.register<JavaExec>("recordFixture") {
+    group = "verification"
+    description = "Re-records the replay fixture at the current Event.SCHEMA_VERSION"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("dm.replay.FixtureRecorder")
+}

@@ -21,7 +21,7 @@ class BeatRendererTest {
     private static final Instant T = Instant.now();
 
     private static Entity entity(String id, String name, boolean player) {
-        return new Entity(id, "kind", name, 15, 12, 12, 4, "1d6", 2, 30, 2, 1, 1, player,
+        return new Entity(id, "kind", name, 15, 12, 12, 4, "1d6", 2, 30, 2, "crypt", 1, 1, player,
                 Map.of());
     }
 

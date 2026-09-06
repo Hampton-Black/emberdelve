@@ -21,6 +21,8 @@ public record Entity(
         int speedFeet,
         /** DEX, and the only ability score the engine ever consults. Combat rolls initiative. */
         int initiativeModifier,
+        /** Which room it is standing in. Scoping lives on the entity so there is nothing to desync. */
+        String roomId,
         int x,
         int y,
         boolean isPlayerControlled,
@@ -48,12 +50,20 @@ public record Entity(
 
     public Entity movedTo(int newX, int newY) {
         return new Entity(id, kind, name, ac, hp, maxHp, toHit, damageDice, damageModifier,
-                speedFeet, initiativeModifier, newX, newY, isPlayerControlled, skillModifiers);
+                speedFeet, initiativeModifier, roomId, newX, newY, isPlayerControlled,
+                skillModifiers);
+    }
+
+    /** Through a door. The only thing that changes which room an entity is in. */
+    public Entity movedToRoom(String newRoomId, int newX, int newY) {
+        return new Entity(id, kind, name, ac, hp, maxHp, toHit, damageDice, damageModifier,
+                speedFeet, initiativeModifier, newRoomId, newX, newY, isPlayerControlled,
+                skillModifiers);
     }
 
     public Entity withHp(int newHp) {
         return new Entity(id, kind, name, ac, Math.clamp(newHp, 0, maxHp), maxHp, toHit,
-                damageDice, damageModifier, speedFeet, initiativeModifier, x, y,
+                damageDice, damageModifier, speedFeet, initiativeModifier, roomId, x, y,
                 isPlayerControlled, skillModifiers);
     }
 

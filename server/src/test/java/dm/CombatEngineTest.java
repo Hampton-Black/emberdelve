@@ -400,7 +400,7 @@ class CombatEngineTest {
         var goblin = fixture.get("goblin");
         fixture.put(new Entity(goblin.id(), goblin.kind(), goblin.name(), goblin.ac(),
                 20, 20, goblin.toHit(), goblin.damageDice(), goblin.damageModifier(),
-                goblin.speedFeet(), goblin.initiativeModifier(), goblin.x(), goblin.y(),
+                goblin.speedFeet(), goblin.initiativeModifier(), "crypt", goblin.x(), goblin.y(),
                 goblin.isPlayerControlled(), goblin.skillModifiers()));
 
         var sink = new CombatSink.Buffer();

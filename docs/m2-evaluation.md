@@ -53,6 +53,13 @@ The length is load-bearing. M0's sessions were 7, 5, and 2 typed turns. Today's 
 knows the eleven marks or it does not. This session went to 30 and the marks were still there at
 the recap.
 
+> **Schema note, added 2026-09-05.** M3 bumped `Event.SCHEMA_VERSION` to 2, because entities now
+> carry a `roomId`. This session's log is schema 1 and is therefore refused by the current build —
+> refusal rather than migration is the rule (M2 spec §3). Criterion 4 above records a result that
+> was true and reproducible on the day it was signed; the file remains as evidence of what
+> happened, not as a fixture that still runs. The suite's replay coverage moved to
+> `crypt-fight.jsonl`, which `./gradlew recordFixture` regenerates at the current schema.
+
 ---
 
 ## 3. What happened

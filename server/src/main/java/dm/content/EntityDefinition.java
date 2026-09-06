@@ -25,9 +25,9 @@ public record EntityDefinition(
         String voice
 ) {
     /** Instantiate at full health at the given square. */
-    public Entity spawn(String entityId, int x, int y) {
+    public Entity spawn(String entityId, String roomId, int x, int y) {
         return new Entity(entityId, kind, name, ac, maxHp, maxHp, toHit, damageDice,
-                damageModifier, speedFeet, ability("DEX"), x, y, isPlayerControlled,
+                damageModifier, speedFeet, ability("DEX"), roomId, x, y, isPlayerControlled,
                 skillModifiers == null ? Map.of() : skillModifiers);
     }
 

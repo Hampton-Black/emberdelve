@@ -23,7 +23,7 @@ class WorldStateTest {
     private static final Instant T = Instant.parse("2026-08-23T12:00:00Z");
 
     private static Entity entity(String id, String kind, int hp, int x, int y, boolean player) {
-        return new Entity(id, kind, id, 15, hp, hp, 4, "1d6", 2, 30, 2, x, y, player, Map.of());
+        return new Entity(id, kind, id, 15, hp, hp, 4, "1d6", 2, 30, 2, "crypt", x, y, player, Map.of());
     }
 
     private static RollResult roll(int face, int total, Outcome outcome) {
