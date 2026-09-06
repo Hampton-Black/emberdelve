@@ -48,7 +48,7 @@ class BlockedSquaresTest {
         engine.revealProp("alcove");
         var scene = engine.scene();
 
-        assertTrue(scene.props().stream().anyMatch(p -> p.id().equals("alcove")),
+        assertTrue(scene.currentRoom().props().stream().anyMatch(p -> p.id().equals("alcove")),
                 "the alcove is on the board once revealed");
         assertFalse(scene.blocked().contains(new Square(9, 6)),
                 "an alcove is a recess, not a wall");
@@ -57,7 +57,8 @@ class BlockedSquaresTest {
     @Test
     @DisplayName("nothing hidden is given away by a square drawn solid")
     void hiddenPropsAreNotAdvertised() {
-        var visible = engine.scene().props().stream().map(p -> new Square(p.x(), p.y())).toList();
+        var visible = engine.scene().currentRoom().props().stream()
+                .map(p -> new Square(p.x(), p.y())).toList();
 
         // Every blocked square belongs to something the player has been shown. A hidden prop that
         // blocked would otherwise put a marker on the board exactly where the secret is.
@@ -69,7 +70,7 @@ class BlockedSquaresTest {
     @Test
     @DisplayName("the doorway is not drawn solid — it is the one square you are meant to use")
     void doorsAreNotBlocked() {
-        var door = engine.scene().exits().getFirst();
+        var door = engine.scene().currentRoom().exits().getFirst();
         assertFalse(engine.scene().blocked().contains(new Square(door.x(), door.y())));
     }
 }

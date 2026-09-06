@@ -124,8 +124,8 @@ class CrossExitTest {
     void sceneCarriesExits() {
         var engine = started(new EventLog());
 
-        assertEquals(engine.room().exits(), engine.scene().exits());
-        assertFalse(engine.scene().exits().isEmpty());
+        assertEquals(engine.room().exits(), engine.scene().currentRoom().exits());
+        assertFalse(engine.scene().currentRoom().exits().isEmpty());
     }
 
     @Test

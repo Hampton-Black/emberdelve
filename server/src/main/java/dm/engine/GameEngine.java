@@ -13,7 +13,7 @@ import dm.model.RollRequest;
 import dm.model.RollResult;
 import dm.model.Skill;
 import dm.model.Difficulty;
-import dm.model.RoomOutline;
+import dm.model.RoomView;
 import dm.model.SceneState;
 import dm.model.Square;
 import dm.state.EventLog;
@@ -21,8 +21,10 @@ import dm.state.WorldState;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Authoritative state. Applies actions and emits diffs; the client renders what it is told
@@ -173,12 +175,7 @@ public final class GameEngine {
      */
     public SceneState scene() {
         var here = room();
-        var revealed = state().revealedHere();
-
-        List<Prop> visible = here.props().stream()
-                .filter(p -> !p.hidden() || revealed.contains(p.id()))
-                .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false))
-                .toList();
+        var visible = visiblePropsOf(here, state().revealedHere());
 
         var entities = state().entitiesHere().stream()
                 .sorted(java.util.Comparator.comparing(Entity::id))
@@ -192,17 +189,62 @@ public final class GameEngine {
                 .map(p -> new Square(p.x(), p.y()))
                 .toList();
 
-        // Only rooms this session actually has. An exit to a room that is not loaded draws
-        // nothing rather than guessing at a shape.
-        var neighbours = here.exits().stream()
-                .filter(exit -> rooms.has(exit.toRoomId()))
-                .map(exit -> RoomOutline.beside(here, exit, rooms.structure(exit.toRoomId())))
-                .filter(java.util.Objects::nonNull)
-                .toList();
+        var known = knownRoomIds(here);
+        var roomViews = known.stream().map(this::roomView).toList();
 
-        return new SceneState(here.roomId(), here.width(), here.height(),
-                here.floorType(), here.wallType(), visible, here.exits(), blocked, neighbours,
-                entities, here.lighting(), state().mode(), combat.view());
+        return new SceneState(here.roomId(), roomViews, entities, blocked, state().mode(),
+                combat.view());
+    }
+
+    /**
+     * Every room the client is told exists: rooms the party has stood in, plus rooms visible
+     * through one of the current room's own exits — spec §8b. Not transitive: a room two doors
+     * away is not offered just because the door in front of it is.
+     *
+     * <p>A room reachable only through a one-way exit has no {@link Rooms#origins() origin} to
+     * place it at, so it is left out here exactly as {@link Rooms} itself leaves it out rather
+     * than guess at a position. M3's authored content has no such exit.
+     */
+    private Set<String> knownRoomIds(RoomDefinition here) {
+        var origins = rooms.origins();
+        var known = new LinkedHashSet<String>();
+        for (var roomId : state().visitedRoomIds()) {
+            if (origins.containsKey(roomId)) {
+                known.add(roomId);
+            }
+        }
+        for (var exit : here.exits()) {
+            if (rooms.has(exit.toRoomId()) && origins.containsKey(exit.toRoomId())) {
+                known.add(exit.toRoomId());
+            }
+        }
+        return known;
+    }
+
+    /**
+     * One room's whole picture, current or not — decision 6: current and non-current rooms are
+     * built by the same code, because {@link Rooms#coveredWalls()} decides the shared-wall owner
+     * by BFS distance rather than by which room the party is standing in.
+     */
+    private RoomView roomView(String roomId) {
+        var structure = rooms.structure(roomId);
+        var visited = state().hasVisited(roomId);
+        // Geometry only when unvisited — the DM was never told this room exists, so a furnished
+        // neighbour would be a room on screen the narrator can and will contradict.
+        var props = visited ? visiblePropsOf(structure, state().revealedIn(roomId)) : List.<Prop>of();
+        var origin = rooms.origins().get(roomId);
+
+        return new RoomView(roomId, structure.width(), structure.height(), structure.floorType(),
+                structure.wallType(), structure.lighting(), props, structure.exits(),
+                origin.x(), origin.z(), visited);
+    }
+
+    /** A room's props as the client may see them: hidden ones withheld unless revealed there. */
+    private List<Prop> visiblePropsOf(RoomDefinition def, Set<String> revealed) {
+        return def.props().stream()
+                .filter(p -> !p.hidden() || revealed.contains(p.id()))
+                .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false))
+                .toList();
     }
 
     public Mode mode() {

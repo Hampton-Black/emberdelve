@@ -192,8 +192,17 @@ public record WorldState(
      * wants, since a room's props are addressed by bare id everywhere else.
      */
     public Set<String> revealedHere() {
+        return revealedIn(roomId);
+    }
+
+    /**
+     * Prop ids revealed in {@code otherRoomId}. {@link #revealedHere()} is this for the room the
+     * party is standing in; {@code GameEngine.scene()} needs it for every other known room too,
+     * so a revealed secret does not leak onto — or get withheld from — the wrong room's view.
+     */
+    public Set<String> revealedIn(String otherRoomId) {
         return revealedProps.stream()
-                .filter(ref -> ref.roomId().equals(roomId))
+                .filter(ref -> ref.roomId().equals(otherRoomId))
                 .map(PropRef::propId)
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
