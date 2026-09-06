@@ -48,35 +48,11 @@ public record GeneratedRoom(
                 new RoomDefinition.StartPositions(
                         List.of(new RoomDefinition.Point(partyStart.x(), partyStart.y())),
                         new RoomDefinition.Point(goblinSpawn.x(), goblinSpawn.y())),
-                new RoomDefinition.DmNotes(UNDRESSED, UNDRESSED, UNDRESSED, UNDRESSED, UNDRESSED));
+                new RoomDefinition.DmNotes(UNDRESSED, UNDRESSED, null, null, null));
     }
 
-    /** The same room, with the dress pass's prose written into it. */
+    /** The same room, with a dress pass's prose written into it. */
     public RoomDefinition toRoomDefinition(Dressing dressing) {
-        // A prop the dresser skipped gets no description rather than the UNDRESSED placeholder:
-        // this adapter's output is read by the DM, and the placeholder is stage direction that
-        // would be printed into the prompt as if it were prose. The prop is still listed —
-        // it is on the board — just without a " — description" tail (see DmService.worldState).
-        var definitions = props.stream()
-                .map(p -> new RoomDefinition.PropDefinition(
-                        p.id(), p.type(), p.x(), p.y(), p.rotation(), p.hidden(),
-                        dressing.propDescriptions().getOrDefault(p.id(), ""),
-                        null, null))
-                .toList();
-
-        var plain = toRoomDefinition();
-        return new RoomDefinition(
-                plain.roomId(),
-                dressing.name(),
-                plain.width(),
-                plain.height(),
-                plain.floorType(),
-                plain.wallType(),
-                plain.lighting(),
-                definitions,
-                List.of(),
-                plain.startPositions(),
-                new RoomDefinition.DmNotes(
-                        dressing.overview(), dressing.sensory(), null, null, null));
+        return dm.content.Dressings.applyTo(toRoomDefinition(), dressing);
     }
 }

@@ -1,5 +1,6 @@
 package dm.state;
 
+import dm.generate.Dressing;
 import dm.model.Combatant;
 import dm.model.Entity;
 import dm.model.Event;
@@ -34,6 +35,7 @@ public record WorldState(
         Mode mode,
         Set<PropRef> revealedProps,
         Set<String> visitedRoomIds,
+        Map<String, Dressing> dressings,
         Optional<CombatRecord> combat,
         List<Fact> facts,
         int consecutiveFailedChecks
@@ -44,13 +46,14 @@ public record WorldState(
 
     public static final WorldState EMPTY = new WorldState(
             "crypt", Map.of(), List.of(), Mode.EXPLORATION, Set.of(), Set.of("crypt"),
-            Optional.empty(), List.of(), 0);
+            Map.of(), Optional.empty(), List.of(), 0);
 
     public WorldState {
         entities = Map.copyOf(entities);
         party = List.copyOf(party);
         revealedProps = Set.copyOf(revealedProps);
         visitedRoomIds = Set.copyOf(visitedRoomIds);
+        dressings = Map.copyOf(dressings);
         facts = List.copyOf(facts);
     }
 
@@ -107,12 +110,12 @@ public record WorldState(
             case Event.CombatEnded ignored -> combatEnded();
             case Event.ModeEntered e -> withMode(e.mode());
             case Event.FactAsserted e -> asserted(e);
-            // Inputs, session framing, and the dress pass, which is content rather than state.
+            case Event.RoomDressed e -> dressed(e);
+            // Inputs and session framing.
             case Event.SessionStarted ignored -> this;
             case Event.PlayerSaid ignored -> this;
             case Event.ToolCallIssued ignored -> this;
             case Event.NarrationLogged ignored -> this;
-            case Event.RoomDressed ignored -> this;
         };
     }
 
@@ -156,7 +159,7 @@ public record WorldState(
         visited.add(e.toRoomId());
 
         return new WorldState(e.toRoomId(), next, party, mode, revealedProps, visited,
-                combat, facts, consecutiveFailedChecks);
+                dressings, combat, facts, consecutiveFailedChecks);
     }
 
     private WorldState attacked(Event.AttackResolved e) {
@@ -242,6 +245,28 @@ public record WorldState(
                             Optional<CombatRecord> newCombat, List<Fact> newFacts,
                             int newFailedChecks) {
         return new WorldState(roomId, newEntities, newParty, newMode, newRevealed, newVisited,
-                newCombat, newFacts, newFailedChecks);
+                dressings, newCombat, newFacts, newFailedChecks);
+    }
+
+    private WorldState copyWithDressings(Map<String, Dressing> newDressings) {
+        return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
+                newDressings, combat, facts, consecutiveFailedChecks);
+    }
+
+    private WorldState dressed(Event.RoomDressed e) {
+        var next = new LinkedHashMap<>(dressings);
+        next.put(e.roomId(), e.dressing());
+        return copyWithDressings(next);
+    }
+
+    /**
+     * The prose a room is wearing, if it has been dressed.
+     *
+     * <p>Spec §5b: this is the half of a room that cannot be made again for free, so it is the
+     * half that lives in the log. A cache would be a second write path, would not survive
+     * {@code restart()}, and could not be reconstructed by a replay that has no model.
+     */
+    public Optional<Dressing> dressingOf(String otherRoomId) {
+        return Optional.ofNullable(dressings.get(otherRoomId));
     }
 }
