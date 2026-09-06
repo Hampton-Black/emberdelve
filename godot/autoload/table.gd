@@ -96,6 +96,14 @@ func prop(id: String) -> Dictionary:
 	return {}
 
 
+## The exit standing on a square, or {} if none does. Mirrors dm.model.Exit.
+func exit_at(square: Vector2i) -> Dictionary:
+	for e in scene.get("exits", []):
+		if int(e.get("x", -1)) == square.x and int(e.get("y", -1)) == square.y:
+			return e
+	return {}
+
+
 ## Queued with the narration, in arrival order, and released when the voice reaches it.
 ##
 ## A hit point bar that empties while the attack die is still in the air has answered the

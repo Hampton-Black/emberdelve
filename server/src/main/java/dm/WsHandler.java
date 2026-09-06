@@ -113,6 +113,13 @@ public final class WsHandler {
                     message.path("y").asInt(),
                     sink));
 
+            // A room change replaces everything, so it answers with a whole Scene rather than
+            // diffs. The client already rebuilds props and tokens when roomId changes.
+            case "enterExit" -> {
+                engine.crossExit(message.path("exitId").asText(""));
+                send(ctx, new ServerMessage.Scene(engine.scene()));
+            }
+
             case "attack" -> act(ctx, sink -> engine.combat().attack(
                     message.path("actorId").asText(),
                     message.path("targetId").asText(),

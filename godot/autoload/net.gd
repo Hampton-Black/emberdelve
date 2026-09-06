@@ -148,6 +148,9 @@ func free_text(actor_id: String, text: String) -> void:
 func move_to(actor_id: String, x: int, y: int) -> void:
 	send({"type": "moveTo", "actorId": actor_id, "x": x, "y": y})
 
+func enter_exit(exit_id: String) -> void:
+	send({"type": "enterExit", "exitId": exit_id})
+
 func attack(actor_id: String, target_id: String) -> void:
 	send({"type": "attack", "actorId": actor_id, "targetId": target_id})
 

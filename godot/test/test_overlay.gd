@@ -47,6 +47,11 @@ func _overlay(world: Node) -> Node:
 	return world.get_node_or_null("Overlay")
 
 
+func _world_with_scene(scene_dict: Dictionary) -> Node3D:
+	Table.set_scene(scene_dict)
+	return _world_tree()
+
+
 func _combat(active_id: String, moves: Array, targets: Array) -> Dictionary:
 	return {
 		"order": [
@@ -346,6 +351,85 @@ func test_pick_at_reads_viewport_pixels_not_window_pixels() -> void:
 			"window-space coords must not pick the same tile")
 	else:
 		assert_true(true, "window-space coords miss the board, which is also not the tile")
+
+
+func test_clicking_a_door_square_is_an_exit_not_a_move() -> void:
+	var world := _world_with_scene({
+		"roomId": "crypt",
+		"width": 12,
+		"height": 12,
+		"mode": "EXPLORATION",
+		"props": [],
+		"exits": [{
+			"id": "door-north",
+			"x": 6,
+			"y": 11,
+			"direction": "NORTH",
+			"toRoomId": "gallery",
+		}],
+		"entities": [{
+			"id": "fighter", "kind": "fighter", "name": "Roderick",
+			"x": 6, "y": 1, "hp": 12, "maxHp": 12, "isPlayerControlled": true,
+		}],
+		"combat": null,
+	})
+	var overlay := _overlay(world)
+	assert_not_null(overlay, "Overlay")
+	if overlay == null:
+		return
+
+	var on_the_door: Dictionary = overlay.intent("", Vector2i(6, 11))
+	assert_eq(String(on_the_door.get("kind", "")), "exit")
+	assert_eq(String(on_the_door.get("exit_id", "")), "door-north")
+
+	var plain_floor: Dictionary = overlay.intent("", Vector2i(4, 4))
+	assert_eq(String(plain_floor.get("kind", "")), "move",
+		"an ordinary square is still a move")
+
+
+func test_committing_an_exit_sends_enter_exit() -> void:
+	Net.outbound.clear()
+	var world := _world_with_scene({
+		"roomId": "crypt", "width": 12, "height": 12, "mode": "EXPLORATION",
+		"props": [],
+		"exits": [{"id": "door-north", "x": 6, "y": 11,
+			"direction": "NORTH", "toRoomId": "gallery"}],
+		"entities": [{"id": "fighter", "kind": "fighter", "name": "Roderick",
+			"x": 6, "y": 1, "hp": 12, "maxHp": 12, "isPlayerControlled": true}],
+		"combat": null,
+	})
+	var overlay := _overlay(world)
+	assert_not_null(overlay, "Overlay")
+	if overlay == null:
+		return
+
+	overlay.commit(overlay.intent("", Vector2i(6, 11)))
+
+	assert_eq(Net.outbound.size(), 1)
+	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
+	assert_eq(String(Net.outbound[0].get("exitId", "")), "door-north")
+
+
+func test_a_door_is_not_clickable_in_combat() -> void:
+	Net.outbound.clear()
+	var world := _world_with_scene({
+		"roomId": "crypt", "width": 12, "height": 12, "mode": "COMBAT",
+		"props": [],
+		"exits": [{"id": "door-north", "x": 6, "y": 11,
+			"direction": "NORTH", "toRoomId": "gallery"}],
+		"entities": [{"id": "fighter", "kind": "fighter", "name": "Roderick",
+			"x": 6, "y": 1, "hp": 12, "maxHp": 12, "isPlayerControlled": true}],
+		# The server refuses it too (CrossExitTest.exitsAreIllegalInCombat); the client
+		# should not offer a click that can only ever come back as an error.
+		"combat": {"activeId": "fighter", "round": 1, "order": [],
+			"moves": [], "targets": []},
+	})
+	var overlay := _overlay(world)
+	assert_not_null(overlay, "Overlay")
+	if overlay == null:
+		return
+
+	assert_true(overlay.intent("", Vector2i(6, 11)).is_empty())
 
 
 func test_a_click_event_in_window_space_still_moves_the_right_square() -> void:

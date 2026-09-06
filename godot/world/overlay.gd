@@ -67,6 +67,14 @@ func intent(entity_id: String, square: Variant = null) -> Dictionary:
 	var at: Vector2i = square
 	if at.x == int(player["x"]) and at.y == int(player["y"]):
 		return {}
+
+	# A door is a decision, not a move that happens to end somewhere. The combat branch above
+	# has already returned, so this is only ever reachable out of combat — which matches the
+	# server, where crossExit refuses while a fight is running.
+	var exit := Table.exit_at(at)
+	if not exit.is_empty():
+		return {"kind": "exit", "exit_id": String(exit.get("id", "")), "square": at}
+
 	return {"kind": "move", "actor_id": String(player["id"]), "square": at}
 
 
@@ -81,6 +89,8 @@ func commit(action: Dictionary) -> void:
 			Net.move_to(String(action["actor_id"]), at.x, at.y)
 		"attack":
 			Net.attack(String(action["actor_id"]), String(action["target_id"]))
+		"exit":
+			Net.enter_exit(String(action["exit_id"]))
 
 
 func set_hover(square: Variant = null) -> void:
