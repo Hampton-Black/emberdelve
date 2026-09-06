@@ -13,6 +13,7 @@ import dm.model.RollRequest;
 import dm.model.RollResult;
 import dm.model.Skill;
 import dm.model.Difficulty;
+import dm.model.RoomOutline;
 import dm.model.SceneState;
 import dm.model.Square;
 import dm.state.EventLog;
@@ -184,8 +185,16 @@ public final class GameEngine {
                 .map(Entity::toView)
                 .toList();
 
+        // Only rooms this session actually has. An exit to a room that is not loaded draws
+        // nothing rather than guessing at a shape.
+        var neighbours = here.exits().stream()
+                .filter(exit -> rooms.has(exit.toRoomId()))
+                .map(exit -> RoomOutline.beside(here, exit, rooms.structure(exit.toRoomId())))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
         return new SceneState(here.roomId(), here.width(), here.height(),
-                here.floorType(), here.wallType(), visible, here.exits(), entities,
+                here.floorType(), here.wallType(), visible, here.exits(), neighbours, entities,
                 here.lighting(), state().mode(), combat.view());
     }
 

@@ -15,6 +15,8 @@ public record SceneState(
         List<Prop> props,
         /** Ways out, so the client knows which floor squares are doors. */
         List<Exit> exits,
+        /** Adjacent rooms as floor and walls only — spec §8b. Empty when nothing is loaded. */
+        List<RoomOutline> neighbours,
         List<EntityView> entities,
         LightingPreset lighting,
         Mode mode,
@@ -29,6 +31,6 @@ public record SceneState(
     /** The scene as the client should first see it — hidden props stripped out entirely. */
     public SceneState asSeenByPlayer() {
         return new SceneState(roomId, width, height, floorType, wallType,
-                visibleProps(), exits, entities, lighting, mode, combat);
+                visibleProps(), exits, neighbours, entities, lighting, mode, combat);
     }
 }

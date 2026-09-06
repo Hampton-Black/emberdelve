@@ -89,6 +89,7 @@ func _on_scene_changed() -> void:
 		_origins.clear()
 		_sizes.clear()
 		register_room(room_id, Vector2i(_room_width(), _room_height()), Vector3.ZERO)
+		_rebuild_neighbours()
 		_rebuild_props()
 		_rebuild_tokens()
 		_follow_party()
@@ -97,6 +98,37 @@ func _on_scene_changed() -> void:
 		return
 	_sync_tokens()
 	_follow_party()
+
+
+## The rooms you can see through the doorways, as floor and walls only.
+##
+## No torches, no props, no tokens, and nothing about them in the DM's prompt — spec §8b. The
+## payoff is that walking through a door lights and dresses a room that was already standing
+## there, instead of cutting to black and rebuilding the same rectangle.
+func _rebuild_neighbours() -> void:
+	var holder := get_node_or_null("Neighbours")
+	if holder == null:
+		holder = Node3D.new()
+		holder.name = "Neighbours"
+		add_child(holder)
+	for child in holder.get_children():
+		child.queue_free()
+
+	for outline in Table.scene.get("neighbours", []):
+		var room_id := String(outline.get("roomId", ""))
+		if room_id.is_empty():
+			continue
+		var size := Vector2i(int(outline.get("width", 0)), int(outline.get("height", 0)))
+		var origin := Vector3(
+			float(outline.get("offsetX", 0.0)), 0.0, float(outline.get("offsetZ", 0.0)))
+		register_room(room_id, size, origin)
+
+		var node := Room.new()
+		node.name = room_id
+		holder.add_child(node)
+		node.build_unlit(room_id, size,
+			String(outline.get("floorType", "STONE")),
+			String(outline.get("wallType", "STONE")))
 
 
 func _on_prop_revealed(prop: Dictionary) -> void:

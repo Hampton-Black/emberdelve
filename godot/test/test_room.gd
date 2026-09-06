@@ -20,14 +20,23 @@ func before_each() -> void:
 	Table.set_scene(CRYPT.duplicate(true))
 
 
-func _room() -> Node3D:
+func _world_tree() -> Node3D:
 	var packed: PackedScene = load("res://world/world.tscn")
 	assert_not_null(packed, "world.tscn")
 	if packed == null:
 		return Node3D.new()
 	var world: Node3D = packed.instantiate()
 	add_child_autofree(world)
-	return world.get_node("Room") as Node3D
+	return world
+
+
+func _world_with_scene(scene_dict: Dictionary) -> Node3D:
+	Table.set_scene(scene_dict)
+	return _world_tree()
+
+
+func _room() -> Node3D:
+	return _world_tree().get_node("Room") as Node3D
 
 
 func test_hash32_matches_three_js_fnv1a() -> void:
@@ -238,6 +247,50 @@ func test_the_room_has_no_sun() -> void:
 		assert_false(node is DirectionalLight3D, "a sun in a crypt undoes M0")
 		for child in node.get_children():
 			stack.append(child)
+
+
+func test_a_neighbour_is_built_as_geometry_with_no_lights_and_no_props() -> void:
+	var world := _world_with_scene({
+		"roomId": "crypt", "width": 12, "height": 12,
+		"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+		"mode": "EXPLORATION", "props": [], "entities": [], "combat": null,
+		"exits": [{"id": "door-north", "x": 6, "y": 11,
+			"direction": "NORTH", "toRoomId": "gallery"}],
+		"neighbours": [{
+			"roomId": "gallery", "width": 10, "height": 16,
+			"floorType": "TILED", "wallType": "CARVED",
+			"offsetX": 0.5, "offsetZ": -14.5,
+		}],
+	})
+	await wait_frames(2)
+
+	var neighbour := world.get_node_or_null("Neighbours/gallery")
+	assert_not_null(neighbour, "the room beyond the door should be built")
+	if neighbour == null:
+		return
+
+	# Spec §8b: geometry only. A lit neighbour is a room the narrator has never been told about
+	# and will describe wrongly; MAX_TORCH_LIGHTS is also a per-room budget.
+	var lights := 0
+	for node in neighbour.find_children("*", "Light3D", true, false):
+		lights += 1
+	assert_eq(lights, 0, "a neighbour carries no torches")
+
+
+func test_the_neighbour_is_registered_where_the_server_put_it() -> void:
+	var world := _world_with_scene({
+		"roomId": "crypt", "width": 12, "height": 12,
+		"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+		"mode": "EXPLORATION", "props": [], "entities": [], "combat": null,
+		"exits": [], "neighbours": [{
+			"roomId": "gallery", "width": 10, "height": 16,
+			"floorType": "TILED", "wallType": "CARVED",
+			"offsetX": 0.5, "offsetZ": -14.5,
+		}],
+	})
+	await wait_frames(2)
+
+	assert_eq(world.room_origin("gallery"), Vector3(0.5, 0.0, -14.5))
 
 
 func _omni_count(root: Node) -> int:

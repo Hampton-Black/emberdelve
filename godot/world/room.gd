@@ -76,6 +76,11 @@ var _packed: Dictionary = {}
 
 
 func _ready() -> void:
+	# Neighbour rooms sit under World/Neighbours, not World. They must not rebuild from
+	# Table.scene — that is the current room, and would light a space the DM has not been told
+	# about (spec §8b).
+	if not (get_parent() is World):
+		return
 	Table.scene_changed.connect(_on_scene_changed)
 	_on_scene_changed()
 
@@ -90,14 +95,31 @@ static func hash32(text: String) -> int:
 
 
 func rebuild() -> void:
-	_clear($Floor)
-	_clear($Walls)
-	_clear($Torches)
+	_clear(_ensure_group("Floor"))
+	_clear(_ensure_group("Walls"))
+	_clear(_ensure_group("Torches"))
 	if Table.scene.is_empty():
 		return
-	_build_floor()
-	_build_walls()
+	var size := Vector2i(_width(), _height())
+	_build_floor(_room_id, size, String(Table.scene.get("floorType", "STONE")))
+	_build_walls(_room_id, size, String(Table.scene.get("wallType", "STONE")))
 	_build_wall_torches()
+
+
+## Floor and walls, and no lights at all.
+##
+## The lit build takes its torch spacing from a LightingPreset. A neighbour has no preset, on
+## purpose: it is a room the DM has not been told about, and a lit one would be a room on screen
+## the narrator can contradict. It also keeps MAX_TORCH_LIGHTS a per-room budget rather than a
+## number two rooms quietly share.
+func build_unlit(room_id: String, size: Vector2i, floor_type: String, wall_type: String) -> void:
+	if Table.scene_changed.is_connected(_on_scene_changed):
+		Table.scene_changed.disconnect(_on_scene_changed)
+	_room_id = room_id
+	_clear(_ensure_group("Floor"))
+	_clear(_ensure_group("Walls"))
+	_build_floor(room_id, size, floor_type)
+	_build_walls(room_id, size, wall_type)
 
 
 func _on_scene_changed() -> void:
@@ -110,17 +132,16 @@ func _on_scene_changed() -> void:
 	rebuild()
 
 
-func _build_floor() -> void:
-	var width := _width()
-	var height := _height()
-	var floor_type := String(Table.scene.get("floorType", "STONE"))
+func _build_floor(room_id: String, size: Vector2i, floor_type: String) -> void:
+	var width := size.x
+	var height := size.y
 	var variants: Array = FLOOR_VARIANTS.get(floor_type, FLOOR_VARIANTS["STONE"])
 	var total := _weight_total(variants)
-	var holder: Node3D = $Floor
+	var holder: Node3D = _ensure_group("Floor")
 
 	for gy in height:
 		for gx in width:
-			var hashed := hash32("%s:floor:%d,%d" % [_room_id, gx, gy])
+			var hashed := hash32("%s:floor:%d,%d" % [room_id, gx, gy])
 			var variant: Dictionary = _pick(variants, hashed, total)
 			var tile := _instance_piece(String(variant["path"]), {"fill_square": true})
 			tile.set_meta("floor_variant", String(variant["path"]))
@@ -128,33 +149,38 @@ func _build_floor() -> void:
 			var yaw := float((hashed >> 16) % 4) * (PI / 2.0)
 			tile.rotation.y = yaw
 			var box := _aabb_of(tile)
-			var at := _to_world(gx, gy)
+			var at := _to_world(room_id, gx, gy, size)
 			tile.position = Vector3(at.x, -box.end.y, at.z)
 			holder.add_child(tile)
 
 
-func _build_walls() -> void:
-	var width := _width()
-	var height := _height()
+func _build_walls(room_id: String, size: Vector2i, wall_type: String) -> void:
+	var width := size.x
+	var height := size.y
 	var half_w := float(width) / 2.0
 	var half_h := float(height) / 2.0
+	# The live room sits at the origin. A neighbour's parent is not World, so its local
+	# wall placements would otherwise land on the crypt — shift them by the registered origin.
+	var origin := Vector3.ZERO
+	var world := _host_world()
+	if world != null and not (get_parent() is World):
+		origin = world.room_origin(room_id)
 	var placements: Array[Dictionary] = []
 	for gx in width:
 		var x := float(gx) - half_w + 0.5
-		placements.append({"x": x, "z": -half_h, "ry": 0.0})
-		placements.append({"x": x, "z": half_h, "ry": PI})
+		placements.append({"x": x + origin.x, "z": -half_h + origin.z, "ry": 0.0})
+		placements.append({"x": x + origin.x, "z": half_h + origin.z, "ry": PI})
 	for gy in height:
 		var z := -(float(gy) - half_h + 0.5)
-		placements.append({"x": -half_w, "z": z, "ry": PI / 2.0})
-		placements.append({"x": half_w, "z": z, "ry": -PI / 2.0})
+		placements.append({"x": -half_w + origin.x, "z": z + origin.z, "ry": PI / 2.0})
+		placements.append({"x": half_w + origin.x, "z": z + origin.z, "ry": -PI / 2.0})
 
-	var wall_type := String(Table.scene.get("wallType", "STONE"))
 	var variants: Array = WALL_VARIANTS_CARVED if wall_type == "CARVED" else WALL_VARIANTS_STONE
 	var total := _weight_total(variants)
-	var holder: Node3D = $Walls
+	var holder: Node3D = _ensure_group("Walls")
 
 	for i in placements.size():
-		var hashed := hash32("%s:wall:%d" % [_room_id, i])
+		var hashed := hash32("%s:wall:%d" % [room_id, i])
 		var variant: Dictionary = _pick(variants, hashed, total)
 		_add_wall_segment(holder, variant, placements[i])
 
@@ -379,13 +405,35 @@ func _weight_total(variants: Array) -> int:
 	return total
 
 
-func _to_world(gx: int, gy: int) -> Vector3:
-	var world := get_parent() as World
-	if world != null:
-		return world.grid_to_world(world.current_room_id(), gx, gy)
-	var width := float(_width())
-	var height := float(_height())
-	return Vector3(gx - width / 2.0 + 0.5, 0.0, -(gy - height / 2.0 + 0.5))
+func _ensure_group(group_name: String) -> Node3D:
+	var node := get_node_or_null(group_name) as Node3D
+	if node == null:
+		node = Node3D.new()
+		node.name = group_name
+		add_child(node)
+	return node
+
+
+func _host_world() -> World:
+	var node: Node = get_parent()
+	while node:
+		if node is World:
+			return node as World
+		node = node.get_parent()
+	return null
+
+
+func _to_world(room_id: String, gx: int, gy: int, size: Vector2i) -> Vector3:
+	var world := _host_world()
+	# Neighbour parent is not World. Floors are world-space via grid_to_world, which already
+	# includes the registered origin — do not also move this node, or the offset applies twice.
+	if world != null and not (get_parent() is World):
+		return world.grid_to_world(room_id, gx, gy)
+	return Vector3(
+		gx - float(size.x) / 2.0 + 0.5,
+		0.0,
+		-(gy - float(size.y) / 2.0 + 0.5),
+	)
 
 
 func _width() -> int:
