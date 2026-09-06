@@ -1,4 +1,5 @@
 extends GutTest
+const SceneFixtures := preload("res://test/scene_fixtures.gd")
 
 ## Prop table, spawn, hidden/reveal, and the sarcophagus silhouette. Game facts stay in Table.
 
@@ -26,7 +27,7 @@ const CRYPT := {
 
 func before_each() -> void:
 	Table.reset()
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 
 
 func _table():
@@ -133,7 +134,7 @@ func test_entity_motion_does_not_rebuild_props() -> void:
 	var kept: int = tomb.get_instance_id()
 	var moved := CRYPT.duplicate(true)
 	moved["entities"][0]["x"] = 5
-	Table.set_scene(moved)
+	Table.set_scene(SceneFixtures.scene(moved))
 	var after := _prop(world, "tomb")
 	assert_not_null(after, "tomb still there")
 	if after == null:
@@ -154,7 +155,7 @@ func test_a_new_room_rebuilds_props() -> void:
 	next["props"] = [
 		{"id": "tomb", "type": "SARCOPHAGUS", "x": 4, "y": 4, "rotation": 90, "hidden": false},
 	]
-	Table.set_scene(next)
+	Table.set_scene(SceneFixtures.scene(next))
 	var rebuilt := _prop(world, "tomb")
 	assert_not_null(rebuilt, "fresh room still has the tomb")
 	if rebuilt == null:

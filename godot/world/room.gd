@@ -112,10 +112,11 @@ func rebuild() -> void:
 	_clear(_ensure_group("Torches"))
 	if Table.scene.is_empty():
 		return
+	var here := Table.room()
 	var size := Vector2i(_width(), _height())
-	_build_floor(_room_id, size, String(Table.scene.get("floorType", "STONE")))
-	_build_walls(_room_id, size, String(Table.scene.get("wallType", "STONE")),
-		Table.scene.get("exits", []))
+	_build_floor(_room_id, size, String(here.get("floorType", "STONE")))
+	_build_walls(_room_id, size, String(here.get("wallType", "STONE")),
+		here.get("exits", []))
 	_build_wall_torches()
 
 
@@ -274,7 +275,7 @@ func _add_wall_segment(holder: Node3D, variant: Dictionary, placement: Dictionar
 
 
 func _build_wall_torches() -> void:
-	var lighting := String(Table.scene.get("lighting", "TORCHLIT"))
+	var lighting := String(Table.room().get("lighting", "TORCHLIT"))
 	var spacing: int = int(TORCH_SPACING.get(lighting, 0))
 	if spacing <= 0:
 		return
@@ -516,11 +517,11 @@ func _to_world(room_id: String, gx: int, gy: int, size: Vector2i) -> Vector3:
 
 
 func _width() -> int:
-	return int(Table.scene.get("width", 12))
+	return int(Table.room().get("width", 12))
 
 
 func _height() -> int:
-	return int(Table.scene.get("height", 12))
+	return int(Table.room().get("height", 12))
 
 
 func _clear(node: Node) -> void:

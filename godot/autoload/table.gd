@@ -89,8 +89,24 @@ func entity(id: String) -> Dictionary:
 	return {}
 
 
+## The room the party is standing in, in the RoomView shape — width, height, floorType,
+## wallType, lighting, props, exits, origin, visited. {} before the first scene arrives.
+func room() -> Dictionary:
+	return room_by_id(String(scene.get("roomId", "")))
+
+
+## Any room the server has ever mentioned — visited, or glimpsed through a current exit
+## (spec §8b) — in the same RoomView shape as `room()`. {} for a room the client has not been
+## told about; there is nothing to draw for it.
+func room_by_id(room_id: String) -> Dictionary:
+	for r in scene.get("rooms", []):
+		if String(r.get("roomId", "")) == room_id:
+			return r
+	return {}
+
+
 func prop(id: String) -> Dictionary:
-	for p in scene.get("props", []):
+	for p in room().get("props", []):
 		if p["id"] == id:
 			return p
 	return {}
@@ -115,7 +131,7 @@ func is_blocked(square: Vector2i) -> bool:
 ## renderer, the DM and this lookup all address one thing. Clicking the floor square a door
 ## happens to stand on is a move, and reads like one.
 func exit_by_id(exit_id: String) -> Dictionary:
-	for e in scene.get("exits", []):
+	for e in room().get("exits", []):
 		if String(e.get("id", "")) == exit_id:
 			return e
 	return {}
@@ -194,9 +210,9 @@ func _apply_now(list: Array) -> void:
 				var revealed: Dictionary = diff["prop"]
 				var at_prop := _index_of_prop(String(revealed["id"]))
 				if at_prop >= 0:
-					scene["props"][at_prop] = revealed
+					room()["props"][at_prop] = revealed
 				else:
-					scene["props"].append(revealed)
+					room()["props"].append(revealed)
 					announcements.append(func() -> void: prop_revealed.emit(revealed))
 
 			"CombatChanged":
@@ -221,7 +237,7 @@ func _index_of_entity(id: String) -> int:
 
 
 func _index_of_prop(id: String) -> int:
-	var props: Array = scene.get("props", [])
+	var props: Array = room().get("props", [])
 	for i in props.size():
 		if props[i]["id"] == id:
 			return i

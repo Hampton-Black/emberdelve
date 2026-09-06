@@ -1,4 +1,5 @@
 extends GutTest
+const SceneFixtures := preload("res://test/scene_fixtures.gd")
 
 ## Tokens spawn from Table, slide rather than physics, and keep a body. Game facts stay in Table.
 
@@ -26,7 +27,7 @@ const RED := Color(0xb8 / 255.0, 0x3a / 255.0, 0x30 / 255.0)
 
 func before_each() -> void:
 	Table.reset()
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 
 
 func _world_tree() -> Node3D:
@@ -87,7 +88,7 @@ func test_kaykit_character_kits_are_cherry_picked_per_atlas() -> void:
 func test_the_world_spawns_every_entity_from_the_scene() -> void:
 	var fighting := CRYPT.duplicate(true)
 	fighting["entities"] = [FIGHTER.duplicate(), GOBLIN.duplicate()]
-	Table.set_scene(fighting)
+	Table.set_scene(SceneFixtures.scene(fighting))
 	var world := _world_tree()
 	var holder := _tokens(world)
 	assert_not_null(holder, "World/Tokens")
@@ -143,7 +144,7 @@ func test_a_move_slides_over_sfx_move_seconds() -> void:
 func test_a_dead_body_stays_on_the_board() -> void:
 	var fighting := CRYPT.duplicate(true)
 	fighting["entities"] = [FIGHTER.duplicate(), GOBLIN.duplicate()]
-	Table.set_scene(fighting)
+	Table.set_scene(SceneFixtures.scene(fighting))
 	var world := _world_tree()
 	var goblin := _token(world, "goblin")
 	assert_not_null(goblin, "goblin")
@@ -162,7 +163,7 @@ func test_a_dead_body_stays_on_the_board() -> void:
 func test_health_bar_colour_is_allegiance_and_length_is_hp() -> void:
 	var fighting := CRYPT.duplicate(true)
 	fighting["entities"] = [FIGHTER.duplicate(), GOBLIN.duplicate()]
-	Table.set_scene(fighting)
+	Table.set_scene(SceneFixtures.scene(fighting))
 	var world := _world_tree()
 	var fighter := _token(world, "fighter")
 	var goblin := _token(world, "goblin")
@@ -224,7 +225,7 @@ func test_the_four_clips_exist_under_the_names_the_token_plays() -> void:
 func test_a_strike_swings_and_impact_delays_the_drop() -> void:
 	var fighting := CRYPT.duplicate(true)
 	fighting["entities"] = [FIGHTER.duplicate(), GOBLIN.duplicate()]
-	Table.set_scene(fighting)
+	Table.set_scene(SceneFixtures.scene(fighting))
 	var world := _world_tree()
 	var fighter := _token(world, "fighter")
 	var goblin := _token(world, "goblin")
@@ -311,7 +312,7 @@ func test_a_creature_revives_when_hit_points_return() -> void:
 	var corpse := GOBLIN.duplicate()
 	corpse["hp"] = 0
 	fighting["entities"] = [FIGHTER.duplicate(), corpse]
-	Table.set_scene(fighting)
+	Table.set_scene(SceneFixtures.scene(fighting))
 	var world := _world_tree()
 	var goblin := _token(world, "goblin")
 	assert_not_null(goblin, "born-dead goblin still has a token")

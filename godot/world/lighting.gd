@@ -10,7 +10,7 @@ func _ready() -> void:
 
 
 func apply() -> void:
-	var preset := String(Table.scene.get("lighting", "TORCHLIT"))
+	var preset := String(Table.room().get("lighting", "TORCHLIT"))
 	if preset.is_empty():
 		preset = "TORCHLIT"
 	for child in get_children():

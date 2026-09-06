@@ -1,4 +1,5 @@
 extends GutTest
+const SceneFixtures := preload("res://test/scene_fixtures.gd")
 
 const CRYPT := {
 	"roomId": "crypt", "width": 12, "height": 12,
@@ -17,7 +18,7 @@ const GOBLIN := {"id": "goblin", "kind": "goblin", "name": "Vessk", "x": 8, "y":
 func before_each() -> void:
 	Table.reset()
 	Clock.silence_now()
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 	await get_tree().process_frame
 	# Swapped in only after the old backend's deferred `finished` has flushed above: test_clock
 	# leaves a HeldVoice installed on the shared Clock, and it holds every line in the air.
@@ -32,7 +33,7 @@ func test_the_scene_arrives_whole() -> void:
 func test_mode_rides_with_the_scene_so_a_reconnect_lands_mid_fight_intact() -> void:
 	var fighting := CRYPT.duplicate(true)
 	fighting["mode"] = "COMBAT"
-	Table.set_scene(fighting)
+	Table.set_scene(SceneFixtures.scene(fighting))
 	assert_eq(Table.mode, "COMBAT")
 
 
@@ -90,7 +91,7 @@ func test_a_revealed_prop_joins_the_room() -> void:
 		"hidden": false}
 	Table.apply_diffs([{"kind": "PropRevealed", "prop": alcove}])
 	await wait_frames(2)
-	assert_eq(Table.scene["props"].size(), 2)
+	assert_eq(Table.room()["props"].size(), 2)
 
 
 func test_revealing_the_same_prop_twice_replaces_rather_than_duplicates() -> void:
@@ -98,8 +99,8 @@ func test_revealing_the_same_prop_twice_replaces_rather_than_duplicates() -> voi
 		"hidden": false}
 	Table.apply_diffs([{"kind": "PropRevealed", "prop": tomb}])
 	await wait_frames(2)
-	assert_eq(Table.scene["props"].size(), 1)
-	assert_eq(Table.scene["props"][0]["rotation"], 1)
+	assert_eq(Table.room()["props"].size(), 1)
+	assert_eq(Table.room()["props"][0]["rotation"], 1)
 
 
 func test_the_mode_flips() -> void:
@@ -325,7 +326,7 @@ func test_a_reconnect_mid_fight_does_not_replay_the_ceremony() -> void:
 	var fighting := CRYPT.duplicate(true)
 	fighting["mode"] = "COMBAT"
 	fighting["combat"] = _combat()
-	Table.set_scene(fighting)
+	Table.set_scene(SceneFixtures.scene(fighting))
 	Table.append_narration({"speakerId": "narrator", "text": "still here"})
 	await wait_frames(4)
 	assert_eq(Table.transcript.size(), 1, "nothing is held for a fight already under way")
@@ -362,7 +363,7 @@ func test_set_scene_recognises_a_restart() -> void:
 	Table.set_started()
 	Table.say_as_player("something")
 	Table.expect_restart()
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 	assert_false(Table.started)
 	assert_false(Table._restarting)
 	assert_eq(Table.transcript, [])
@@ -373,7 +374,7 @@ func test_set_scene_recognises_a_restart() -> void:
 
 func test_an_ordinary_scene_does_not_end_the_session() -> void:
 	Table.set_started()
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 	assert_true(Table.started)
 	assert_eq(Table.entity("fighter")["name"], "Roderick")
 

@@ -211,9 +211,10 @@ func _apply_camera() -> void:
 
 func _room_extent() -> Vector2:
 	# Live from Table — width/height are scene facts, not view state.
+	var here := Table.room()
 	return Vector2(
-		float(int(Table.scene.get("width", 12))) / 2.0,
-		float(int(Table.scene.get("height", 12))) / 2.0,
+		float(int(here.get("width", 12))) / 2.0,
+		float(int(here.get("height", 12))) / 2.0,
 	)
 
 

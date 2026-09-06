@@ -1,4 +1,5 @@
 extends GutTest
+const SceneFixtures := preload("res://test/scene_fixtures.gd")
 
 ## Floor mix, lighting groups, and the roomId rebuild guard. Geometry is hashed from the
 ## room id the way Renderer.ts does, so a reconnect cannot reshuffle the tiles.
@@ -17,7 +18,7 @@ const CRYPT := {
 
 func before_each() -> void:
 	Table.reset()
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 
 
 func _world_tree() -> Node3D:
@@ -51,12 +52,12 @@ func test_hash32_matches_three_js_fnv1a() -> void:
 func test_tiled_and_cracked_stone_lay_different_floor_mixes() -> void:
 	var tiled := CRYPT.duplicate(true)
 	tiled["floorType"] = "TILED"
-	Table.set_scene(tiled)
+	Table.set_scene(SceneFixtures.scene(tiled))
 	var tiled_mix := _floor_mix(_room())
 
 	var cracked := CRYPT.duplicate(true)
 	cracked["floorType"] = "CRACKED_STONE"
-	Table.set_scene(cracked)
+	Table.set_scene(SceneFixtures.scene(cracked))
 	var cracked_mix := _floor_mix(_room())
 
 	assert_eq(tiled_mix["total"], 144, "one tile per square")
@@ -83,17 +84,17 @@ func test_tiled_and_cracked_stone_lay_different_floor_mixes() -> void:
 func test_stone_sits_between_tiled_and_cracked() -> void:
 	var stone := CRYPT.duplicate(true)
 	stone["floorType"] = "STONE"
-	Table.set_scene(stone)
+	Table.set_scene(SceneFixtures.scene(stone))
 	var stone_mix := _floor_mix(_room())
 
 	var tiled := CRYPT.duplicate(true)
 	tiled["floorType"] = "TILED"
-	Table.set_scene(tiled)
+	Table.set_scene(SceneFixtures.scene(tiled))
 	var tiled_mix := _floor_mix(_room())
 
 	var cracked := CRYPT.duplicate(true)
 	cracked["floorType"] = "CRACKED_STONE"
-	Table.set_scene(cracked)
+	Table.set_scene(SceneFixtures.scene(cracked))
 	var cracked_mix := _floor_mix(_room())
 
 	assert_true(_is_kaykit_floor(stone_mix))
@@ -118,14 +119,14 @@ func test_lighting_group_visibility_follows_the_preset() -> void:
 
 	var dim := CRYPT.duplicate(true)
 	dim["lighting"] = "DIM"
-	Table.set_scene(dim)
+	Table.set_scene(SceneFixtures.scene(dim))
 	assert_true(lighting.get_node("DIM").visible)
 	assert_false(lighting.get_node("TORCHLIT").visible)
 	assert_false(lighting.get_node("DARK").visible)
 
 	var dark := CRYPT.duplicate(true)
 	dark["lighting"] = "DARK"
-	Table.set_scene(dark)
+	Table.set_scene(SceneFixtures.scene(dark))
 	assert_true(lighting.get_node("DARK").visible)
 	assert_false(lighting.get_node("TORCHLIT").visible)
 	assert_false(lighting.get_node("DIM").visible)
@@ -140,7 +141,7 @@ func test_rebuild_is_skipped_when_room_id_is_unchanged() -> void:
 	var kept: int = tiles[0].get_instance_id()
 	var moved := CRYPT.duplicate(true)
 	moved["entities"][0]["x"] = 5
-	Table.set_scene(moved)
+	Table.set_scene(SceneFixtures.scene(moved))
 	var after := _floor_roots(room)
 	assert_eq(after.size(), tiles.size(), "entity motion must not relayout the floor")
 	assert_eq(after[0].get_instance_id(), kept,
@@ -171,7 +172,7 @@ func test_a_generated_room_uses_its_own_floor_and_lights() -> void:
 	generated["floorType"] = "STONE"
 	generated["wallType"] = "STONE"
 	generated["lighting"] = "DIM"
-	Table.set_scene(generated)
+	Table.set_scene(SceneFixtures.scene(generated))
 	var room := _room()
 	var mix := _floor_mix(room)
 	assert_eq(mix["total"], 195)
@@ -189,7 +190,7 @@ func test_dark_rooms_carry_no_wall_torch_lights() -> void:
 	var dark := CRYPT.duplicate(true)
 	dark["roomId"] = "dark-crypt"
 	dark["lighting"] = "DARK"
-	Table.set_scene(dark)
+	Table.set_scene(SceneFixtures.scene(dark))
 	var room := _room()
 	assert_eq(_omni_count(room), 0, "DARK is unlit walls, not dim torches")
 
@@ -207,12 +208,12 @@ func test_carved_walls_differ_from_stone_in_geometry() -> void:
 	# passage through it; those are exits, and exits are placed, not hashed.
 	var stone := CRYPT.duplicate(true)
 	stone["wallType"] = "STONE"
-	Table.set_scene(stone)
+	Table.set_scene(SceneFixtures.scene(stone))
 	var stone_mix := _wall_mix(_room())
 
 	var carved := CRYPT.duplicate(true)
 	carved["wallType"] = "CARVED"
-	Table.set_scene(carved)
+	Table.set_scene(SceneFixtures.scene(carved))
 	var carved_mix := _wall_mix(_room())
 
 	assert_gt(stone_mix["total"], 0)
@@ -238,16 +239,17 @@ func test_the_room_has_no_sun() -> void:
 
 func test_a_neighbour_is_built_as_geometry_with_no_lights_and_no_props() -> void:
 	var world := _world_with_scene({
-		"roomId": "crypt", "width": 12, "height": 12,
-		"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
-		"mode": "EXPLORATION", "props": [], "entities": [], "combat": null,
-		"exits": [{"id": "door-north", "x": 6, "y": 11,
-			"direction": "NORTH", "toRoomId": "gallery"}],
-		"neighbours": [{
-			"roomId": "gallery", "width": 10, "height": 16,
-			"floorType": "TILED", "wallType": "CARVED",
-			"offsetX": 0.5, "offsetZ": -14.5,
-		}],
+		"roomId": "crypt", "mode": "EXPLORATION", "entities": [], "combat": null,
+		"rooms": [
+			{"roomId": "crypt", "width": 12, "height": 12,
+				"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "originX": 0.0, "originZ": 0.0, "visited": true,
+				"exits": [{"id": "door-north", "x": 6, "y": 11,
+					"direction": "NORTH", "toRoomId": "gallery"}]},
+			{"roomId": "gallery", "width": 10, "height": 16,
+				"floorType": "TILED", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "exits": [], "originX": 0.5, "originZ": -14.5, "visited": false},
+		],
 	})
 	await wait_frames(2)
 
@@ -266,14 +268,15 @@ func test_a_neighbour_is_built_as_geometry_with_no_lights_and_no_props() -> void
 
 func test_the_neighbour_is_registered_where_the_server_put_it() -> void:
 	var world := _world_with_scene({
-		"roomId": "crypt", "width": 12, "height": 12,
-		"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
-		"mode": "EXPLORATION", "props": [], "entities": [], "combat": null,
-		"exits": [], "neighbours": [{
-			"roomId": "gallery", "width": 10, "height": 16,
-			"floorType": "TILED", "wallType": "CARVED",
-			"offsetX": 0.5, "offsetZ": -14.5,
-		}],
+		"roomId": "crypt", "mode": "EXPLORATION", "entities": [], "combat": null,
+		"rooms": [
+			{"roomId": "crypt", "width": 12, "height": 12,
+				"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "exits": [], "originX": 0.0, "originZ": 0.0, "visited": true},
+			{"roomId": "gallery", "width": 10, "height": 16,
+				"floorType": "TILED", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "exits": [], "originX": 0.5, "originZ": -14.5, "visited": false},
+		],
 	})
 	await wait_frames(2)
 
@@ -287,7 +290,7 @@ func test_the_only_hole_in_the_wall_is_the_way_out() -> void:
 	crypt["wallType"] = "CARVED"
 	crypt["exits"] = [{"id": "door-north", "x": 6, "y": 11,
 		"direction": "NORTH", "toRoomId": "gallery"}]
-	Table.set_scene(crypt)
+	Table.set_scene(SceneFixtures.scene(crypt))
 	var mix := _wall_mix(_room())
 
 	assert_eq(int(mix.get("wall_gated", 0)), 0, "a barred gate is a way out that is not one")
@@ -300,7 +303,7 @@ func test_a_room_with_no_exits_has_no_doorway_at_all() -> void:
 	sealed["roomId"] = "sealed"
 	sealed["wallType"] = "CARVED"
 	sealed["exits"] = []
-	Table.set_scene(sealed)
+	Table.set_scene(SceneFixtures.scene(sealed))
 	assert_eq(int(_wall_mix(_room()).get("wall_doorway", 0)), 0)
 
 
@@ -309,7 +312,7 @@ func test_the_doorway_is_cut_in_the_wall_the_exit_faces() -> void:
 	crypt["wallType"] = "CARVED"
 	crypt["exits"] = [{"id": "door-north", "x": 6, "y": 11,
 		"direction": "NORTH", "toRoomId": "gallery"}]
-	Table.set_scene(crypt)
+	Table.set_scene(SceneFixtures.scene(crypt))
 	var room := _room()
 	var doorway := _segment_named(room, "wall_doorway")
 	assert_not_null(doorway, "the exit's segment")
@@ -324,18 +327,19 @@ func test_a_neighbour_is_dark_stone_not_a_second_lit_room() -> void:
 	# Playtest 2026-09-06: withholding the torches was not enough — the ambient still lifted
 	# the kit textures far enough to read, so the gallery looked like somewhere already visited.
 	var world := _world_with_scene({
-		"roomId": "crypt", "width": 12, "height": 12,
-		"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
-		"mode": "EXPLORATION", "props": [], "entities": [], "combat": null,
-		"exits": [{"id": "door-north", "x": 6, "y": 11,
-			"direction": "NORTH", "toRoomId": "gallery"}],
-		"neighbours": [{
-			"roomId": "gallery", "width": 10, "height": 16,
-			"floorType": "TILED", "wallType": "CARVED",
-			"offsetX": 0.0, "offsetZ": -14.0,
-			"back": {"id": "door-south", "x": 5, "y": 0,
-				"direction": "SOUTH", "toRoomId": "crypt"},
-		}],
+		"roomId": "crypt", "mode": "EXPLORATION", "entities": [], "combat": null,
+		"rooms": [
+			{"roomId": "crypt", "width": 12, "height": 12,
+				"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "originX": 0.0, "originZ": 0.0, "visited": true,
+				"exits": [{"id": "door-north", "x": 6, "y": 11,
+					"direction": "NORTH", "toRoomId": "gallery"}]},
+			{"roomId": "gallery", "width": 10, "height": 16,
+				"floorType": "TILED", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "originX": 0.0, "originZ": -14.0, "visited": false,
+				"exits": [{"id": "door-south", "x": 5, "y": 0,
+					"direction": "SOUTH", "toRoomId": "crypt"}]},
+		],
 	})
 	await wait_frames(2)
 	var neighbour := world.get_node_or_null("Neighbours/gallery")
@@ -367,18 +371,19 @@ func test_a_neighbour_is_dark_stone_not_a_second_lit_room() -> void:
 
 func test_a_neighbour_leaves_the_whole_shared_wall_to_the_room_you_are_in() -> void:
 	var world := _world_with_scene({
-		"roomId": "crypt", "width": 12, "height": 12,
-		"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
-		"mode": "EXPLORATION", "props": [], "entities": [], "combat": null,
-		"exits": [{"id": "door-north", "x": 6, "y": 11,
-			"direction": "NORTH", "toRoomId": "gallery"}],
-		"neighbours": [{
-			"roomId": "gallery", "width": 10, "height": 16,
-			"floorType": "TILED", "wallType": "CARVED",
-			"offsetX": 0.0, "offsetZ": -14.0,
-			"back": {"id": "door-south", "x": 5, "y": 0,
-				"direction": "SOUTH", "toRoomId": "crypt"},
-		}],
+		"roomId": "crypt", "mode": "EXPLORATION", "entities": [], "combat": null,
+		"rooms": [
+			{"roomId": "crypt", "width": 12, "height": 12,
+				"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "originX": 0.0, "originZ": 0.0, "visited": true,
+				"exits": [{"id": "door-north", "x": 6, "y": 11,
+					"direction": "NORTH", "toRoomId": "gallery"}]},
+			{"roomId": "gallery", "width": 10, "height": 16,
+				"floorType": "TILED", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "originX": 0.0, "originZ": -14.0, "visited": false,
+				"exits": [{"id": "door-south", "x": 5, "y": 0,
+					"direction": "SOUTH", "toRoomId": "crypt"}]},
+		],
 	})
 	await wait_frames(2)
 	var neighbour := world.get_node_or_null("Neighbours/gallery") as Node3D

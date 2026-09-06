@@ -1,4 +1,5 @@
 extends GutTest
+const SceneFixtures := preload("res://test/scene_fixtures.gd")
 
 ## Legal-move highlights and click routing. Membership in the server's lists is the
 ## entire client-side movement rule (invariant #1). Actor ids come from the scene,
@@ -29,7 +30,7 @@ const CRYPT := {
 
 func before_each() -> void:
 	Table.reset()
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 	Net.outbound.clear()
 
 
@@ -70,7 +71,7 @@ func _fighting(active_id: String, moves: Array, targets: Array) -> Dictionary:
 	scene["mode"] = "COMBAT"
 	scene["entities"] = [KEEPER.duplicate(), GOBLIN.duplicate()]
 	scene["combat"] = _combat(active_id, moves, targets)
-	return scene
+	return SceneFixtures.scene(scene)
 
 
 func _commit_pick(world: Node, entity_id: String, square: Vector2i) -> void:
@@ -134,7 +135,7 @@ func test_a_dead_player_cannot_click_the_floor() -> void:
 	var dead := CRYPT.duplicate(true)
 	dead["entities"] = [KEEPER.duplicate()]
 	dead["entities"][0]["hp"] = 0
-	Table.set_scene(dead)
+	Table.set_scene(SceneFixtures.scene(dead))
 	var world := _world_tree()
 	_commit_pick(world, "", Vector2i(4, 3))
 	assert_eq(Net.outbound.size(), 0)
@@ -383,7 +384,7 @@ const DOORWAY := {
 
 
 func test_clicking_the_door_is_an_exit_and_the_square_under_it_is_not() -> void:
-	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
 	var overlay := _overlay(world)
 	assert_not_null(overlay, "Overlay")
 	if overlay == null:
@@ -411,7 +412,7 @@ func test_clicking_the_door_is_an_exit_and_the_square_under_it_is_not() -> void:
 
 
 func test_the_door_is_picked_by_pointing_at_it() -> void:
-	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
 	await wait_process_frames(2)
 	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
 	assert_not_null(cam, "Camera3D")
@@ -461,7 +462,7 @@ func test_a_prop_does_not_swallow_a_click_meant_for_the_floor() -> void:
 	# The pillar is in the crypt's own layout and is 1.6 units tall, so an isometric ray to the
 	# floor behind it passes through its box. Picking must still land on the floor square the
 	# ray actually reaches first, or movement goes sticky around every column in the room.
-	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
 	await wait_process_frames(2)
 	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
 	if cam == null:
@@ -498,7 +499,7 @@ func test_a_real_click_on_the_door_sends_enter_exit() -> void:
 	# World.handle_pointer, which picks, asks the overlay, and commits. pick_at and intent are
 	# each covered above; this is the one that would catch them being wired together wrongly.
 	Net.outbound.clear()
-	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
 	await wait_process_frames(2)
 	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
 	assert_not_null(cam, "Camera3D")
@@ -531,7 +532,7 @@ func test_a_real_click_on_the_door_sends_enter_exit() -> void:
 
 
 func test_a_solid_square_is_marked_before_it_is_clicked() -> void:
-	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
 	var overlay := _overlay(world)
 	assert_not_null(overlay, "Overlay")
 	if overlay == null:
@@ -551,7 +552,7 @@ func test_a_solid_square_is_marked_before_it_is_clicked() -> void:
 
 func test_a_blocked_click_is_still_sent_so_the_server_answers() -> void:
 	Net.outbound.clear()
-	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
 	var overlay := _overlay(world)
 	if overlay == null:
 		return
@@ -567,7 +568,7 @@ func test_a_blocked_click_is_still_sent_so_the_server_answers() -> void:
 
 
 func test_the_hover_is_tinted_by_what_the_click_would_do() -> void:
-	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
 	var overlay := _overlay(world)
 	if overlay == null:
 		return
@@ -595,7 +596,7 @@ func test_the_hover_is_tinted_by_what_the_click_would_do() -> void:
 
 func test_committing_an_exit_sends_enter_exit() -> void:
 	Net.outbound.clear()
-	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
 	var overlay := _overlay(world)
 	assert_not_null(overlay, "Overlay")
 	if overlay == null:
@@ -610,7 +611,7 @@ func test_committing_an_exit_sends_enter_exit() -> void:
 
 func test_a_door_is_not_clickable_in_combat() -> void:
 	Net.outbound.clear()
-	var world := _world_with_scene({
+	var world := _world_with_scene(SceneFixtures.scene({
 		"roomId": "crypt", "width": 12, "height": 12, "mode": "COMBAT",
 		"props": [],
 		"exits": [{"id": "door-north", "x": 6, "y": 11,
@@ -621,7 +622,7 @@ func test_a_door_is_not_clickable_in_combat() -> void:
 		# should not offer a click that can only ever come back as an error.
 		"combat": {"activeId": "fighter", "round": 1, "order": [],
 			"moves": [], "targets": []},
-	})
+	}))
 	var overlay := _overlay(world)
 	assert_not_null(overlay, "Overlay")
 	if overlay == null:

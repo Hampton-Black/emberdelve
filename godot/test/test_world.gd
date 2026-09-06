@@ -1,4 +1,5 @@
 extends GutTest
+const SceneFixtures := preload("res://test/scene_fixtures.gd")
 
 ## Grid conversion is the one number later tasks all hang off. Square (0, 0) is the north-west
 ## corner of a room centred on the origin; +y on the grid is north, which is -Z in the world.
@@ -15,7 +16,7 @@ const CRYPT := {
 
 func before_each() -> void:
 	Table.reset()
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 
 
 func _world() -> Node3D:
@@ -32,7 +33,7 @@ func _world_with_room(w: int, h: int) -> Node3D:
 	var scene := CRYPT.duplicate(true)
 	scene["width"] = w
 	scene["height"] = h
-	Table.set_scene(scene)
+	Table.set_scene(SceneFixtures.scene(scene))
 	return _world()
 
 
@@ -141,7 +142,7 @@ func test_a_first_scene_settles_the_camera() -> void:
 		return
 	var fighting := CRYPT.duplicate(true)
 	fighting["mode"] = "COMBAT"
-	Table.set_scene(fighting)
+	Table.set_scene(SceneFixtures.scene(fighting))
 	var target: Dictionary = world.rig._framing_target()
 	assert_eq(world.rig._framing_t, 1.0, "hello snaps; easing would leave the tween in flight")
 	assert_almost_eq(world.rig.half_height, target["half_height"], 0.0001)
@@ -260,7 +261,7 @@ func test_exploration_follow_is_the_party_centroid_not_the_fighter() -> void:
 		{"id": "ally", "kind": "fighter", "name": "Bram", "x": 7, "y": 3,
 			"hp": 12, "maxHp": 12, "isPlayerControlled": true},
 	]
-	Table.set_scene(party)
+	Table.set_scene(SceneFixtures.scene(party))
 	var world := _world_tree()
 	if world.rig == null:
 		assert_not_null(world.rig, "Camera3D")

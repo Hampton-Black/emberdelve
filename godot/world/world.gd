@@ -114,29 +114,32 @@ func _rebuild_neighbours() -> void:
 	for child in holder.get_children():
 		child.queue_free()
 
-	for outline in Table.scene.get("neighbours", []):
-		var room_id := String(outline.get("roomId", ""))
-		if room_id.is_empty():
+	# Every known room ships in one list now (RoomView), current room included, each carrying
+	# its own absolute origin in the world frame anchored at the entrance. The current room is
+	# always registered at Vector3.ZERO (_on_scene_changed), so a neighbour's offset is just its
+	# origin minus that one.
+	var current_origin := Vector3(
+		float(Table.room().get("originX", 0.0)), 0.0, float(Table.room().get("originZ", 0.0)))
+
+	for view in Table.scene.get("rooms", []):
+		var room_id := String(view.get("roomId", ""))
+		if room_id.is_empty() or room_id == _room_id:
 			continue
-		var size := Vector2i(int(outline.get("width", 0)), int(outline.get("height", 0)))
+		var size := Vector2i(int(view.get("width", 0)), int(view.get("height", 0)))
 		var origin := Vector3(
-			float(outline.get("offsetX", 0.0)), 0.0, float(outline.get("offsetZ", 0.0)))
+			float(view.get("originX", 0.0)), 0.0, float(view.get("originZ", 0.0))) - current_origin
 		register_room(room_id, size, origin)
 
 		var node := Room.new()
 		node.name = room_id
 		holder.add_child(node)
-		# The one thing the outline says about the inside of that room: which wall its
-		# answering door is in. Without it the far room is drawn with an unbroken perimeter
-		# and the doorway you are looking through is backed by stone.
-		var openings: Array = []
-		var back: Variant = outline.get("back", null)
-		if typeof(back) == TYPE_DICTIONARY:
-			openings.append(back)
+		# This room's own exits — the one thing said about the inside of a neighbour. Without
+		# it the far room is drawn with an unbroken perimeter and the doorway you are looking
+		# through is backed by stone.
 		node.build_unlit(room_id, size,
-			String(outline.get("floorType", "STONE")),
-			String(outline.get("wallType", "STONE")),
-			openings)
+			String(view.get("floorType", "STONE")),
+			String(view.get("wallType", "STONE")),
+			view.get("exits", []))
 
 
 func _on_prop_revealed(prop: Dictionary) -> void:
@@ -152,7 +155,7 @@ func _rebuild_props() -> void:
 		child.free()
 	if Table.scene.is_empty():
 		return
-	for prop in Table.scene.get("props", []):
+	for prop in Table.room().get("props", []):
 		if bool(prop.get("hidden", false)):
 			continue
 		_instance_prop(prop)
@@ -518,8 +521,8 @@ func _ray_aabb_t(origin: Vector3, dir: Vector3, aabb: AABB) -> float:
 
 
 func _room_width() -> int:
-	return int(Table.scene.get("width", 12))
+	return int(Table.room().get("width", 12))
 
 
 func _room_height() -> int:
-	return int(Table.scene.get("height", 12))
+	return int(Table.room().get("height", 12))

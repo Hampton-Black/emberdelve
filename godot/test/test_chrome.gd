@@ -1,4 +1,5 @@
 extends GutTest
+const SceneFixtures := preload("res://test/scene_fixtures.gd")
 
 ## Headless pins for the overlay: the log is rebuilt from Table, the box locks while the
 ## DM has the floor, and the title click takes the floor before it asks the server to begin.
@@ -19,7 +20,7 @@ func before_each() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	Clock.use_backend(VoiceBackend.new())
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 	Net.outbound.clear()
 
 
@@ -393,7 +394,7 @@ func test_restart_flags_the_table_before_it_hits_the_wire() -> void:
 	assert_true(Table._restarting, "expect_restart before Net.restart")
 	assert_eq(Net.outbound.size(), 1)
 	assert_eq(Net.outbound[0]["type"], "restart")
-	Table.set_scene(CRYPT.duplicate(true))
+	Table.set_scene(SceneFixtures.scene(CRYPT))
 	assert_false(Table.started)
 	assert_eq(Table.transcript, [])
 
@@ -473,7 +474,7 @@ func test_a_mid_fight_reconnect_lands_with_the_bar_already_assembled() -> void:
 	var fighting := CRYPT.duplicate(true)
 	fighting["mode"] = "COMBAT"
 	fighting["combat"] = _combat_view()
-	Table.set_scene(fighting)
+	Table.set_scene(SceneFixtures.scene(fighting))
 	var bar := _combat_bar()
 	var now := Time.get_ticks_msec()
 	assert_eq(bar.arrival(now, int(Table.combat_beat["opened_at"]),
