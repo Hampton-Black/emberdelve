@@ -63,6 +63,20 @@ class RoomOutlineTest {
     }
 
     @Test
+    @DisplayName("the outline names the wall the neighbour must leave open")
+    void outlineCarriesTheAnsweringDoor() {
+        var crypt = CONTENT.room("crypt");
+        var gallery = CONTENT.room("gallery");
+
+        var outline = RoomOutline.beside(crypt, crypt.exits().getFirst(), gallery);
+
+        // Without this the client draws an unbroken perimeter on the far room and the doorway
+        // you are looking through is a hole in one wall backed by stone in the next.
+        assertEquals(gallery.exits().getFirst(), outline.back());
+        assertEquals(Direction.SOUTH, outline.back().direction());
+    }
+
+    @Test
     @DisplayName("a one-way exit has no answering door and produces no outline")
     void oneWayExitsAreNotDrawn() {
         var crypt = CONTENT.room("crypt");

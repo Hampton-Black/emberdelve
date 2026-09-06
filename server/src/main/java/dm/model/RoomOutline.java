@@ -15,9 +15,12 @@ import dm.content.RoomDefinition;
  * be tested without a renderer.
  *
  * @param offsetX added to a square's local position to place it in the current room's frame
+ * @param back    this room's answering door, so the client leaves that one wall open instead of
+ *                drawing stone across the opening the party is looking through. The only thing
+ *                said about the inside of a neighbour, and it is said about a wall, not a room
  */
 public record RoomOutline(String roomId, int width, int height, FloorType floorType,
-                          WallType wallType, double offsetX, double offsetZ) {
+                          WallType wallType, double offsetX, double offsetZ, Exit back) {
 
     /**
      * Place {@code there} so that its answering door sits one square beyond {@code exit}.
@@ -46,7 +49,7 @@ public record RoomOutline(String roomId, int width, int height, FloorType floorT
         double throughZ = doorZ - exit.direction().dy();
 
         return new RoomOutline(there.roomId(), there.width(), there.height(),
-                there.floorType(), there.wallType(), throughX - backX, throughZ - backZ);
+                there.floorType(), there.wallType(), throughX - backX, throughZ - backZ, back);
     }
 
     /** Matches {@code World.grid_to_world} exactly. Two mappings would be one bug. */
