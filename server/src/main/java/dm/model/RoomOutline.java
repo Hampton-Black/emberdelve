@@ -52,12 +52,16 @@ public record RoomOutline(String roomId, int width, int height, FloorType floorT
                 there.floorType(), there.wallType(), throughX - backX, throughZ - backZ, back);
     }
 
-    /** Matches {@code World.grid_to_world} exactly. Two mappings would be one bug. */
-    private static double localX(int x, int width) {
+    /**
+     * The centre of a square, in its own room's frame. Matches {@code World.grid_to_world}
+     * exactly. Two mappings would be one bug — anything server-side that needs to know where a
+     * square sits calls these rather than writing the arithmetic out again.
+     */
+    public static double localX(int x, int width) {
         return x - width / 2.0 + 0.5;
     }
 
-    private static double localZ(int y, int height) {
+    public static double localZ(int y, int height) {
         return -(y - height / 2.0 + 0.5);
     }
 }

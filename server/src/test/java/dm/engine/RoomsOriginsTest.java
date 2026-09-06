@@ -1,20 +1,17 @@
 package dm.engine;
 
 import dm.content.ContentLoader;
-import dm.content.RoomDefinition;
 import dm.model.Direction;
 import dm.model.Exit;
-import dm.model.FloorType;
-import dm.model.LightingPreset;
 import dm.model.RoomOrigin;
 import dm.model.RoomOutline;
-import dm.model.WallType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
+import static dm.engine.SyntheticRooms.room;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -27,15 +24,6 @@ import static org.junit.jupiter.api.Assertions.*;
 class RoomsOriginsTest {
 
     private static final ContentLoader CONTENT = new ContentLoader();
-
-    private static RoomDefinition room(String id, int width, int height, Exit... exits) {
-        return new RoomDefinition(id, id, width, height, FloorType.STONE, WallType.STONE,
-                LightingPreset.DARK, List.of(), List.of(exits),
-                new RoomDefinition.StartPositions(
-                        List.of(new RoomDefinition.Point(1, 1)),
-                        new RoomDefinition.Point(1, 1)),
-                new RoomDefinition.DmNotes("o", "s", null, null, null));
-    }
 
     @Test
     @DisplayName("a single room is at the entrance")

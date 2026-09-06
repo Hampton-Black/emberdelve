@@ -559,11 +559,29 @@ out to be.
 - **A one-prop fixture will not find a picking bug.** The test that missed this held only the
   door, so nothing was ever in front of it. `DOORWAY` in `test_overlay.gd` now carries the
   crypt's real furniture, and re-adding props to the picker turns it red.
-- **The room the party is standing in owns the shared wall.** The server places a neighbour so
+- **The room nearer the entrance owns the shared wall.** The server places a neighbour so
   the two doors line up, which puts both perimeters on one plane. Drawing both is two walls
   fighting for one depth — it showed as a door with two handles, then as texture noise across the
-  seam. A neighbour omits the whole wall run its answering door is in, not just that segment:
-  matching segment against segment can half-work when the rooms' widths differ in parity.
+  seam. The plane is drawn once, by whichever of the two rooms is fewer doors from the entrance,
+  ties broken by `roomId`. *Not* by which room the party is standing in: that was the rule until
+  `Rooms.coveredWalls()`, and it stops working the moment more than one room is on screen — a
+  middle room has shared walls on both sides, and two rooms the party is standing in neither of
+  would each leave the wall between them to the other.
+- **Omission is an interval overlap, not a direction match.** A neighbour used to omit the whole
+  wall run its answering door is in, on the grounds that matching segment against segment can
+  half-work when the rooms' widths differ in parity. It loses the part of a perimeter that
+  *overhangs* the shared run — two 1-unit holes at the crypt's north corners, seen from the
+  gallery, and a hole in a wall is a way out. `coveredWalls()` compares 1D intervals on the shared
+  plane using absolute origins, and drops a segment only when the owner's run contains it whole.
+  The parity worry was about segment *centres*: two rooms whose widths differ in parity do sit
+  half a square out of step, but `beside` offsets by half the width difference too, which puts
+  their segment *boundaries* back on one lattice. So a partial overlap means something upstream
+  is wrong, and overlapping stone reads as noise where a half-square gap reads as a way through.
+- **These two are decided server-side and not yet drawn.** `Rooms.coveredWalls()` holds the rule
+  and the tests; `room.gd` still omits by direction, and the crypt's two corner holes are still on
+  screen from the gallery. The answer reaches the client with the wire reshape and the DIM render
+  level (`bd show emberdelve-xgg.2`, `emberdelve-xgg.4`). Until then this section describes the
+  server's rule, not the picture.
 - **Withholding the torches did not make a neighbour dark.** The ambient still lifted the kit
   textures far enough to read, so the gallery looked like somewhere already visited.
   `Room.build_unlit` paints every surface near-black and **unshaded** — shaded, the crypt's own
