@@ -544,6 +544,18 @@ out to be.
   and the failure was silent. **A thing with nothing behind it must not shadow a thing that has
   something behind it.** Props get added to `_target_under` when they gain actions, ranked
   against each other deliberately — not on spec.
+- **A marker has to leave the warm end to be seen.** The exit marker was first drawn amber,
+  `0xd8994a` — which is (0.85, 0.60, 0.29), against a torchlit floor that renders at about
+  (0.85, 0.60, 0.35). An unshaded quad at 60% alpha over a ground it already matches is an
+  invisible quad. The markers are cool now: teal for a door, red for a solid square. Anything
+  that must read against these floors has to be picked against the floor, not in isolation.
+- **Where you cannot walk is shipped, not derived.** `SceneState.blocked` carries the squares the
+  player can see are solid, for the same reason `CombatView` ships `legalMoves` — the client owns
+  no movement rule (invariant #1). It cannot be read off `props` either: an alcove is a prop you
+  can walk into. **Visible props only** — a hidden prop that blocks would put a marker on the
+  board exactly where a secret is. The click is still sent and the server still refuses it in its
+  own words; the marker only says so a moment earlier. The quad stays *under* whatever stands on
+  the square: drawn over the top it reads as paint on the object rather than a mark on the square.
 - **A one-prop fixture will not find a picking bug.** The test that missed this held only the
   door, so nothing was ever in front of it. `DOORWAY` in `test_overlay.gd` now carries the
   crypt's real furniture, and re-adding props to the picker turns it red.

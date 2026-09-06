@@ -96,6 +96,19 @@ func prop(id: String) -> Dictionary:
 	return {}
 
 
+## Whether the server has told us this square is solid.
+##
+## A lookup, never a rule. The set arrives in the scene (SceneState.blocked) because the client
+## owns no movement rule — invariant #1 — and it cannot be read off `props` either: an alcove is
+## a prop you can walk into. Absent from the set is not a promise the move is legal; a creature
+## may be standing there, and a hidden solid prop is deliberately not advertised.
+func is_blocked(square: Vector2i) -> bool:
+	for cell in scene.get("blocked", []):
+		if int(cell.get("x", -1)) == square.x and int(cell.get("y", -1)) == square.y:
+			return true
+	return false
+
+
 ## The exit with this id, or {} if there is none. Mirrors dm.model.Exit.
 ##
 ## By id and not by square: an Exit carries the id of the DOOR prop standing in it, so the

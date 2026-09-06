@@ -15,6 +15,18 @@ public record SceneState(
         List<Prop> props,
         /** Ways out, so the client knows which floor squares are doors. */
         List<Exit> exits,
+        /**
+         * Squares the player can see are solid, so the board can say so before they click.
+         *
+         * <p>Shipped rather than derived, for the same reason {@code CombatView} ships
+         * {@code legalMoves}: the client owns no movement rule (invariant #1). It cannot be read
+         * off {@code props} either — an alcove is a prop and you can walk into it.
+         *
+         * <p>Visible props only. A hidden prop that blocks would otherwise put a marker on the
+         * board exactly where a secret is. The server refuses the move either way; this is the
+         * hint, not the rule.
+         */
+        List<Square> blocked,
         /** Adjacent rooms as floor and walls only — spec §8b. Empty when nothing is loaded. */
         List<RoomOutline> neighbours,
         List<EntityView> entities,
@@ -31,6 +43,6 @@ public record SceneState(
     /** The scene as the client should first see it — hidden props stripped out entirely. */
     public SceneState asSeenByPlayer() {
         return new SceneState(roomId, width, height, floorType, wallType,
-                visibleProps(), exits, neighbours, entities, lighting, mode, combat);
+                visibleProps(), exits, blocked, neighbours, entities, lighting, mode, combat);
     }
 }

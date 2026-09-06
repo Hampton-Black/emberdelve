@@ -372,6 +372,10 @@ const DOORWAY := {
 	],
 	"exits": [{"id": "door-north", "x": 6, "y": 11,
 		"direction": "NORTH", "toRoomId": "gallery"}],
+	# What the server says is solid. Note the alcove at (9,6) is deliberately absent — it is a
+	# prop you can walk into, which is why this cannot be derived from `props`.
+	"blocked": [{"x": 6, "y": 7}, {"x": 2, "y": 8}, {"x": 9, "y": 8},
+		{"x": 3, "y": 4}, {"x": 8, "y": 4}, {"x": 2, "y": 2}],
 	"entities": [{"id": "fighter", "kind": "fighter", "name": "Roderick",
 		"x": 6, "y": 1, "hp": 12, "maxHp": 12, "isPlayerControlled": true}],
 	"combat": null,
@@ -471,11 +475,22 @@ func test_a_prop_does_not_swallow_a_click_meant_for_the_floor() -> void:
 	var overlay := _overlay(world)
 	if overlay == null:
 		return
-	# Whatever the pick said about the pillar, the intent is a move — only a door takes over.
+	# The pillar's own square is solid, so the honest answer here is "blocked" — but it is an
+	# answer about a square, which is the thing that was being lost. A swallowed click returns
+	# {} and leaves the player looking at nothing.
 	assert_eq(String(overlay.intent(
 		String(picked.get("entity_id", "")),
 		picked.get("square", null),
-		String(picked.get("target_id", ""))).get("kind", "")), "move")
+		String(picked.get("target_id", ""))).get("kind", "")), "blocked")
+
+	# And open floor a step away is still an ordinary move, so the pillar is not casting a
+	# shadow over its neighbours.
+	var free := Vector2i(4, 5)
+	var beside: Dictionary = world.pick_at(
+		cam.unproject_position(world.grid_to_world("crypt", free.x, free.y)))
+	assert_eq(beside.get("square", null), free)
+	assert_eq(String(overlay.intent("", beside.get("square", null),
+		String(beside.get("target_id", ""))).get("kind", "")), "move")
 
 
 func test_a_real_click_on_the_door_sends_enter_exit() -> void:
@@ -513,6 +528,69 @@ func test_a_real_click_on_the_door_sends_enter_exit() -> void:
 		return
 	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
 	assert_eq(String(Net.outbound[0].get("exitId", "")), "door-north")
+
+
+func test_a_solid_square_is_marked_before_it_is_clicked() -> void:
+	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var overlay := _overlay(world)
+	assert_not_null(overlay, "Overlay")
+	if overlay == null:
+		return
+
+	# The sarcophagus. The server would refuse this move; the board says so first.
+	var solid: Dictionary = overlay.intent("", Vector2i(6, 7))
+	assert_eq(String(solid.get("kind", "")), "blocked")
+	assert_eq(solid.get("square", null), Vector2i(6, 7))
+
+	# The alcove's square is a prop and is walkable, which is the case that rules out reading
+	# this off the prop list on the client.
+	assert_eq(String(overlay.intent("", Vector2i(9, 6)).get("kind", "")), "move",
+		"an alcove is a recess, not a wall")
+	assert_eq(String(overlay.intent("", Vector2i(4, 4)).get("kind", "")), "move")
+
+
+func test_a_blocked_click_is_still_sent_so_the_server_answers() -> void:
+	Net.outbound.clear()
+	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var overlay := _overlay(world)
+	if overlay == null:
+		return
+
+	overlay.commit(overlay.intent("", Vector2i(6, 7)))
+
+	# The refusal and its wording are the server's (invariant #1). Swallowing the click here
+	# would trade a spoken "something solid is already there" for silence.
+	assert_eq(Net.outbound.size(), 1)
+	assert_eq(String(Net.outbound[0].get("type", "")), "moveTo")
+	assert_eq(int(Net.outbound[0].get("x", -1)), 6)
+	assert_eq(int(Net.outbound[0].get("y", -1)), 7)
+
+
+func test_the_hover_is_tinted_by_what_the_click_would_do() -> void:
+	var world := _world_with_scene(DOORWAY.duplicate(true))
+	var overlay := _overlay(world)
+	if overlay == null:
+		return
+	var hover := overlay.get_node("Hover") as MeshInstance3D
+
+	overlay.set_hover(Vector2i(4, 4), "move")
+	var plain: Color = (hover.material_override as StandardMaterial3D).albedo_color
+	overlay.set_hover(Vector2i(6, 11), "exit")
+	var exit: Color = (hover.material_override as StandardMaterial3D).albedo_color
+	overlay.set_hover(Vector2i(6, 7), "blocked")
+	var blocked: Color = (hover.material_override as StandardMaterial3D).albedo_color
+
+	assert_ne(plain, exit)
+	assert_ne(plain, blocked)
+	assert_ne(exit, blocked)
+
+	# The bug this replaces: the exit marker was amber over a torchlit floor that is also amber,
+	# so there was nothing to see. Both markers now sit at the cool end, away from every floor
+	# this game lays. `hue` is undefined for greys, and none of these are grey.
+	assert_gt(exit.h, 0.4, "the exit marker must not be a warm colour")
+	assert_lt(exit.h, 0.6)
+	assert_gt(exit.s, 0.5, "and must not be washed out")
+	assert_gt(blocked.s, 0.6, "blocked reads as a refusal, not as dim stone")
 
 
 func test_committing_an_exit_sends_enter_exit() -> void:

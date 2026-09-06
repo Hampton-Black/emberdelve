@@ -185,6 +185,13 @@ public final class GameEngine {
                 .map(Entity::toView)
                 .toList();
 
+        // Off the visible list, not off here.isObstructed(): that consults hidden props too, and
+        // a red square over a secret is a worse bug than no hint at all.
+        var blocked = visible.stream()
+                .filter(p -> p.type().blocksMovement())
+                .map(p -> new Square(p.x(), p.y()))
+                .toList();
+
         // Only rooms this session actually has. An exit to a room that is not loaded draws
         // nothing rather than guessing at a shape.
         var neighbours = here.exits().stream()
@@ -194,8 +201,8 @@ public final class GameEngine {
                 .toList();
 
         return new SceneState(here.roomId(), here.width(), here.height(),
-                here.floorType(), here.wallType(), visible, here.exits(), neighbours, entities,
-                here.lighting(), state().mode(), combat.view());
+                here.floorType(), here.wallType(), visible, here.exits(), blocked, neighbours,
+                entities, here.lighting(), state().mode(), combat.view());
     }
 
     public Mode mode() {

@@ -12,9 +12,25 @@ const OVERLAY_Y := 0.03
 const MOVE_TINT := Color8(0x5c, 0x86, 0xc4)
 const TARGET_TINT := Color8(0xc0, 0x45, 0x3c)
 const HOVER_TINT := Color8(0xe8, 0xdc, 0xc0)
-## Warmer than the hover, because what is on the other side of the door is the only light in
-## this scene that is not a brazier. A door is not a square you are about to step on.
-const EXIT_TINT := Color8(0xd8, 0x9a, 0x4a)
+
+## A door, and a square with something solid on it.
+##
+## Both are cool on purpose. The first try at the exit marker was amber, Color8(0xd8, 0x9a, 0x4a)
+## — which is (0.85, 0.60, 0.29), and a torchlit floor in this room renders at about
+## (0.85, 0.60, 0.35). An unshaded quad at 60% alpha over a ground it already matches is an
+## invisible quad; it was not that the colour was wrong, it was that there was no colour
+## difference to see. Anything that has to read against these floors has to leave the warm end.
+##
+## Teal for the way out, red for the way blocked, and the two never appear at once: the hover is
+## one square and one intent. TARGET_TINT is also red, but it belongs to combat, where this
+## marker never runs — see [method intent].
+##
+## The blocked marker is a floor quad and stays under whatever is standing on it, so on a big
+## prop it is a red edge around the base rather than a red slab. Drawing it over the top with
+## `no_depth_test` was tried and rejected: it reads as paint on the object instead of a mark on
+## the square, and the square is what the click was about.
+const EXIT_TINT := Color8(0x3c, 0xd2, 0xc8)
+const BLOCKED_TINT := Color8(0xe0, 0x3b, 0x30)
 
 const MOVE_SIZE := 0.86
 const HOVER_SIZE := 0.92
@@ -23,6 +39,7 @@ var _move_mat: StandardMaterial3D
 var _target_mat: StandardMaterial3D
 var _hover_mat: StandardMaterial3D
 var _exit_mat: StandardMaterial3D
+var _blocked_mat: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -80,6 +97,12 @@ func intent(entity_id: String, square: Variant = null, target_id: String = "") -
 	if at.x == int(player["x"]) and at.y == int(player["y"]):
 		return {}
 
+	# A square the server has already said is solid. Still a move, and still sent: the refusal
+	# and its message belong to the server (invariant #1), and hearing it is the point. What
+	# this adds is saying so a moment earlier, on the square itself.
+	if Table.is_blocked(at):
+		return {"kind": "blocked", "actor_id": String(player["id"]), "square": at}
+
 	return {"kind": "move", "actor_id": String(player["id"]), "square": at}
 
 
@@ -108,7 +131,7 @@ func commit(action: Dictionary) -> void:
 	if action.is_empty():
 		return
 	match String(action.get("kind", "")):
-		"move":
+		"move", "blocked":
 			var at: Vector2i = action["square"]
 			Net.move_to(String(action["actor_id"]), at.x, at.y)
 		"attack":
@@ -133,7 +156,13 @@ func set_hover(square: Variant = null, kind: String = "") -> void:
 	var at: Vector2i = square
 	var pos: Vector3 = world.grid_to_world(world.current_room_id(), at.x, at.y)
 	hover.position = Vector3(pos.x, OVERLAY_Y + 0.004, pos.z)
-	hover.material_override = _exit_mat if kind == "exit" else _hover_mat
+	match kind:
+		"exit":
+			hover.material_override = _exit_mat
+		"blocked":
+			hover.material_override = _blocked_mat
+		_:
+			hover.material_override = _hover_mat
 	hover.visible = true
 
 
@@ -201,7 +230,8 @@ func _ensure() -> void:
 		_move_mat = _tint_material(MOVE_TINT, 0.3)
 		_target_mat = _tint_material(TARGET_TINT, 0.42)
 		_hover_mat = _tint_material(HOVER_TINT, 0.5)
-		_exit_mat = _tint_material(EXIT_TINT, 0.62)
+		_exit_mat = _tint_material(EXIT_TINT, 0.7)
+		_blocked_mat = _tint_material(BLOCKED_TINT, 0.7)
 	if get_node_or_null("Moves") == null:
 		var moves := Node3D.new()
 		moves.name = "Moves"
