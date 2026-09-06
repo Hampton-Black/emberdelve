@@ -81,3 +81,17 @@ This matters most after a failed check, which is exactly when the narrator reach
 - "There is nothing else in this room" — you cannot know that. Do not.
 
 Record what the character managed. Never what the room contains.
+
+### Move what the narration moved
+
+If the description says someone crossed the room, went to a thing, or backed away, call
+`move_entity` so the board agrees. The player said they walked to the pillar, the narration
+followed them there, and the token should not still be by the stair.
+
+Only when a **destination** is named or obvious. Narration is full of incidental motion — a hand
+raised, a head turned, a step back from heat — and none of that is a square. In the M2 session,
+6/88 narration segments implied movement; most of it was not a square. If you cannot say which
+square they ended on, they did not move.
+
+You cannot take the party out of the room. There is no tool for it here and that is deliberate:
+leaving is the player's decision, not a consequence of how a sentence was written.

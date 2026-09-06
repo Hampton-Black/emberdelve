@@ -68,6 +68,8 @@ public final class ToolDispatcher {
                 case ToolSchema.SPAWN_ENTITY -> spawnEntity(args);
                 case ToolSchema.START_COMBAT -> startCombat();
                 case ToolSchema.ASSERT_FACT -> assertFact(args);
+                case ToolSchema.USE_EXIT -> useExit(args);
+                case ToolSchema.MOVE_ENTITY -> moveEntity(args);
                 default -> Result.rejected("no such tool: " + call.name());
             };
         } catch (Exception e) {
@@ -192,6 +194,43 @@ public final class ToolDispatcher {
                         + "sentences. Do not list the order. Do not narrate anyone's turn, "
                         + "attack, movement or wound: none of that has happened yet.",
                 buffer.collectedDiffs(), buffer.collectedRolls());
+    }
+
+    private Result useExit(JsonNode args) {
+        String exitId = args.path("exit_id").asText("");
+        String from = engine.state().roomId();
+        try {
+            engine.crossExit(exitId);
+        } catch (IllegalArgumentException e) {
+            return Result.rejected(e.getMessage());
+        }
+        // No diffs: a room change replaces everything and the caller sends a fresh Scene.
+        // Spec §9.
+        return Result.applied(
+                "The party left " + from + " and is now in " + engine.state().roomId()
+                        + ". Describe what they walk into. Do not describe " + from + " again.",
+                List.of());
+    }
+
+    private Result moveEntity(JsonNode args) {
+        String actorId = args.path("actor_id").asText("");
+        if (engine.state().find(actorId).isEmpty()) {
+            return Result.rejected("no entity '" + actorId + "' is present");
+        }
+        int x = args.path("x").asInt(-1);
+        int y = args.path("y").asInt(-1);
+
+        var buffer = new CombatSink.Buffer();
+        try {
+            // The same call the click makes, so bounds, obstruction, occupancy, aliveness and —
+            // in a fight — requireActive and the movement budget all apply without a second set
+            // of rules that could disagree with the first.
+            engine.moveTo(actorId, x, y, buffer);
+        } catch (IllegalArgumentException e) {
+            return Result.rejected(e.getMessage());
+        }
+        return Result.applied("Moved '" + actorId + "' to (" + x + "," + y + ").",
+                buffer.collectedDiffs());
     }
 
     /**

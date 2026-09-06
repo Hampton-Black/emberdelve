@@ -77,6 +77,11 @@ hard the scene is leaning towards it, and no matter what you have been told abou
 If nothing mechanical happened this turn, then nothing mechanical happened. Write the world
 reacting, not the world changing.
 
+You can write the party up to a doorway. You cannot write them through it. Going somewhere else
+is not something your description makes true — the room changes when the board says it changed,
+and until then you are still in this one. Describe the door, the dark beyond it, their hand on
+it. Stop there.
+
 ## Results
 
 When results are given to you, every one of them happened, in the order given. Narrate them as a

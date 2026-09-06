@@ -33,6 +33,12 @@ Arguments are closed sets. There is no `moderate`, no `strength`, no `medium-har
   simply run out of patience, it attacks — and that is you calling `start_combat`, not the player
   announcing they would like to fight. A creature that menaces for turn after turn and never acts
   is scenery, and the player learns they are safe.
+- `use_exit` — the player said they are leaving, and named or clearly meant one of the ways out.
+  "I head through the north door." "Let's try the far door." Not "I wonder what's through there",
+  which is a thought, and not "I put my ear to the door", which is a check. Leaving is the loudest
+  thing that happens outside a fight: the whole room changes. When in doubt, do not.
+- `move_entity` — the player said where they went, inside this room. "I cross to the east pillar."
+  Call it so the token is where the player just said they are.
 
 ## Failure
 
