@@ -425,7 +425,7 @@ Java record, per the standing rule.
 
 ## 10. The gate
 
-A played session and an offline replay, written up as `docs/m3-evaluation.md` and signed, in the
+A played session and an offline replay, written up as `../../milestones/m3-evaluation.md` and signed, in the
 shape M0 and M2 used.
 
 Mechanical criteria alone would not do. Four of the things most likely to go wrong here are
@@ -540,7 +540,7 @@ exists.
 8. The second authored room.
 9. `grid_to_world` room-aware; the dark neighbour; the wire's neighbour outline.
 10. Capture a multi-room session, add the replay fixture, play the gate, write
-    `docs/m3-evaluation.md`.
+    `../../milestones/m3-evaluation.md`.
 
 Steps 1–4 are invisible to a player and are most of the risk. Step 5 is the first one that can be
 walked.

@@ -670,7 +670,7 @@ Expected: PASS. `EntityRoomTest` is green, and `ReplayRunnerTest.recordedSession
 
 - [ ] **Step 10: Note the cost in the M2 evaluation**
 
-`docs/evidence/session-m2-twenty-turns.jsonl` was written at schema 1 and can no longer be replayed. It stays as the record of what happened, and m2-evaluation.md §2's criterion 4 becomes a historical result rather than a reproducible one. Add to the end of `docs/m2-evaluation.md` §2:
+`docs/evidence/session-m2-twenty-turns.jsonl` was written at schema 1 and can no longer be replayed. It stays as the record of what happened, and m2-evaluation.md §2's criterion 4 becomes a historical result rather than a reproducible one. Add to the end of `../../milestones/m2-evaluation.md` §2:
 
 ```markdown
 > **Schema note, added 2026-09-05.** M3 bumped `Event.SCHEMA_VERSION` to 2, because entities now
@@ -3987,7 +3987,7 @@ re-introduction on return, `move_entity` making the fighter wander, and whether 
 reads as a dungeon or as a bug. All four are judgements about prose.
 
 **Files:**
-- Create: `docs/m3-evaluation.md`
+- Create: `../../milestones/m3-evaluation.md`
 - Create: `docs/evidence/session-m3-traversal.jsonl`
 - Modify: `server/src/test/java/dm/replay/ReplayRunnerTest.java`
 - Modify: `AGENTS.md`
@@ -4059,7 +4059,7 @@ already has one.
 
 - [ ] **Step 4: Write the evaluation**
 
-Create `docs/m3-evaluation.md`, following `docs/m2-evaluation.md`'s structure: what was under test,
+Create `../../milestones/m3-evaluation.md`, following `../../milestones/m2-evaluation.md`'s structure: what was under test,
 the criteria table, what happened turn by turn, consistency, then a signed verdict and a "carried
 out of M3" section.
 

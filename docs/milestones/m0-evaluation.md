@@ -13,12 +13,12 @@ suite but an honest answer to one question, asked of a person who is not the aut
 ## 1. What was under test
 
 Three sessions were played end to end by a human on 2026-08-20. All three server logs are
-preserved in `docs/evidence/`, because they are the only unbiased sample the milestone produced
+preserved in `../evidence`, because they are the only unbiased sample the milestone produced
 and two of them were otherwise living in a temp directory.
 
 | | Session A | Session B | Session C |
 |---|---|---|---|
-| Log | `evidence/session-a-solo.log` | `evidence/session-b-playtest.log` | `evidence/session-c-head.log` |
+| Log | `../evidence/session-a-solo.log` | `../evidence/session-b-playtest.log` | `../evidence/session-c-head.log` |
 | Player | the author | a friend, first time, no explanation given | the author |
 | Build | pre-fix | pre-fix | **HEAD `cbaa2f1`** |
 | Typed turns | 7 | 5 | 2, then a fight |

@@ -11,5 +11,11 @@
         "matcher": ""
       }
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": false
+  },
+  "attribution": {
+    "commit": ""
   }
 }

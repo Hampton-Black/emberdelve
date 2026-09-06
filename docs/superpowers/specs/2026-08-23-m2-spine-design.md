@@ -1,7 +1,7 @@
 # M2 — The spine: event log, projection, replay
 
 **Status:** Design approved, pre-implementation
-**Companion to:** `docs/m0-evaluation.md` (the faults this closes) and
+**Companion to:** `../../milestones/m0-evaluation.md` (the faults this closes) and
 `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` (the milestone this
 interrupts)
 

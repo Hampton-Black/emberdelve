@@ -3,7 +3,7 @@
 **Status:** Design approved 2026-08-22, pre-implementation. **Blocked on the Phase B parity gate.**
 Look (2026-08-23): the world behind this frame is stylized isometric 3D at native resolution, not a 480px pixel crypt. Palette and “no parchment” still hold for this chrome pass; the old reason (photoreal UI vs pixel world) is gone, so a later chrome pass may reopen materials. Do not reopen it in this document.
 **Companion to:** `docs/superpowers/specs/2026-08-21-godot-client-design.md` (the client this
-dresses), `AGENTS.md` (every presentation number), `docs/m0-evaluation.md` (the feel that must
+dresses), `AGENTS.md` (every presentation number), `../../milestones/m0-evaluation.md` (the feel that must
 survive).
 **Amends:** that spec's §7 *Chrome*. Where the two disagree, **this document wins for chrome and
 that one wins for everything else.** The single substantive reversal is recorded in §2.

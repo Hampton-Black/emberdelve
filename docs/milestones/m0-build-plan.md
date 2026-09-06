@@ -1,6 +1,6 @@
 # M0 — Vertical Slice Build Plan
 
-**Companion to:** `ai-dm-system-design.md` (but this document is self-contained; you do not need the
+**Companion to:** `../ai-dm-system-design.md` (but this document is self-contained; you do not need the
 design doc to build M0)
 **Target:** 2 weeks of evenings
 **Status:** Ready to build
@@ -72,7 +72,7 @@ loop. Judge M0 on steps 1–8.
 
 | Component | M0 form |
 |---|---|
-| Renderer | Three.js, orthographic camera, low-res target upscaled nearest-neighbor. **Superseded for the Godot client (2026-08-23):** stylized isometric 3D at native resolution — `docs/superpowers/specs/2026-08-21-godot-client-design.md` |
+| Renderer | Three.js, orthographic camera, low-res target upscaled nearest-neighbor. **Superseded for the Godot client (2026-08-23):** stylized isometric 3D at native resolution — `../superpowers/specs/2026-08-21-godot-client-design.md` |
 | Room | One hand-authored room, loaded from a JSON file |
 | Party | **A list containing exactly one** level-1 fighter with fixed stats |
 | Monster | One goblin, fixed stats |

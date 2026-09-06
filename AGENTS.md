@@ -5,7 +5,7 @@ AI Dungeon Master. Java backend, Godot desktop client.
 **Current milestone: M3 — gate PASSED 2026-09-06.** A room is a place you can leave and come
 back to. The gate was a 19-turn played session that crossed four times, spent ≥7 turns in each
 room, found the gallery niche as it was left, and replayed identical:
-`docs/m3-evaluation.md`.
+`docs/milestones/m3-evaluation.md`.
 
 **Next: the generator plan** — M1's remaining half, *can the world be made rather than authored*.
 The plan at `docs/superpowers/plans/2026-08-21-m1-dungeon-navigation.md` is **stale in its
@@ -17,24 +17,24 @@ tasks are React/Three.js, and a `GameRepository` that no longer exists. Its `Lay
 
 | | Gate | Verdict | Where |
 |---|---|---|---|
-| **M0** | Does this feel like a DM running a game? | PASS 2026-08-20 | `docs/m0-evaluation.md` |
+| **M0** | Does this feel like a DM running a game? | PASS 2026-08-20 | `docs/milestones/m0-evaluation.md` |
 | **M1** | Can the world be made rather than authored? | **Half done.** Single-room generation merged; a generated dungeon is the remaining half | `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` |
-| **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `docs/m2-evaluation.md` |
-| **M3** | Is a room a place you can leave and come back to? | PASS 2026-09-06 | `docs/m3-evaluation.md` |
+| **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `docs/milestones/m2-evaluation.md` |
+| **M3** | Is a room a place you can leave and come back to? | PASS 2026-09-06 | `docs/milestones/m3-evaluation.md` |
 
 Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22).
 
 ### Reading order
 
-`docs/m3-evaluation.md` first — it is the most recent gate and its §8 lists what M3 handed
+`docs/milestones/m3-evaluation.md` first — it is the most recent gate and its §8 lists what M3 handed
 forward. `docs/superpowers/specs/2026-09-05-m3-traversal-design.md` is the traversal architecture.
-`docs/m2-evaluation.md` and `docs/superpowers/specs/2026-08-23-m2-spine-design.md` are the spine
+`docs/milestones/m2-evaluation.md` and `docs/superpowers/specs/2026-08-23-m2-spine-design.md` are the spine
 everything still sits on. `docs/ai-dm-system-design.md` is the long-range design. **Amended
 2026-09-05** against three gates: its §2a lists the four decisions play reversed and why, and
 §14 carries both the real milestone history and the original ordering it superseded. Where it
 and this file disagree, this file wins — it is the operational one.
 
-`docs/m0-build-plan.md` and `docs/m0-evaluation.md` are history. They are still worth reading for
+`docs/milestones/m0-build-plan.md` and `docs/milestones/m0-evaluation.md` are history. They are still worth reading for
 *why* things are the way they are, and their shortcuts table no longer describes this codebase.
 Where M0 and M2 disagree, **M2 wins**. Where M2 and M3 disagree, **M3 wins**.
 
@@ -101,7 +101,7 @@ Resolved in a design review before implementation. Do not silently revisit these
 | Camera | Four fixed isometric corners, 90° snap (Q/E). Never free orbit — it breaks the isometric read and grid picking. |
 | Look | **Stylized isometric 3D at native resolution.** KayKit-class meshes, linear filtering, real lights. Not a 480px/960px nearest-neighbour pixel pass, not 2D isometric sprites. |
 
-### Deviations from `docs/m0-build-plan.md` as written
+### Deviations from `docs/milestones/m0-build-plan.md` as written
 
 The plan is the spec; these are the agreed amendments to it.
 
@@ -141,83 +141,42 @@ Related, if you ever route to Claude directly: never set `thinking: {type: "disa
 Opus 5 — it can write a tool call into visible text instead of emitting a `tool_use` block, with
 no error raised. Use a low effort setting instead.
 
-## Model selection — measured, not guessed
+## Models — the pick, and where the reasoning lives
 
-Venice exposes `supportsFunctionCalling` and `supportsResponseSchema` per model. **Require
-both.** But the capability flag is not the same as the behaviour: several models that advertise
-function calling simply narrate instead of calling anything.
+**Current pick, signed at the M2 gate and unchanged through M3:**
 
-Measured against the real tool schema, one round, "heave the sarcophagus lid open":
+```
+DM_MODEL_TOOLS=qwen3-next-80b
+DM_MODEL_PROSE=gemini-3-8-flash
+DM_REASONING_EFFORT_PROSE=low
+```
 
-| Model | TTFT | Calls `roll_check` correctly? |
-|---|---|---|
-| `qwen3-coder-480b-a35b-instruct-turbo` | 795ms | yes |
-| `qwen3-next-80b` | 834ms | yes |
-| `qwen3-235b-a22b-instruct-2507` | 1605ms | yes |
-| `zai-org-glm-5-2` | 1924ms | yes |
-| `deepseek-v4-flash` | 2437ms | yes |
-| `claude-opus-5` | 2679ms | yes |
-| `grok-4-6` | 5042ms | yes |
-| `venice-uncensored-1-2` | 728ms | **no — narrates instead** |
-| `venice-uncensored-role-play` | 914ms | **no — narrates instead** |
-| `mistral-small-3-2-24b-instruct` | 1017ms | **no — narrates instead** |
+The DM is **two models, not one**: phase 1 decides tool calls on `DM_MODEL_TOOLS` and any prose
+it writes is discarded; phase 2 writes narration on `DM_MODEL_PROSE` while the dice are still
+animating, which is what buys it permission to be slow. Never literals — always these config
+strings. Narration stays on exactly one model; splitting *it* makes tone drift audible between
+turns. Full reasoning and the measured end-to-end numbers: **ADR-0003**.
 
-Two findings that should survive this milestone:
+`DM_REASONING_EFFORT_PROSE=low` **is not optional.** Gemini 3.x Flash cannot turn thinking off
+and `low` is the floor; at default it takes 9–15s to a first word, which is an empty screen the
+dice cannot cover. Leave it unset for models that do not take the parameter — a bad value 400s
+the turn.
 
-1. **Reasoning models cannot hit the first-feedback gate.** Reasoning-on models land at 1.9–5.0s to
-   first token; reasoning-off models land at 0.7–1.6s. The split is clean. Worse, the agentic
-   loop multiplies it: a turn with three tool calls on `grok-4-6` measured **44 seconds**.
-2. **The uncensored and roleplay models are the ones that cannot drive this architecture.**
-   They write the best prose and never call a tool — the exact silent failure this design is
-   most vulnerable to.
+Four things to carry into any model change. The evidence for each is in **ADR-0008**:
 
-Most `e2ee-*` models report `supportsFunctionCalling: false` and are incompatible outright,
-despite being the strongest privacy tier.
+- **A capability flag is a claim, not a behaviour.** Require both `supportsFunctionCalling` and
+  `supportsResponseSchema`, then measure against the real tool schema — several models that
+  advertise function calling narrate instead. Most `e2ee-*` models report `false` and are
+  incompatible outright.
+- **Judge the tail, not the median.** Two finalists were disqualified for multi-second stalls
+  with no error and full quota. Bimodal is worse than consistently slow.
+- **The pick's own tail is live.** `qwen3-next-80b` showed 14.3s and 15.5s tool phases in play
+  that no benchmark caught. Watch `FIRST FEEDBACK` in a real session.
+- **`qwen3-next-80b` hallucinates props**, and holds the tools slot anyway because its prose is
+  discarded. That safety is void the moment anyone promotes it to prose.
 
-### Finalists, 4 samples each
-
-| Model | TTFT samples | Tools | Prose |
-|---|---|---|---|
-| `qwen3-coder-480b-a35b-instruct-turbo` | 563 / 653 / 603 / 621ms | 100% valid | good, stays in-world |
-| `qwen3-next-80b` | 540 / 771 / 577 / 586ms | 100% valid | **invents props** |
-| `deepseek-v4-flash-0731-fast` | 1195 / 1364 / 1599 / **38478**ms | 100% valid | good, stays in-world |
-
-**Current pick, as of the M2 gate: `DM_MODEL_TOOLS=qwen3-next-80b`,
-`DM_MODEL_PROSE=gemini-3-8-flash` with `DM_REASONING_EFFORT_PROSE=low`.** That is the split the
-30-turn session in `docs/m2-evaluation.md` was played and judged on, chosen after six shorter
-sessions the same day eliminated the alternatives:
-
-- `venice-uncensored-role-play` — the better voice and the worse follower. It leaked the
-  world-state footer into spoken narration. It is what `m0-evaluation.md` judged tone against.
-- `gemini-3-8-flash` at **default** thinking — 9–15s to a first word. `low` is the floor (it
-  cannot be turned off) and brings that to 3–8s. Setting this is not optional.
-- `deepseek-v4-flash` on tools — coherent, and put an 8.5s hole in front of a die.
-
-`claude-opus-5` remains the `.env.example` default and is a fine writer; it has not been played
-against a full gate.
-
-**`qwen3-next-80b` has a tail too, found in play, not in the benchmark:** 14.3s and 15.5s tool
-phases in two logged sessions, no error, full quota. Rarer than the 480b's and it survives the
-pick, but assume *any* single-provider MoE does this and watch `FIRST FEEDBACK` for it.
-
-`qwen3-coder-480b-a35b-instruct-turbo` looked like the winner on first measurement and is
-**disqualified**. Over one session it went 563ms → 42s → 66s → 621ms → 34s, with full rate-limit
-quota remaining and no error. Bimodal latency is worse than consistently slow, because you cannot
-design around it. Assume any very large MoE on a smaller provider may behave this way.
-
-**Benchmark discipline learned the hard way:** a single-shot benchmark against a multi-tenant
-inference provider measures a moment, not a steady state. Sample repeatedly, and across time,
-before believing a number. Every early figure in this file was collected in one burst and the
-model rankings did not survive contact with a second burst.
-
-Two disqualifiers found by measuring rather than reasoning:
-
-- `deepseek-v4-flash-0731-fast` throws occasional **38-second stalls**. Its median is fine; its
-  tail is not, and one freeze mid-session ruins a five-minute demo.
-- `qwen3-next-80b` **hallucinates props** — it invented "a small silver disc, half-buried in ash"
-  and a trail of footprints, neither of which exists in the room. It also misused a `[[fighter]]`
-  speaker marker for plain narration. Fast and tool-correct, but it fabricates world state, which
-  is the one thing the closed-enum design exists to prevent.
+A candidate enters a slot on a **played session**, not a benchmark — single-shot numbers against
+a multi-tenant provider measure a moment, not a steady state.
 
 ---
 
@@ -310,7 +269,7 @@ a regression stays visible, and do not propose latency work on the DM path unpro
 | Click-to-move → token starts moving | < 100ms | no model in this path. T10 |
 | Full enemy round resolved and narrated | < 4s | **measured ~3s** — 1.5s to resolve, 1.3–1.6s to narrate |
 
-### Why these are not the numbers in `docs/m0-build-plan.md`
+### Why these are not the numbers in `docs/milestones/m0-build-plan.md`
 
 The plan's targets — first token < 800ms, first spoken word < 1.5s — come from a text-chat mental
 model, where the first token *is* the experience and silence before it is the whole cost. This
@@ -328,7 +287,7 @@ Two consequences:
 
 ### What T13 decided — measured over two played sessions
 
-Both questions are answered in `docs/m0-evaluation.md` §4, against 12 typed turns of real play
+Both questions are answered in `docs/milestones/m0-evaluation.md` §4, against 12 typed turns of real play
 rather than the dice-building sample the question warned about. In short:
 
 1. **How often is a turn tool-free? 42% of turns — 5 of 12 — showed the player nothing**, and the
@@ -350,34 +309,6 @@ no dice. `FIRST FEEDBACK` is the honest signal — over the same 12 turns the co
 feedback line said 7.
 
 ---
-
-## The DM is two models, not one
-
-Phase 1 — **mechanics**, `DM_MODEL_TOOLS`. Decides tool calls; any prose it writes is discarded.
-This is the phase the &lt;800ms budget applies to, because it is what puts dice on the table.
-Wants a fast, non-reasoning, reliably tool-calling model.
-
-Phase 2 — **narration**, `DM_MODEL_PROSE`. Writes the prose with the engine's real results as
-context, *while the dice are still animating*. That concurrency is what buys it permission to be
-slow, so pick the best writer you can afford.
-
-Two consequences worth knowing:
-
-- A model that writes beautifully but cannot call tools is now **usable** — it just goes in the
-  prose slot. `venice-uncensored-role-play` was disqualified outright before the split.
-- A model that calls tools reliably but hallucinates props is now **usable** — it never writes
-  narration, so it cannot invent anything. `qwen3-next-80b` was disqualified before the split.
-
-Narration stays on exactly one model. Splitting *narration* across models makes tone drift
-audible between turns (design doc §10); splitting mechanics off does not.
-
-Measured end-to-end, `--demo`, "heave the sarcophagus lid open":
-
-| Config | First dice | First word | Total |
-|---|---|---|---|
-| Single model (`grok-4-6`) | — | — | 44,000ms |
-| Split, degraded tools model | 33,908ms | 45,616ms | 48,323ms |
-| Split, healthy tools model | **1,025ms** | 7,394ms | 8,860ms |
 
 ## Characters
 
@@ -558,7 +489,7 @@ sarcophagus, never spawned (`m3-evaluation.md` §4).
 
 ### Carried out of M2 — findings, not tasks
 
-The full list is `docs/m2-evaluation.md` §8. The ones that will bite first:
+The full list is `docs/milestones/m2-evaluation.md` §8. The ones that will bite first:
 
 - **Talking to yourself can start a fight.** A spoken aside on turn 11 of the gate session had the
   mechanics model spawn Vessk and call `start_combat`. The two-failure escalation rule in
@@ -573,7 +504,7 @@ The full list is `docs/m2-evaluation.md` §8. The ones that will bite first:
 
 ### Carried out of M3 — findings, not tasks
 
-The full list is `docs/m3-evaluation.md` §8.
+The full list is `docs/milestones/m3-evaluation.md` §8.
 
 - **`reveal_prop` can beat the sentence.** A look-around was enough to put the gallery niche on
   the board before the prose named it.
@@ -753,6 +684,37 @@ proves it is already on disk.
 `VENICE_API_KEY` and `ELEVENLABS_API_KEY` come from a gitignored `.env`.
 Never commit a key. Never log one.
 
+## Agent skills
+
+This repo is configured for the [engineering skills](https://github.com/mattpocock/skills).
+`/grill-with-docs` and `/implement` are the entry points; `/tdd`, `/triage`, `/wayfinder`,
+`/domain-modeling` and `/review` are reached from there or invoked directly.
+
+### Issue tracker
+
+Beads (`bd`), local to this repo — not GitHub Issues, even though the GitHub remote exists.
+Every skill that says "publish to the issue tracker" or "fetch the relevant ticket" means `bd`.
+See `docs/agents/issue-tracker.md`. Workflow reference: `.agents/skills/beads/SKILL.md`, or
+`bd prime`.
+
+### Triage labels
+
+The five canonical triage roles map to beads labels of the same name, applied with `bd label add`.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. Read them before exploring.
+See `docs/agents/domain.md`.
+
+### Where this file sits
+
+`AGENTS.md` is the source of truth for project rules. `CLAUDE.md` imports it and adds nothing
+but build commands — edit this file, not that one. `CONTEXT.md` is the glossary, not a second
+rules file: when the two overlap, this file wins.
+
+---
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:970c3bf2 -->
 ## Beads Issue Tracker
 
@@ -808,27 +770,3 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - Do not commit or push without clear authority from the active profile or the current user request.
 - If a required sync or push is blocked, stop and report the exact command and error.
 <!-- END BEADS INTEGRATION -->
-
-<!-- BEGIN BEADS CODEX SETUP: generated by bd setup codex -->
-## Beads Issue Tracker
-
-Use Beads (`bd`) for durable task tracking in repositories that include it. Use the `beads` skill at `.agents/skills/beads/SKILL.md` (project install) or `~/.agents/skills/beads/SKILL.md` (global install) for Beads workflow guidance, then use the `bd` CLI for issue operations.
-
-### Quick Reference
-
-```bash
-bd ready                # Find available work
-bd show <id>            # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>           # Complete work
-bd prime                # Refresh Beads context
-```
-
-### Rules
-
-- Use `bd` for all task tracking; do not create markdown TODO lists.
-- Run `bd prime` when Beads context is missing or stale. Codex 0.129.0+ can load Beads context automatically through native hooks; use `/hooks` to inspect or toggle them.
-- Keep persistent project memory in Beads via `bd remember`; do not create ad hoc memory files.
-
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
-<!-- END BEADS CODEX SETUP -->

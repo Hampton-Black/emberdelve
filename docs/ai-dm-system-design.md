@@ -339,7 +339,7 @@ come due, both worth knowing before the work starts:
 - **`Event.AttackResolved` is one coarse event** carrying the to-hit roll, the damage roll, the
   damage applied, and whether the target died. That coarseness is deliberate and well-reasoned —
   split into separate damage and death events, the beat handed to the narrator loses its attacker,
-  and `m0-evaluation.md` §4.4 records what that cost the first time. But a reaction fires *between*
+  and `milestones/m0-evaluation.md` §4.4 records what that cost the first time. But a reaction fires *between*
   the parts of that event, so the interrupt work and the narration's need for a whole beat are on a
   collision course. Solve it by keeping the coarse event as a *projection* over finer ones rather
   than by making the narrator reassemble a swing from fragments.
@@ -985,9 +985,9 @@ could turn into a test, and every milestone after it would have paid that cost.
 
 | | Gate question | Verdict | Where |
 |---|---|---|---|
-| **M0** | Does this feel like a DM running a game? | PASS 2026-08-20 | `m0-evaluation.md` |
+| **M0** | Does this feel like a DM running a game? | PASS 2026-08-20 | `milestones/m0-evaluation.md` |
 | **M1** | Can the world be made rather than authored? | **Half done** — room generation merged; the dungeon is outstanding | `specs/2026-08-20-m1-procedural-generation-design.md` |
-| **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `m2-evaluation.md` |
+| **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `milestones/m2-evaluation.md` |
 | **M3** | Is a room a place you can leave and come back to? | Planned 2026-09-05 | `specs/2026-09-05-m3-traversal-design.md` |
 | **M4** | Can you lose a delve, and does losing it sting? | Not started | §9 |
 

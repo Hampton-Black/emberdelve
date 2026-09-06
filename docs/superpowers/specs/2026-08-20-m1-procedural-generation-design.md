@@ -1,7 +1,7 @@
 # M1 — Procedural dungeon generation
 
 **Status:** Design approved, pre-implementation
-**Companion to:** `docs/m0-evaluation.md` (what M0 proved) and `docs/ai-dm-system-design.md` (the
+**Companion to:** `../../milestones/m0-evaluation.md` (what M0 proved) and `docs/ai-dm-system-design.md` (the
 long-range design, which this milestone deliberately reorders — see §9)
 
 ---

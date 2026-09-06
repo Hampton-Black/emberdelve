@@ -145,9 +145,9 @@ Read in this order.
 | Document | What it is |
 |---|---|
 | [AGENTS.md](AGENTS.md) | The rules. Invariants, locked decisions, measured model picks, anti-goals. Start here before changing anything |
-| [docs/m2-evaluation.md](docs/m2-evaluation.md) | The most recent gate — a 30-turn session, what held and what did not |
+| [docs/m2-evaluation.md](docs/milestones/m2-evaluation.md) | The most recent gate — a 30-turn session, what held and what did not |
 | [docs/superpowers/specs/2026-08-23-m2-spine-design.md](docs/superpowers/specs/2026-08-23-m2-spine-design.md) | The architecture above, argued out |
-| [docs/m0-evaluation.md](docs/m0-evaluation.md) | The first gate. Where "multi-turn consistency is the metric" comes from |
+| [docs/m0-evaluation.md](docs/milestones/m0-evaluation.md) | The first gate. Where "multi-turn consistency is the metric" comes from |
 | [docs/ai-dm-system-design.md](docs/ai-dm-system-design.md) | The long-range design. Superseded twice on ordering — history, not a plan |
 
 Each milestone is a question, not a feature list, and each one ends with a signed answer:

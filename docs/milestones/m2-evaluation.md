@@ -19,7 +19,7 @@ dropped the first telling.
 
 | | Session D |
 |---|---|
-| Log | `docs/evidence/session-m2-twenty-turns.jsonl` (copy of `server/sessions/20260905-205347-b4a16f95.jsonl`) |
+| Log | `../evidence/session-m2-twenty-turns.jsonl` (copy of `server/sessions/20260905-205347-b4a16f95.jsonl`) |
 | Player | the author |
 | Build | `m2-spine`, with `DM_REASONING_EFFORT_PROSE=low` on the prose client |
 | Typed turns | **30** (gate is 20) |
@@ -31,7 +31,7 @@ dropped the first telling.
 Earlier the same day, six shorter sessions on the same branch trained the model pick (Venice
 role-play leaking the world-state footer; Gemini at default thinking waiting 9–15s for a first
 word; DeepSeek-on-tools putting an 8.5s hole in front of a die). Session D is the confirming run
-on the split that survived that. Those earlier JSONL files stay in `server/sessions/` and are not
+on the split that survived that. Those earlier JSONL files stay in `../../server/sessions` and are not
 the gate.
 
 The goblin never spoke. The player did not parley. Sticky-creature-voice was not re-tested here;
@@ -45,7 +45,7 @@ player-line tagging was (four times, all correct).
 |---|---|---|
 | 1 | ≥20 typed turns | **30.** See §3. |
 | 2 | Nothing the DM says contradicts a fact it established | **Held, with one overclaim recorded in §4.** Callbacks in turns 17–29 still knew the tallies, the scratches, Vessk's blade, the empty trough, and the key. |
-| 3 | Capture the session | `docs/evidence/session-m2-twenty-turns.jsonl`, 222 events. |
+| 3 | Capture the session | `../evidence/session-m2-twenty-turns.jsonl`, 222 events. |
 | 4 | Replay it offline, no network | **`replayed 32 events: identical`** (outcome events only; `PlayerSaid` / `NarrationLogged` / `FactAsserted` / `ToolCallIssued` are skipped by `ReplayRunner`, as designed). The checked-in fixture `crypt-fight.jsonl` remains green under `./gradlew test`. |
 
 The length is load-bearing. M0's sessions were 7, 5, and 2 typed turns. Today's morning loops were

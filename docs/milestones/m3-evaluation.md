@@ -18,7 +18,7 @@ calls. Typed turns waited for `narrationEnd` before the next.
 
 | | Gate session |
 |---|---|
-| Log | `docs/evidence/session-m3-traversal.jsonl` (copy of `server/sessions/20260906-160343-d5ef5f0a.jsonl`) |
+| Log | `../evidence/session-m3-traversal.jsonl` (copy of `server/sessions/20260906-160343-d5ef5f0a.jsonl`) |
 | Player | websocket client, scripted against spec §10 |
 | Build | `m3-traversal` at `72a3753`, plus this evaluation |
 | Typed turns | **19** |

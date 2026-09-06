@@ -1,7 +1,7 @@
 # Godot desktop client
 
 **Status:** **Shipped 2026-08-23.** Human parity gate passed (Task 22); `client/` deleted. Look: stylized isometric 3D at native resolution (see §2 *Look*).
-**Companion to:** `docs/m0-evaluation.md` (the feel that must survive), `docs/m0-build-plan.md`
+**Companion to:** `../../milestones/m0-evaluation.md` (the feel that must survive), `../../milestones/m0-build-plan.md`
 (invariants), `AGENTS.md` (presentation numbers), `docs/ai-dm-system-design.md` (long-range stack)
 **Supersedes:** `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` §8b
 ("Three.js stays for M1"). Procedural generation remains server-side; the client that renders
