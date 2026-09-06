@@ -3,6 +3,7 @@ package dm.ai;
 import dm.model.Diff;
 import dm.model.NarrationSegment;
 import dm.model.RollResult;
+import dm.model.SceneState;
 
 import java.util.List;
 
@@ -14,6 +15,9 @@ public interface TurnSink {
     void diffs(List<Diff> diffs);
 
     void roll(RollResult result);
+
+    default void scene(SceneState scene) {
+    }
 
     void complete();
 

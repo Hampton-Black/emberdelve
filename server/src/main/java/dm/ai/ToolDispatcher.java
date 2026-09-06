@@ -39,20 +39,23 @@ public final class ToolDispatcher {
     }
 
     /**
-     * @param ok      whether the call was applied
-     * @param message what the model is told — the roll outcome, or why it was rejected
-     * @param diffs   what the client must be shown
-     * @param rolls   dice this call produced, in the order they were thrown, so the UI can
-     *                animate them — starting combat rolls one per combatant
+     * @param ok             whether the call was applied
+     * @param message        what the model is told — the roll outcome, or why it was rejected
+     * @param diffs          what the client must be shown
+     * @param rolls          dice this call produced, in the order they were thrown, so the UI can
+     *                       animate them — starting combat rolls one per combatant
+     * @param replacesScene  when true the caller must send a fresh Scene — a room change
+     *                       replaces everything and carries no diffs (spec §9)
      */
-    public record Result(boolean ok, String message, List<Diff> diffs, List<RollResult> rolls) {
+    public record Result(boolean ok, String message, List<Diff> diffs, List<RollResult> rolls,
+                         boolean replacesScene) {
 
         static Result rejected(String why) {
-            return new Result(false, "REJECTED: " + why, List.of(), List.of());
+            return new Result(false, "REJECTED: " + why, List.of(), List.of(), false);
         }
 
         static Result applied(String message, List<Diff> diffs) {
-            return new Result(true, message, diffs, List.of());
+            return new Result(true, message, diffs, List.of(), false);
         }
     }
 
@@ -109,7 +112,7 @@ public final class ToolDispatcher {
                 result.total(),
                 result.outcome());
 
-        return new Result(true, message, List.of(), List.of(result));
+        return new Result(true, message, List.of(), List.of(result), false);
     }
 
     private Result revealProp(JsonNode args) {
@@ -193,7 +196,7 @@ public final class ToolDispatcher {
                         + "Describe only the instant the fight breaks out — one or two "
                         + "sentences. Do not list the order. Do not narrate anyone's turn, "
                         + "attack, movement or wound: none of that has happened yet.",
-                buffer.collectedDiffs(), buffer.collectedRolls());
+                buffer.collectedDiffs(), buffer.collectedRolls(), false);
     }
 
     private Result useExit(JsonNode args) {
@@ -206,10 +209,10 @@ public final class ToolDispatcher {
         }
         // No diffs: a room change replaces everything and the caller sends a fresh Scene.
         // Spec §9.
-        return Result.applied(
+        return new Result(true,
                 "The party left " + from + " and is now in " + engine.state().roomId()
                         + ". Describe what they walk into. Do not describe " + from + " again.",
-                List.of());
+                List.of(), List.of(), true);
     }
 
     private Result moveEntity(JsonNode args) {

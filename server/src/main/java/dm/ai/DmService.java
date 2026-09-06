@@ -359,11 +359,15 @@ public final class DmService {
                             call.name(), call.argumentsJson(), outcome.message());
                 }
 
-                boolean visible = !outcome.diffs().isEmpty() || !outcome.rolls().isEmpty();
+                boolean visible = !outcome.diffs().isEmpty() || !outcome.rolls().isEmpty()
+                        || outcome.replacesScene();
                 if (visible && firstFeedback < 0) {
                     firstFeedback = (System.nanoTime() - phaseStart) / 1_000_000;
                 }
 
+                if (outcome.replacesScene()) {
+                    sink.scene(engine.scene());
+                }
                 if (!outcome.diffs().isEmpty()) {
                     sink.diffs(outcome.diffs());
                 }

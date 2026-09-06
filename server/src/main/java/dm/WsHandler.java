@@ -361,6 +361,11 @@ public final class WsHandler {
             }
 
             @Override
+            public void scene(dm.model.SceneState scene) {
+                send(ctx, new ServerMessage.Scene(scene));
+            }
+
+            @Override
             public void complete() {
                 send(ctx, new ServerMessage.NarrationEnd());
                 // A DM turn can start a fight, and whatever it started the fight against may go

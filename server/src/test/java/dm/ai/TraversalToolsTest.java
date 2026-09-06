@@ -126,6 +126,8 @@ class TraversalToolsTest {
         assertTrue(result.ok(), result.message());
         assertEquals("gallery", engine.state().roomId());
         assertTrue(log.events().stream().anyMatch(Event.PartyMoved.class::isInstance));
+        assertTrue(result.replacesScene());
+        assertTrue(result.diffs().isEmpty());
     }
 
     @Test
