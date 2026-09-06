@@ -26,9 +26,10 @@ Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22).
 
 `docs/m2-evaluation.md` first — it is the most recent gate and its §8 lists what M2 handed
 forward. `docs/superpowers/specs/2026-08-23-m2-spine-design.md` is the architecture everything
-now sits on. `docs/ai-dm-system-design.md` is the long-range design and has been **superseded
-twice** on milestone ordering (M1 took generation before the rules engine; M2 took the spine
-before the rest of M1) — read its §14 as a record of early intent, not a plan.
+now sits on. `docs/ai-dm-system-design.md` is the long-range design. **Amended 2026-09-05** against
+three gates: its §2a lists the six decisions play reversed and why, and §14 carries both the
+real milestone history and the original ordering it superseded. Where it and this file
+disagree, this file wins — it is the operational one.
 
 `docs/m0-build-plan.md` and `docs/m0-evaluation.md` are history. They are still worth reading for
 *why* things are the way they are, and their shortcuts table no longer describes this codebase.
