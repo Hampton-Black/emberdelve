@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Initiative, movement and one melee attack. That is the whole of combat in M0 (§4), and the
@@ -42,12 +43,21 @@ public final class CombatEngine {
 
     private final EventLog log;
     private final DiceRoller dice;
-    private final RoomDefinition room;
+    private final Supplier<RoomDefinition> currentRoom;
 
-    public CombatEngine(EventLog log, DiceRoller dice, RoomDefinition room) {
+    public CombatEngine(EventLog log, DiceRoller dice, Supplier<RoomDefinition> currentRoom) {
         this.log = log;
         this.dice = dice;
-        this.room = room;
+        this.currentRoom = currentRoom;
+    }
+
+    /**
+     * The room this fight is being fought in. A supplier rather than a value because the party
+     * can now be somewhere else than where the engine was constructed, and terrain that lagged
+     * behind would let a fighter walk through a pillar that is in a different room.
+     */
+    public RoomDefinition terrain() {
+        return currentRoom.get();
     }
 
     WorldState state() {
@@ -417,6 +427,7 @@ public final class CombatEngine {
     }
 
     private boolean isPassable(Square square, Set<Square> occupied) {
+        var room = currentRoom.get();
         return square.x() >= 0 && square.x() < room.width()
                 && square.y() >= 0 && square.y() < room.height()
                 && !room.isObstructed(square.x(), square.y())

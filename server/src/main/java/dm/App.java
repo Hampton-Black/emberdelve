@@ -9,6 +9,7 @@ import dm.content.RoomDefinition;
 import dm.engine.DiceRoller;
 import dm.engine.GameEngine;
 import dm.engine.RandomDiceRoller;
+import dm.engine.Rooms;
 import dm.engine.ScriptedDiceRoller;
 import dm.replay.ReplayRunner;
 import dm.generate.RoomDresser;
@@ -60,39 +61,38 @@ public final class App {
 
         // --generate <seed> boots into a procedurally generated room instead of the crypt.
         // The crypt stays the default: it is the room every M0 measurement was taken in.
-        RoomDefinition room;
-        if (cli.generateSeed() == null) {
-            room = RoomSource.authored(content, "crypt");
-        } else if (config.has("VENICE_API_KEY")) {
-            // The dress pass reads as writing, but what it must actually emit is a JSON object
-            // with a fixed shape — which is the tools model's skill, not the prose model's.
-            // Measured on seed 7, four samples each: venice-uncensored-role-play produced
-            // unparseable JSON 4/4 (a string opened with " and closed with ', a stray 'あ', a
-            // bad escape) and fell back to "An Unnamed Chamber" every time; qwen3-next-80b
-            // parsed 3/3. A prose model tuned for roleplay cannot hold a quote character.
-            room = RoomSource.generated(content, new RoomDresser(
-                    new VeniceDmClient(config, config.get("DM_MODEL_TOOLS", "qwen3-next-80b"),
-                            java.time.Duration.ofSeconds(30)),
-                    content.prompt("dress-room")), "crypt", cli.generateSeed());
-        } else {
-            // Undressed but playable — the generator half needs no key, and a room with no prose
-            // is more useful than a refusal to boot while tuning layout. The dump is logged here
-            // too: this is the path that exists for tuning layout, and it is the one place the
-            // grid would otherwise never be seen.
-            log.warn("VENICE_API_KEY not set — generating an undressed room.");
-            var generated = new RoomGenerator(content).generate("crypt", cli.generateSeed());
-            log.info("generated room, seed {}:\n{}", cli.generateSeed(), RoomDumper.dump(generated));
-            room = generated.toRoomDefinition();
+        RoomDefinition room = null;
+        if (cli.generateSeed() != null) {
+            if (config.has("VENICE_API_KEY")) {
+                // The dress pass reads as writing, but what it must actually emit is a JSON object
+                // with a fixed shape — which is the tools model's skill, not the prose model's.
+                // Measured on seed 7, four samples each: venice-uncensored-role-play produced
+                // unparseable JSON 4/4 (a string opened with " and closed with ', a stray 'あ', a
+                // bad escape) and fell back to "An Unnamed Chamber" every time; qwen3-next-80b
+                // parsed 3/3. A prose model tuned for roleplay cannot hold a quote character.
+                room = RoomSource.generated(content, new RoomDresser(
+                        new VeniceDmClient(config, config.get("DM_MODEL_TOOLS", "qwen3-next-80b"),
+                                java.time.Duration.ofSeconds(30)),
+                        content.prompt("dress-room")), "crypt", cli.generateSeed());
+            } else {
+                // Undressed but playable — the generator half needs no key, and a room with no prose
+                // is more useful than a refusal to boot while tuning layout. The dump is logged here
+                // too: this is the path that exists for tuning layout, and it is the one place the
+                // grid would otherwise never be seen.
+                log.warn("VENICE_API_KEY not set — generating an undressed room.");
+                var generated = new RoomGenerator(content).generate("crypt", cli.generateSeed());
+                log.info("generated room, seed {}:\n{}", cli.generateSeed(), RoomDumper.dump(generated));
+                room = generated.toRoomDefinition();
+            }
         }
 
-        var engine = new GameEngine(content, eventLog, dice, room);
+        var engine = cli.generateSeed() == null
+                ? new GameEngine(content, eventLog, dice, Rooms.authored(content, "crypt"))
+                : new GameEngine(content, eventLog, dice, room);
         eventLog.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION,
                 0L, // the dungeon seed lands here when navigation does
                 config.orElse("DM_MODEL_TOOLS", "none"),
                 config.orElse("DM_MODEL_PROSE", "none")));
-        // The dress pass lands here when navigation makes it per-room. A generated
-        // room currently bakes Dressing into RoomDefinition and does not carry a
-        // Dressing object, so there is nothing to append until then.
         engine.start();
 
         // Everything up to T5 runs without a key; only narration needs one.

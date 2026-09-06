@@ -1,6 +1,7 @@
 package dm.engine;
 
 import dm.content.ContentLoader;
+import dm.content.Dressings;
 import dm.content.RoomDefinition;
 import dm.model.Diff;
 import dm.model.Entity;
@@ -26,25 +27,31 @@ import java.util.Optional;
  */
 public final class GameEngine {
 
-    private static final String ROOM_ID = "crypt";
-
     private final ContentLoader content;
     private final EventLog log;
     private final DiceRoller dice;
-    private final RoomDefinition room;
+    private final Rooms rooms;
     private final CombatEngine combat;
 
     public GameEngine(ContentLoader content, EventLog log, DiceRoller dice) {
-        this(content, log, dice, content.room(ROOM_ID));
+        this(content, log, dice, Rooms.authored(content, "crypt"));
     }
 
-    public GameEngine(ContentLoader content, EventLog log, DiceRoller dice,
-                      RoomDefinition room) {
+    public GameEngine(ContentLoader content, EventLog log, DiceRoller dice, RoomDefinition room) {
+        this(content, log, dice, Rooms.of(room));
+    }
+
+    public GameEngine(ContentLoader content, EventLog log, DiceRoller dice, Rooms rooms) {
         this.content = content;
         this.log = log;
         this.dice = dice;
-        this.room = room;
-        this.combat = new CombatEngine(log, dice, room);
+        this.rooms = rooms;
+        if (!WorldState.EMPTY.roomId().equals(rooms.first().roomId())) {
+            throw new IllegalArgumentException(
+                    "The entrance must be '" + WorldState.EMPTY.roomId() + "' until the fold's "
+                            + "starting room is configurable, got '" + rooms.first().roomId() + "'");
+        }
+        this.combat = new CombatEngine(log, dice, this::room);
     }
 
     /** The log. The only way anything in this engine writes. */
@@ -57,21 +64,42 @@ public final class GameEngine {
         return log.state();
     }
 
-    /** Spawn the party at the room's start positions. M0's party has exactly one member. */
+    /** Spawn the party at the entrance room's start positions. M3's party has one member. */
     public void start() {
+        var entrance = rooms.first();
         var fighter = content.entity("fighter");
-        var starts = room.startPositions().party();
+        var starts = entrance.startPositions().party();
         var members = new ArrayList<Entity>();
 
         for (int i = 0; i < starts.size(); i++) {
             var at = starts.get(i);
-            // One member in M0, but the loop is the point — see invariant #2.
+            // One member in M3, but the loop is the point — see invariant #2.
             String entityId = starts.size() == 1 ? fighter.id() : fighter.id() + "-" + i;
-            members.add(fighter.spawn(entityId, room.roomId(), at.x(), at.y()));
+            members.add(fighter.spawn(entityId, entrance.roomId(), at.x(), at.y()));
         }
 
+        // The party is in the entrance before it is spawned there: PartySpawned does not move
+        // anyone, and WorldState.EMPTY names "crypt". Recording the dressing first also means
+        // the opening narration sees the room already dressed.
+        recordDressing(entrance.roomId());
         log.append(new Event.PartySpawned(Instant.now(), List.copyOf(members)));
         log.append(new Event.ModeEntered(Instant.now(), Mode.EXPLORATION));
+    }
+
+    /**
+     * Write down what a room looks like, the first time anyone stands in it.
+     *
+     * <p>Authored rooms go through this exactly as generated ones will — spec §5b. The prose is
+     * already on disk, so the event is redundant today and is the point: it means the fold, the
+     * compose and the replay of a dressed room are all exercised now, with no model in the path,
+     * rather than for the first time in the generator plan.
+     */
+    private void recordDressing(String roomId) {
+        if (state().dressingOf(roomId).isPresent()) {
+            return;
+        }
+        log.append(new Event.RoomDressed(Instant.now(), roomId,
+                Dressings.of(rooms.structure(roomId))));
     }
 
     /**
@@ -106,8 +134,26 @@ public final class GameEngine {
         return content;
     }
 
+    /** The room the party is standing in, structure and dressing composed. */
     public RoomDefinition room() {
-        return room;
+        return room(state().roomId());
+    }
+
+    /**
+     * Any room, dressed with whatever the log is holding for it.
+     *
+     * <p>Composed on read rather than cached. Spec §5b: a cache would not survive
+     * {@code restart()} and could not be rebuilt by a replay that has no model.
+     */
+    public RoomDefinition room(String roomId) {
+        var structure = rooms.structure(roomId);
+        return state().dressingOf(roomId)
+                .map(dressing -> Dressings.applyTo(structure, dressing))
+                .orElse(structure);
+    }
+
+    public Rooms rooms() {
+        return rooms;
     }
 
     public DiceRoller dice() {
@@ -123,6 +169,7 @@ public final class GameEngine {
      * revealed, so a curious player cannot read the secrets out of a websocket frame.
      */
     public SceneState scene() {
+        var room = room();
         var revealed = state().revealedHere();
 
         List<Prop> visible = room.props().stream()
@@ -130,7 +177,7 @@ public final class GameEngine {
                 .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false))
                 .toList();
 
-        var entities = state().entities().values().stream()
+        var entities = state().entitiesHere().stream()
                 .sorted(java.util.Comparator.comparing(Entity::id))
                 .map(Entity::toView)
                 .toList();
@@ -170,10 +217,10 @@ public final class GameEngine {
         if (!isInBounds(x, y)) {
             throw new IllegalArgumentException("Off the grid: " + x + "," + y);
         }
-        if (room.isObstructed(x, y)) {
+        if (room().isObstructed(x, y)) {
             throw new IllegalArgumentException("Something solid is already at " + x + "," + y);
         }
-        boolean occupied = state().entities().values().stream()
+        boolean occupied = state().entitiesHere().stream()
                 .anyMatch(e -> e.isAlive() && !e.id().equals(actorId) && e.x() == x && e.y() == y);
         if (occupied) {
             throw new IllegalArgumentException("Someone is standing at " + x + "," + y);
@@ -187,12 +234,12 @@ public final class GameEngine {
     }
 
     public List<Diff> revealProp(String propId) {
-        var definition = room.prop(propId);
+        var definition = room().prop(propId);
 
         if (state().revealedHere().contains(propId)) {
             return List.of();
         }
-        log.append(new Event.PropRevealed(Instant.now(), ROOM_ID, propId));
+        log.append(new Event.PropRevealed(Instant.now(), state().roomId(), propId));
         return List.of(new Diff.PropRevealed(definition.toProp().revealed()));
     }
 
@@ -222,14 +269,14 @@ public final class GameEngine {
                     : existing.get().name() + " is dead. A spawn does not raise the dead.");
         }
 
-        var goblin = definition.spawn(definition.id(), room.roomId(), x, y);
+        var goblin = definition.spawn(definition.id(), room().roomId(), x, y);
         log.append(new Event.EntitySpawned(Instant.now(), goblin));
         return List.of(new Diff.EntityAdded(goblin.toView()));
     }
 
     /** Where the goblin comes out of the sarcophagus, if the DM does not name a square. */
     public RoomDefinition.Point defaultGoblinSpawn() {
-        return room.startPositions().goblinSpawn();
+        return room().startPositions().goblinSpawn();
     }
 
     /**
@@ -272,6 +319,7 @@ public final class GameEngine {
     }
 
     public boolean isInBounds(int x, int y) {
+        var room = room();
         return x >= 0 && x < room.width() && y >= 0 && y < room.height();
     }
 }

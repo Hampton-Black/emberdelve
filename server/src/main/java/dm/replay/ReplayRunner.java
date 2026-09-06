@@ -112,8 +112,32 @@ public final class ReplayRunner {
      * not a debugging aid.
      */
     private static Result compare(List<Event> recorded, List<Event> produced) {
-        var expected = new ArrayList<Event>();
-        for (var event : recorded) {
+        var expected = skipInputs(recorded);
+        var actual = skipInputs(produced);
+
+        int limit = Math.min(expected.size(), actual.size());
+        for (int i = 0; i < limit; i++) {
+            if (!sameFact(expected.get(i), actual.get(i))) {
+                return new Result(false, i,
+                        "index %d:%n  recorded %s%n  produced %s"
+                                .formatted(i, expected.get(i), actual.get(i)));
+            }
+        }
+        if (expected.size() != actual.size()) {
+            return new Result(false, limit,
+                    "the session recorded %d events and the replay produced %d"
+                            .formatted(expected.size(), actual.size()));
+        }
+        return new Result(true, expected.size(), null);
+    }
+
+    /**
+     * RoomDressed is produced by {@code start()} now. Skipping it only on the recorded side
+     * makes a replay diverge the moment the engine writes one.
+     */
+    private static List<Event> skipInputs(List<Event> events) {
+        var kept = new ArrayList<Event>();
+        for (var event : events) {
             switch (event) {
                 case Event.SessionStarted ignored -> { }
                 case Event.PlayerSaid ignored -> { }
@@ -121,24 +145,10 @@ public final class ReplayRunner {
                 case Event.NarrationLogged ignored -> { }
                 case Event.RoomDressed ignored -> { }
                 case Event.FactAsserted ignored -> { }
-                default -> expected.add(event);
+                default -> kept.add(event);
             }
         }
-
-        int limit = Math.min(expected.size(), produced.size());
-        for (int i = 0; i < limit; i++) {
-            if (!sameFact(expected.get(i), produced.get(i))) {
-                return new Result(false, i,
-                        "index %d:%n  recorded %s%n  produced %s"
-                                .formatted(i, expected.get(i), produced.get(i)));
-            }
-        }
-        if (expected.size() != produced.size()) {
-            return new Result(false, limit,
-                    "the session recorded %d events and the replay produced %d"
-                            .formatted(expected.size(), produced.size()));
-        }
-        return new Result(true, expected.size(), null);
+        return kept;
     }
 
     /** Equality with the clock taken out of it: two runs never share a timestamp. */

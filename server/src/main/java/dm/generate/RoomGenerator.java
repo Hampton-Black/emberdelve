@@ -49,8 +49,11 @@ public final class RoomGenerator {
             if (goblinSpawn == null) {
                 continue;
             }
+            // The fold still opens in WorldState.EMPTY's room ("crypt"). A generated session
+            // is one room in that world; naming it generated-{seed} would fail the engine's
+            // entrance assertion and look up a room the map does not hold.
             return new GeneratedRoom(
-                    "generated-" + seed, shape, props, partyStart, goblinSpawn);
+                    kitId, shape, props, partyStart, goblinSpawn);
         }
         throw new IllegalStateException(
                 "Kit '" + kitId + "' produced no legal room in " + MAX_ATTEMPTS + " attempts");
