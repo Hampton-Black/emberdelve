@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "emberdelve",
+  "project_id": "301a950e-737a-4862-b34e-b651d5927612"
+}

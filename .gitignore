@@ -21,3 +21,9 @@ client/tsconfig.tsbuildinfo
 
 # Play sessions. The ones worth keeping get copied into src/test/resources/sessions/.
 server/sessions/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
