@@ -3,6 +3,7 @@ package dm.replay;
 import dm.content.ContentLoader;
 import dm.engine.CombatSink;
 import dm.engine.GameEngine;
+import dm.engine.Rooms;
 import dm.model.Combatant;
 import dm.model.Diff;
 import dm.model.Event;
@@ -42,8 +43,9 @@ public final class ReplayRunner {
                 .flatMap(ReplayRunner::rollsIn)
                 .toList());
 
+        var content = new ContentLoader();
         var log = new EventLog();
-        var engine = new GameEngine(new ContentLoader(), log, dice);
+        var engine = new GameEngine(content, log, dice, roomsIn(content, recorded));
 
         for (var event : recorded) {
             switch (event) {
@@ -65,6 +67,10 @@ public final class ReplayRunner {
                         engine.combat().endTurn(engine.combat().activeId(), SILENT);
                     }
                 }
+                // The exit id is recorded, so replay walks the same door rather than inferring
+                // one from the destination — a room with two ways into it would otherwise be a
+                // coin flip that diverges on the landing square.
+                case Event.PartyMoved e -> engine.crossExit(e.throughExitId());
                 // Everything else is an input the engine does not act on, or an outcome the
                 // engine produces for itself. Replaying either would double it.
                 default -> { }
@@ -72,6 +78,25 @@ public final class ReplayRunner {
         }
 
         return compare(recorded, log.events());
+    }
+
+    /**
+     * The rooms a recorded session visited, entrance first.
+     *
+     * <p>Read out of the log rather than passed in, so replaying a file needs nothing but the
+     * file. {@code RoomDressed} is emitted on first entry to every room, in entry order, which
+     * makes it the one event that names them all in the right order.
+     */
+    private static Rooms roomsIn(ContentLoader content, List<Event> recorded) {
+        var ids = recorded.stream()
+                .filter(Event.RoomDressed.class::isInstance)
+                .map(Event.RoomDressed.class::cast)
+                .map(Event.RoomDressed::roomId)
+                .distinct()
+                .toList();
+        return ids.isEmpty()
+                ? Rooms.authored(content, "crypt")
+                : Rooms.authored(content, ids.toArray(String[]::new));
     }
 
     private static void move(GameEngine engine, Event.EntityMoved e) {

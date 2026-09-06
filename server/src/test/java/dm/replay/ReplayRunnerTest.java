@@ -5,6 +5,7 @@ import dm.ai.ToolDispatcher;
 import dm.content.ContentLoader;
 import dm.engine.CombatSink;
 import dm.engine.GameEngine;
+import dm.engine.Rooms;
 import dm.engine.ScriptedDiceRoller;
 import dm.model.Event;
 import dm.state.EventLog;
@@ -109,6 +110,55 @@ class ReplayRunnerTest {
 
         var result = ReplayRunner.replay(writer.path());
         assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
+    }
+
+    @Test
+    @DisplayName("a session that walks between rooms replays into the same rooms")
+    void aCrossingReplays(@TempDir Path dir) {
+        var writer = SessionWriter.open(dir);
+        var log = new EventLog(writer);
+        log.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION, 0L,
+                "none", "none"));
+        var content = new ContentLoader();
+        var engine = new GameEngine(content, log, new ScriptedDiceRoller(10),
+                dm.engine.Rooms.authored(content, "crypt", "gallery"));
+        engine.start();
+        engine.crossExit("door-north");
+        engine.crossExit("door-south");
+        writer.close();
+
+        assertEquals("crypt", engine.state().roomId(), "setup: back where we started");
+
+        var result = ReplayRunner.replay(writer.path());
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
+    }
+
+    @Test
+    @DisplayName("what you leave in a room is still there when the replay comes back")
+    void replayKeepsWhatWasLeftBehind(@TempDir Path dir) {
+        var writer = SessionWriter.open(dir);
+        var log = new EventLog(writer);
+        log.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION, 0L,
+                "none", "none"));
+        var content = new ContentLoader();
+        var engine = new GameEngine(content, log, new ScriptedDiceRoller(10),
+                dm.engine.Rooms.authored(content, "crypt", "gallery"));
+        engine.start();
+        engine.spawnGoblin(6, 6);
+        engine.revealProp("alcove");
+        engine.crossExit("door-north");
+        engine.crossExit("door-south");
+        writer.close();
+
+        var result = ReplayRunner.replay(writer.path());
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
+
+        // The replay's own fold, not the recording engine's: this is the gate's "as you left it"
+        // criterion, asserted mechanically before anyone plays it.
+        var replayed = EventLog.load(writer.path()).state();
+        assertEquals("crypt", replayed.roomId());
+        assertEquals("crypt", replayed.find("goblin").orElseThrow().roomId());
+        assertTrue(replayed.revealedHere().contains("alcove"));
     }
 
     @Test
