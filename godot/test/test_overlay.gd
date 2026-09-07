@@ -686,6 +686,11 @@ func test_a_click_event_in_window_space_still_moves_the_right_square() -> void:
 
 ## The party has crossed north into the gallery. The crypt stays on the board behind them, DIM,
 ## still at the world origin; the gallery — the room they are in — stands at (0, -14).
+##
+## `coveredWalls` is what the server actually ships: the crypt is the entrance, so it owns the
+## plane the two share and the gallery's whole south run is left to it. The gallery still hangs
+## the door in it, because the pointer only ever reaches the current room's walls — which is the
+## thing `test_the_door_back_is_still_clickable_from_the_room_beyond` is here to keep true.
 func _crossed() -> Dictionary:
 	return {
 		"roomId": "gallery", "mode": "EXPLORATION", "combat": null, "blocked": [],
@@ -694,12 +699,12 @@ func _crossed() -> Dictionary:
 		"rooms": [
 			{"roomId": "crypt", "width": 12, "height": 12, "floorType": "CRACKED_STONE",
 				"wallType": "CARVED", "lighting": "TORCHLIT", "props": [], "visited": true,
-				"originX": 0.0, "originZ": 0.0,
+				"originX": 0.0, "originZ": 0.0, "coveredWalls": [],
 				"exits": [{"id": "door-north", "x": 6, "y": 11,
 					"direction": "NORTH", "toRoomId": "gallery"}]},
 			{"roomId": "gallery", "width": 10, "height": 16, "floorType": "TILED",
 				"wallType": "CARVED", "lighting": "TORCHLIT", "props": [], "visited": true,
-				"originX": 0.0, "originZ": -14.0,
+				"originX": 0.0, "originZ": -14.0, "coveredWalls": SceneFixtures.south_run(10),
 				"exits": [{"id": "door-south", "x": 5, "y": 0,
 					"direction": "SOUTH", "toRoomId": "crypt"}]},
 		],

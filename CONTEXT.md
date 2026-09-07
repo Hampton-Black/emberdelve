@@ -58,10 +58,16 @@ is standing in. *Not: the picture of one room* — it stopped being that when vi
 on the board.
 
 **Room view** — one room as far as the client is allowed to draw it (`RoomView`), current or not:
-size, floor and wall type, lighting, exits, visible props, its origin in the world frame, and
-whether it has been visited. One shape for every room, because the shared-wall owner is decided
-by distance from the entrance rather than by where the party stands. Entities never appear in
-one.
+size, floor and wall type, lighting, exits, visible props, its covered walls, its origin in the
+world frame, and whether it has been visited. One shape for every room, because the shared-wall
+owner is decided by distance from the entrance rather than by where the party stands. Entities
+never appear in one.
+
+**Covered wall** — a perimeter segment a room must not draw, because a room nearer the entrance
+already draws that plane (`Rooms.coveredWalls`, shipped as `RoomView.coveredWalls`). Two rooms
+joined by a door share the wall it is in, and drawing both is two walls fighting for one depth.
+Named per `WallSegment` — a square and one of its sides — never per wall, so a room keeps the
+part of its perimeter that overhangs the shared run.
 
 ## The world
 

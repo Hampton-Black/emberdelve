@@ -577,11 +577,15 @@ out to be.
   half a square out of step, but `beside` offsets by half the width difference too, which puts
   their segment *boundaries* back on one lattice. So a partial overlap means something upstream
   is wrong, and overlapping stone reads as noise where a half-square gap reads as a way through.
-- **These two are decided server-side and not yet drawn.** `Rooms.coveredWalls()` holds the rule
-  and the tests; `room.gd` still omits by direction, and the crypt's two corner holes are still on
-  screen from the gallery. Nothing ships the answer — `RoomView` carries no covered-segment field.
-  `bd show emberdelve-xgg.7` is the wiring. Until then this section describes the server's rule,
-  not the picture.
+- **The stone is the server's; the door is the party's.** `RoomView.coveredWalls` carries
+  `Rooms.coveredWalls()`' answer for one room and `room.gd` omits exactly those segments, so both
+  rules above are now what is on screen — the crypt's north corners are stone from the gallery,
+  and every plane is drawn once by the same room from either side. The doorway is the exception,
+  and it has to be: a door is one object that two rooms address by two ids, and `_target_under`
+  only ever scans the current room's walls. So the room the party is standing in hangs the door
+  and every other room draws nothing at its own exits, which leaves the opening open — which is
+  also what the far side of a doorway should look like. Hang it anywhere else and you get a door
+  you can see and cannot open, which ends a crossing one way.
 - **Withholding the torches did not make a neighbour dark.** The ambient still lifted the kit
   textures far enough to read, so the gallery looked like somewhere already visited. A room built
   at `Room.Level.BLACK` has every surface painted near-black and **unshaded** — shaded, the crypt's

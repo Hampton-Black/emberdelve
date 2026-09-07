@@ -9,7 +9,7 @@
 
 const ROOM_FIELDS := ["width", "height", "floorType", "wallType", "lighting", "props", "exits"]
 const ROOM_DEFAULTS := {"props": [], "exits": []}
-const ROOM_META_FIELDS := ["originX", "originZ", "visited"]
+const ROOM_META_FIELDS := ["originX", "originZ", "visited", "coveredWalls"]
 
 
 static func scene(flat: Dictionary) -> Dictionary:
@@ -18,6 +18,9 @@ static func scene(flat: Dictionary) -> Dictionary:
 	room["originX"] = float(out.get("originX", 0.0))
 	room["originZ"] = float(out.get("originZ", 0.0))
 	room["visited"] = bool(out.get("visited", true))
+	# A lone room is nearest the entrance by definition and so covers nothing. A fixture that
+	# wants to say otherwise sets it flat, like every other room fact.
+	room["coveredWalls"] = out.get("coveredWalls", [])
 	for field in ROOM_FIELDS:
 		if out.has(field):
 			room[field] = out[field]
@@ -29,3 +32,14 @@ static func scene(flat: Dictionary) -> Dictionary:
 		out.erase(field)
 	out["rooms"] = [room]
 	return out
+
+
+## Every segment of a room's south wall, in the wire shape `RoomView.coveredWalls` ships —
+## {x, y, direction}, the same pair `Room._is_covered` matches a placement on. The run two rooms
+## share is what `Rooms.coveredWalls()` names in the crypt/gallery pair, so more than one test
+## needs to write it out.
+static func south_run(width: int) -> Array:
+	var run: Array = []
+	for x in width:
+		run.append({"x": x, "y": 0, "direction": "SOUTH"})
+	return run

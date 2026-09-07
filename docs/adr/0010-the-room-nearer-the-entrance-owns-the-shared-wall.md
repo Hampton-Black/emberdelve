@@ -48,6 +48,17 @@ dropped only when the owner's run contains it *whole*.
   `aParityMismatchStillLandsOnWholeSegments` is the case that holds this.
 - **Ownership is stable across runs and independent of where the party is.** A room's walls are
   the same whether you are standing in it, next to it, or three doors away.
+- **The stone is the server's; the door is the party's.** The answer is shipped as
+  `RoomView.coveredWalls` and `room.gd` omits exactly those segments — the client re-derives none
+  of it, for the same reason it is handed `blocked`, and it could not anyway without being told
+  which room is the entrance. The **doorway is the one exception**, and it has to be: a door is a
+  single object that two rooms address by two ids, and `World._target_under` only ever scans the
+  current room's walls. So the room the party is standing in hangs the door, and every other room
+  draws nothing at its own exits. One object either way, in the same place, looking the same; what
+  moves with the party is only which node holds it. Hang it by owner instead and the way back is a
+  door you can see and cannot open, which makes a crossing one-way.
+- **A room that is not current leaves its openings open.** Falling out of the same exception, and
+  right: the far side of a doorway you are looking through should not be a hung door.
 - **Cost is O(n²) over placed rooms**, comparing four runs each. Irrelevant at two rooms; worth
   revisiting when the generator produces a dungeon rather than a pair.
 - **Rejected: keep whole-run omission.** Cheapest, and leaves the two corner holes — regressing
@@ -62,6 +73,9 @@ dropped only when the owner's run contains it *whole*.
 `AGENTS.md` — the two shared-wall bullets under *Fixed after the M3 gate* state this operationally
 and were amended in the same commit that made the old rule false.
 [ADR-0009](0009-the-world-frame-is-anchored-at-the-entrance.md) supplies both the origins and the
-hop distance. Proven by `RoomsCoveredWallsTest`: a lone room covering nothing, the wider entrance
+hop distance. `SceneRoomsTest` holds the wire — a room is shipped the rule's own answer, not a
+literal beside it — and `test_room.gd` holds the picture: the crypt's corners survive from the
+gallery, and the shared plane carries one set of stone and exactly one door from either side.
+Proven by `RoomsCoveredWallsTest`: a lone room covering nothing, the wider entrance
 keeping its overhang, the overhang not being a whole-run omission, a parity mismatch still landing
 on whole segments, a middle room right on both sides, and equal distance breaking by `roomId`.

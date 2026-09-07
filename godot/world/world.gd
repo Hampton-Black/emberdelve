@@ -163,9 +163,10 @@ func _register_rooms() -> void:
 func _rebuild_rooms() -> void:
 	var here := get_node_or_null("Room") as Room
 	if here != null:
-		# Through the policy like everything else, rather than hardcoding LIT here. One decision
-		# site is the whole point of `level_for`; two is how they drift.
-		here.build(Table.room(), Room.level_for(Table.room(), _room_id))
+		# Told where the party is, not how bright to be. `Room.build` puts that through
+		# `level_for` like every other room — one decision site is the whole point of it, and
+		# two is how they drift.
+		here.build(Table.room(), _room_id)
 
 	var holder := get_node_or_null("Neighbours")
 	if holder == null:
@@ -188,7 +189,7 @@ func _rebuild_rooms() -> void:
 		holder.add_child(node)
 		# Its own exits go in as openings — the doorway you are looking through has to be a hole
 		# from both sides, or the far room is a rectangle of unbroken stone behind an open door.
-		node.build(view, Room.level_for(view, _room_id))
+		node.build(view, _room_id)
 
 
 ## A secret coming out is always a secret in the room the party is standing in.

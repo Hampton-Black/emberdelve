@@ -121,7 +121,13 @@ static func hash32(text: String) -> int:
 	return h
 
 
-## Lay out one room, in a RoomView from the wire, at the level `level_for` decided.
+## Lay out one room, in a RoomView from the wire, for a party standing in `current_room_id`.
+##
+## The room id rather than the level, because two different questions are asked of it and only
+## one of them is about light. `level_for` answers how much of this room may be seen; whether it
+## hangs the doors in its own exits is just whether the party is here. Welding the second to
+## `Level.LIT` would make the agreed DIM-reads-wrong fallback — one line in `level_for` — quietly
+## hang a second door on every shared plane, which is the two-ring-handles regression again.
 ##
 ## The only build path there is, for the room the party is standing in and for every room it
 ## can see. World drives it — this node reads nothing from Table, so the same code draws a room
@@ -137,8 +143,10 @@ static func hash32(text: String) -> int:
 ## the dungeon runs. [b]BLACK[/b] is a room only ever seen through a doorway — geometry, painted
 ## out. Nothing stands on its floor either, but that is `RoomView` withholding an unvisited room's
 ## props and `World._rebuild_props` declining to draw them; no room node has ever drawn a prop.
-func build(view: Dictionary, level: Level) -> void:
+func build(view: Dictionary, current_room_id: String) -> void:
 	_room_id = String(view.get("roomId", ""))
+	var level := level_for(view, current_room_id)
+	var party_is_here := _room_id == current_room_id
 	_clear(_ensure_group("Floor"))
 	_clear(_ensure_group("Walls"))
 	_clear(_ensure_group("Torches"))
@@ -147,7 +155,7 @@ func build(view: Dictionary, level: Level) -> void:
 		return
 	_build_floor(_room_id, size, String(view.get("floorType", "STONE")))
 	_build_walls(_room_id, size, String(view.get("wallType", "STONE")),
-		view.get("exits", []), level != Level.LIT)
+		view.get("exits", []), view.get("coveredWalls", []), party_is_here)
 	if level != Level.BLACK:
 		_build_wall_torches(size, String(view.get("lighting", "TORCHLIT")), level == Level.LIT)
 	if level == Level.BLACK:
@@ -197,18 +205,24 @@ func _build_floor(room_id: String, size: Vector2i, floor_type: String) -> void:
 ## that picks a face is the placement index: reordering this loop reshuffles every wall in the
 ## crypt for no reason.
 ##
-## `omit_shared_wall` is set for every room but the one the party is in, and it drops that whole
-## wall rather than the one segment. Two rooms joined by a door share the wall it is in: the
-## server places them so the doors line up, which puts both perimeters on the same plane.
-## Drawing both is two walls fighting for the same depth — it showed first as the crypt's north
-## door growing a second ring handle, and then as the wall either side of it going to noise.
+## Two rooms joined by a door share the wall it is in: the server places them so the doors line
+## up, which puts both perimeters on one plane. Drawing both is two walls fighting for one depth —
+## it showed first as the crypt's north door growing a second ring handle, and then as the wall
+## either side of it going to noise. So the plane is drawn once, and [b]`covered` says which
+## segments this room gives up[/b]. It is `Rooms.coveredWalls()`, straight off the wire: the
+## owner is whichever room is fewer doors from the entrance and omission is a 1D interval
+## overlap, so a room keeps the part of its perimeter that overhangs the shared run. Nothing here
+## re-derives any of that — the client is told, for the same reason it is told `blocked`
+## (invariant #1), and it could not work it out anyway without knowing which room is the entrance.
 ##
-## This is not the rule any more, it is what is drawn until the rule arrives. `Rooms.coveredWalls()`
-## decides ownership by distance from the entrance and omits by 1D interval overlap, which is what
-## closes the 1-unit holes a whole-run omission leaves at the crypt's north corners. Wiring it
-## needs a field on RoomView; until then the room the party is in owns the plane.
+## [b]The stone is the server's; the door is the party's.[/b] `hangs_doors` is set only for the
+## room the party is standing in, and it is the one thing about this wall that moves with them.
+## A door is one object that two rooms address by two ids, and the pointer only ever reaches the
+## current room's walls (`World._target_under`) — so hanging it anywhere else is a door you can
+## see and cannot open. A room that is not current draws nothing at its own exits and leaves the
+## opening as an opening, which is also what the far side of a doorway should look like.
 func _build_walls(room_id: String, size: Vector2i, wall_type: String,
-		openings: Array = [], omit_shared_wall: bool = false) -> void:
+		openings: Array, covered: Array, hangs_doors: bool) -> void:
 	var width := size.x
 	var height := size.y
 	var half_w := float(width) / 2.0
@@ -236,25 +250,37 @@ func _build_walls(room_id: String, size: Vector2i, wall_type: String,
 
 	for i in placements.size():
 		var placement: Dictionary = placements[i]
-		if omit_shared_wall and _on_a_shared_wall(openings, placement):
-			continue
+		# Asked before `covered`, and it has to be: a room's own exits stand in the run it gives
+		# up — the gallery's whole south wall is covered, its doorway's square among them — so
+		# testing the other way round loses the way home.
 		var opening := _opening_at(openings, placement)
 		if not opening.is_empty():
+			if not hangs_doors:
+				continue
 			var doorway := _add_wall_segment(holder, {"path": WALL_DOORWAY}, placement)
 			# What the pointer addresses. An Exit carries the id of the DOOR prop standing in
 			# its square, so this id resolves through Table.exit_by_id exactly as a prop's does.
 			doorway.set_meta("exit_id", String(opening.get("id", "")))
 			continue
+		if _is_covered(covered, placement):
+			continue
 		var hashed := hash32("%s:wall:%d" % [room_id, i])
 		_add_wall_segment(holder, _pick(variants, hashed, total), placement)
 
 
-## Whether this segment is on a wall some exit passes through — the whole run, not the one
-## square. Direction alone: a room has four walls and an exit names the one it is in.
-static func _on_a_shared_wall(openings: Array, placement: Dictionary) -> bool:
-	for exit_dict in openings:
-		if typeof(exit_dict) == TYPE_DICTIONARY \
-				and String(exit_dict.get("direction", "")) == String(placement["dir"]):
+## Whether a room nearer the entrance already draws this exact segment.
+##
+## The one square, named by the same {x, y, direction} pair the renderer keys a placement on —
+## not the run it is in. A whole-run omission is what lost the two crypt segments that overhang
+## the gallery, and a hole in a wall is a way out.
+static func _is_covered(covered: Array, placement: Dictionary) -> bool:
+	var square: Vector2i = placement["square"]
+	for segment in covered:
+		if typeof(segment) != TYPE_DICTIONARY:
+			continue
+		if String(segment.get("direction", "")) != String(placement["dir"]):
+			continue
+		if Vector2i(int(segment.get("x", -1)), int(segment.get("y", -1))) == square:
 			return true
 	return false
 

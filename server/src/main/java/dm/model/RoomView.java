@@ -32,6 +32,20 @@ public record RoomView(
         /** Visible props, including secrets already revealed in this room. Empty when unvisited. */
         List<Prop> props,
         List<Exit> exits,
+        /**
+         * Perimeter segments this room must not draw, because a room nearer the entrance already
+         * draws that plane.
+         *
+         * <p>Shipped rather than derived, for the same reason {@code SceneState.blocked} is: the
+         * client owns no architectural rule either (invariant #1). It could not derive this one
+         * anyway — ownership is BFS distance from the entrance, and the client is never told
+         * which room that is, only where each room stands.
+         *
+         * <p>{@link dm.engine.Rooms#coveredWalls()} is where the rule lives and where it is
+         * tested. This carries its answer for one room, in a fixed order so two runs of the same
+         * session put the same bytes on the wire.
+         */
+        List<WallSegment> coveredWalls,
         double originX,
         double originZ,
         /** Whether the party has ever stood here. False means geometry only. */

@@ -2,13 +2,16 @@ package dm.engine;
 
 import dm.content.ContentLoader;
 import dm.model.EntityView;
+import dm.model.Direction;
 import dm.model.RoomView;
+import dm.model.WallSegment;
 import dm.state.EventLog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import static dm.engine.SyntheticRooms.room;
 import static org.junit.jupiter.api.Assertions.*;
@@ -60,6 +63,39 @@ class SceneRoomsTest {
         assertFalse(view.visited());
         assertTrue(view.props().isEmpty(),
                 "the gallery is authored with props, but an unvisited room ships geometry only");
+    }
+
+    @Test
+    @DisplayName("a neighbour is told which of its segments the nearer room already draws")
+    void aNeighbourCarriesTheSegmentsItMustNotDraw() {
+        // The client cannot work this out: ownership is BFS distance from the entrance, and the
+        // client has never been told which room that is. Standing in the crypt, the crypt is the
+        // entrance and owns the shared plane; the gallery's answering south run is covered.
+        var engine = started(Rooms.authored(CONTENT, "crypt", "gallery"));
+
+        assertEquals(List.of(), roomView(engine, "crypt").coveredWalls(),
+                "the entrance draws its whole perimeter, overhanging corners included");
+        assertEquals(
+                IntStream.range(0, 10)
+                        .mapToObj(x -> new WallSegment(x, 0, Direction.SOUTH))
+                        .toList(),
+                roomView(engine, "gallery").coveredWalls(),
+                "the gallery leaves the whole shared run to the crypt");
+    }
+
+    @Test
+    @DisplayName("what a room must not draw is what Rooms.coveredWalls() says, not what it is next to")
+    void theShippedSegmentsAreTheRuleItself() {
+        // The wire carries the decision, not the inputs to it — invariant #1 applied to walls.
+        // Asserting against coveredWalls() rather than a literal is what keeps the two from
+        // drifting apart the day the rule changes.
+        var rooms = Rooms.authored(CONTENT, "crypt", "gallery");
+        var engine = started(rooms);
+
+        for (var view : engine.scene().rooms()) {
+            assertEquals(rooms.coveredWalls().get(view.roomId()), Set.copyOf(view.coveredWalls()),
+                    view.roomId() + " must be shipped exactly the rule's own answer");
+        }
     }
 
     @Test

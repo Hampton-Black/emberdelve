@@ -369,42 +369,29 @@ func test_a_neighbour_is_dark_stone_not_a_second_lit_room() -> void:
 				"the room the party is standing in keeps its own surfaces")
 
 
-func test_a_neighbour_leaves_the_whole_shared_wall_to_the_room_you_are_in() -> void:
-	var world := _world_with_scene({
-		"roomId": "crypt", "mode": "EXPLORATION", "entities": [], "combat": null,
-		"rooms": [
-			{"roomId": "crypt", "width": 12, "height": 12,
-				"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
-				"props": [], "originX": 0.0, "originZ": 0.0, "visited": true,
-				"exits": [{"id": "door-north", "x": 6, "y": 11,
-					"direction": "NORTH", "toRoomId": "gallery"}]},
-			{"roomId": "gallery", "width": 10, "height": 16,
-				"floorType": "TILED", "wallType": "CARVED", "lighting": "TORCHLIT",
-				"props": [], "originX": 0.0, "originZ": -14.0, "visited": false,
-				"exits": [{"id": "door-south", "x": 5, "y": 0,
-					"direction": "SOUTH", "toRoomId": "crypt"}]},
-		],
-	})
+func test_a_neighbour_gives_up_the_segments_the_server_named_and_no_others() -> void:
+	# The gallery's south wall is coplanar with the crypt's north one — the server lines the
+	# doors up, which puts both perimeters on one plane. Two walls fighting for one depth showed
+	# up in play as texture noise across the seam, and as a door with two ring handles. Here the
+	# crypt is the entrance and owns the plane, so `coveredWalls` names the gallery's whole south
+	# run; every other segment of its perimeter is its own to draw.
+	var world := _world_with_scene(_two_rooms("crypt"))
 	await wait_frames(2)
 	var neighbour := world.get_node_or_null("Neighbours/gallery") as Node3D
 	assert_not_null(neighbour, "Neighbours/gallery")
 	if neighbour == null:
 		return
 
-	# The gallery's south wall is coplanar with the crypt's north one — the server lines the
-	# doors up, which puts both perimeters on one plane. Two walls fighting for one depth
-	# showed up in play as texture noise across the seam, and as a door with two ring handles.
 	var mix := _wall_mix(neighbour)
 	assert_eq(int(mix.get("wall_doorway", 0)), 0,
 		"the room you are standing in hangs the door; the room beyond leaves it alone")
 	assert_eq(int(mix["total"]), 2 * (10 + 16) - 10,
-		"the gallery's whole south run is missing, not just the door's square")
+		"ten segments given up — the run the crypt covers, its own doorway among them")
 
 	# And nothing of the neighbour stands on the shared plane at all. The gallery is north of
 	# the crypt, so its remaining walls are all further out than z = -6.
-	for child in (neighbour.get_node("Walls") as Node3D).get_children():
-		assert_gt(absf((child as Node3D).position.z - (-6.0)), 0.001,
-			"a segment on the crypt's north wall plane would fight it for depth")
+	assert_eq(_segments_on_plane(neighbour, Vector3.AXIS_Z, -6.0), [] as Array,
+		"a segment on the crypt's north wall plane would fight it for depth")
 
 
 func _worked(mix: Dictionary) -> int:
@@ -532,6 +519,10 @@ func test_the_render_level_is_lit_here_dim_where_you_have_been_black_where_you_h
 
 ## The crypt and the gallery, with the party in whichever one is named. Both visited unless
 ## `unseen` says otherwise — the shape GameEngine.scene() ships once you have crossed once.
+##
+## `coveredWalls` is what `Rooms.coveredWalls()` answers for this pair: the crypt is the entrance
+## and owns the plane the two share, so the gallery's whole south run is left to it. Both sides of
+## the wire, so the fixture cannot quietly disagree with the server about who draws what.
 func _two_rooms(current: String, unseen: Array = []) -> Dictionary:
 	return {
 		"roomId": current, "mode": "EXPLORATION", "entities": [], "combat": null,
@@ -539,17 +530,131 @@ func _two_rooms(current: String, unseen: Array = []) -> Dictionary:
 			{"roomId": "crypt", "width": 12, "height": 12,
 				"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
 				"props": [], "originX": 0.0, "originZ": 0.0,
-				"visited": not ("crypt" in unseen),
+				"visited": not ("crypt" in unseen), "coveredWalls": [],
 				"exits": [{"id": "door-north", "x": 6, "y": 11,
 					"direction": "NORTH", "toRoomId": "gallery"}]},
 			{"roomId": "gallery", "width": 10, "height": 16,
 				"floorType": "TILED", "wallType": "CARVED", "lighting": "TORCHLIT",
 				"props": [], "originX": 0.0, "originZ": -14.0,
-				"visited": not ("gallery" in unseen),
+				"visited": not ("gallery" in unseen), "coveredWalls": SceneFixtures.south_run(10),
 				"exits": [{"id": "door-south", "x": 5, "y": 0,
 					"direction": "SOUTH", "toRoomId": "crypt"}]},
 		],
 	}
+
+
+## Every wall segment of a room standing on one plane, given by its position along the other
+## axis. A north or south wall is a constant z and a run along x; an east or west wall is the
+## other way round — same comparison, so one helper takes which axis holds the plane.
+func _segments_on_plane(room: Node, axis: Vector3.Axis, plane: float) -> Array:
+	var found: Array = []
+	var holder: Node = room.get_node_or_null("Walls")
+	if holder == null:
+		return found
+	for child in holder.get_children():
+		var at := (child as Node3D).position
+		if absf(at[axis] - plane) < 0.001:
+			found.append(at.x if axis == Vector3.AXIS_Z else at.z)
+	found.sort()
+	return found
+
+
+## A west-to-east chain of three 4x4 rooms, the party in the entrance. `Rooms.origins()` puts
+## them at x = 0, 4 and 8; `Rooms.coveredWalls()` gives each of the two rooms beyond the entrance
+## its whole west run, because the room nearer the entrance owns every plane.
+func _three_rooms() -> Dictionary:
+	var chain: Array = []
+	var ids := ["a-entrance", "b-middle", "c-far"]
+	for i in 3:
+		var exits: Array = []
+		if i > 0:
+			exits.append({"id": "%s-back" % ids[i], "x": 0, "y": 1 + i,
+				"direction": "WEST", "toRoomId": ids[i - 1]})
+		if i < 2:
+			exits.append({"id": "%s-on" % ids[i], "x": 3, "y": 1 + i,
+				"direction": "EAST", "toRoomId": ids[i + 1]})
+		var covered: Array = []
+		if i > 0:
+			for y in 4:
+				covered.append({"x": 0, "y": y, "direction": "WEST"})
+		chain.append({"roomId": ids[i], "width": 4, "height": 4,
+			"floorType": "STONE", "wallType": "STONE", "lighting": "DARK",
+			"props": [], "originX": float(i * 4), "originZ": 0.0, "visited": true,
+			"coveredWalls": covered, "exits": exits})
+	return {"roomId": "a-entrance", "mode": "EXPLORATION", "entities": [], "combat": null,
+		"rooms": chain}
+
+
+func test_the_wall_between_two_rooms_the_party_is_in_neither_of_is_still_there() -> void:
+	# Found reviewing emberdelve-xgg.4 and latent while M3 ships two rooms. Omitting by direction
+	# dropped a whole run for every room but the current one, so in a chain the middle and far
+	# rooms each left their mutual wall to the other and it went missing entirely. Ownership by
+	# distance from the entrance has exactly one room answering for each plane.
+	var world := _world_with_scene(_three_rooms())
+	await wait_frames(2)
+	var middle := world.get_node_or_null("Neighbours/b-middle") as Node3D
+	var far := world.get_node_or_null("Neighbours/c-far") as Node3D
+	assert_not_null(middle, "Neighbours/b-middle")
+	assert_not_null(far, "Neighbours/c-far")
+	if middle == null or far == null:
+		return
+
+	# The plane the two share stands at x = 6, between rooms centred on 4 and 8.
+	var seam: Array = _segments_on_plane(middle, Vector3.AXIS_X, 6.0) \
+		+ _segments_on_plane(far, Vector3.AXIS_X, 6.0)
+	seam.sort()
+	assert_eq(seam, [-1.5, 0.5, 1.5] as Array,
+		"the middle room draws its east wall; only its own doorway's square is an opening")
+
+
+func test_a_neighbour_keeps_the_perimeter_that_overhangs_the_shared_run() -> void:
+	# emberdelve-5sc, seen from the gallery. The crypt is twelve wide and the gallery ten, so a
+	# whole-run omission takes the two crypt segments that stick out past the gallery with it —
+	# and a hole in a wall is a way out. The crypt is the entrance, owns the plane, and is told
+	# it covers nothing, so it draws the run whether or not anyone is standing in it.
+	var world := _world_with_scene(_two_rooms("gallery"))
+	await wait_frames(2)
+	var crypt := world.get_node_or_null("Neighbours/crypt") as Node3D
+	assert_not_null(crypt, "Neighbours/crypt")
+	if crypt == null:
+		return
+
+	var on_the_seam := _segments_on_plane(crypt, Vector3.AXIS_Z, -6.0)
+	assert_true(-5.5 in on_the_seam, "no hole at the crypt's north-west corner")
+	assert_true(5.5 in on_the_seam, "no hole at the crypt's north-east corner")
+	assert_eq(on_the_seam.size(), 11,
+		"the whole north run but the door's own square, which the gallery hangs")
+	assert_eq(int(_wall_mix(crypt)["total"]), 2 * (12 + 12) - 1,
+		"nothing else of the crypt's perimeter is given up")
+
+
+func test_the_shared_plane_carries_one_set_of_stone_and_one_door() -> void:
+	# Two walls fighting for one depth showed in play as a door with two ring handles and then
+	# as noise across the seam. From either side the plane is drawn exactly once: the crypt owns
+	# the stone from either side, and the room the party is in hangs the door.
+	for current in ["crypt", "gallery"]:
+		var world := _world_with_scene(_two_rooms(current))
+		await wait_frames(2)
+		var here := world.get_node("Room") as Node3D
+		var there := world.get_node_or_null(
+			"Neighbours/%s" % ("gallery" if current == "crypt" else "crypt")) as Node3D
+		assert_not_null(there, "the other room is on the board")
+		if there == null:
+			return
+
+		var seam: Array = _segments_on_plane(here, Vector3.AXIS_Z, -6.0) \
+			+ _segments_on_plane(there, Vector3.AXIS_Z, -6.0)
+		var seen := {}
+		for x in seam:
+			assert_false(seen.has(x),
+				"two segments at x=%s on the shared plane, standing in the %s" % [x, current])
+			seen[x] = true
+		assert_eq(seam.size(), 12, "the crypt's whole north run, once, standing in the " + current)
+		assert_eq(int(_wall_mix(here).get("wall_doorway", 0))
+			+ int(_wall_mix(there).get("wall_doorway", 0)), 1,
+			"one door hangs in the opening, standing in the " + current)
+		assert_eq(int(_wall_mix(here).get("wall_doorway", 0)), 1,
+			"and it is hung by the room the party is in, which is the room that can open it")
 
 
 func test_a_room_you_have_left_keeps_its_surfaces_and_gives_up_its_lights() -> void:

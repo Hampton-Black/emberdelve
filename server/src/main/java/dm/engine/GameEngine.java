@@ -16,6 +16,7 @@ import dm.model.Difficulty;
 import dm.model.RoomView;
 import dm.model.SceneState;
 import dm.model.Square;
+import dm.model.WallSegment;
 import dm.state.EventLog;
 import dm.state.WorldState;
 
@@ -236,7 +237,23 @@ public final class GameEngine {
 
         return new RoomView(roomId, structure.width(), structure.height(), structure.floorType(),
                 structure.wallType(), structure.lighting(), props, structure.exits(),
-                origin.x(), origin.z(), visited);
+                coveredWallsOf(roomId), origin.x(), origin.z(), visited);
+    }
+
+    /**
+     * The segments this room leaves to a room nearer the entrance, in a fixed order.
+     *
+     * <p>{@link Rooms#coveredWalls()} answers in a {@code Set} because the rule is about
+     * membership. The wire wants a sequence, and an unordered one would put different bytes on
+     * it for the same session — so it is sorted here, at the one place a set becomes a list,
+     * rather than left to whoever reads it.
+     */
+    private List<WallSegment> coveredWallsOf(String roomId) {
+        return rooms.coveredWalls().getOrDefault(roomId, Set.<WallSegment>of()).stream()
+                .sorted(java.util.Comparator.comparing(WallSegment::direction)
+                        .thenComparingInt(WallSegment::x)
+                        .thenComparingInt(WallSegment::y))
+                .toList();
     }
 
     /** A room's props as the client may see them: hidden ones withheld unless revealed there. */
