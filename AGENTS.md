@@ -579,13 +579,13 @@ out to be.
   is wrong, and overlapping stone reads as noise where a half-square gap reads as a way through.
 - **These two are decided server-side and not yet drawn.** `Rooms.coveredWalls()` holds the rule
   and the tests; `room.gd` still omits by direction, and the crypt's two corner holes are still on
-  screen from the gallery. The answer reaches the client with the wire reshape and the DIM render
-  level (`bd show emberdelve-xgg.2`, `emberdelve-xgg.4`). Until then this section describes the
-  server's rule, not the picture.
+  screen from the gallery. Nothing ships the answer — `RoomView` carries no covered-segment field.
+  `bd show emberdelve-xgg.7` is the wiring. Until then this section describes the server's rule,
+  not the picture.
 - **Withholding the torches did not make a neighbour dark.** The ambient still lifted the kit
-  textures far enough to read, so the gallery looked like somewhere already visited.
-  `Room.build_unlit` paints every surface near-black and **unshaded** — shaded, the crypt's own
-  torches would light the far room by degrees as the party walked up to the door.
+  textures far enough to read, so the gallery looked like somewhere already visited. A room built
+  at `Room.Level.BLACK` has every surface painted near-black and **unshaded** — shaded, the crypt's
+  own torches would light the far room by degrees as the party walked up to the door.
 
 **`TurnMetrics` mislabels its counter** — see the latency section. One line; left alone so the
 numbers in `m0-evaluation.md` match the logs as they were written.

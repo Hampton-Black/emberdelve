@@ -3,9 +3,13 @@ extends Node3D
 
 ## The 3D world, created once (invariant #4). Game facts live in Table (invariant #3).
 ##
-## Grid conversion is the contract later tasks hang props and tokens off. The room is centred
-## on the origin; +y on the grid is north, which is -Z in the world — the same mapping as
-## `toWorld` in the old Three.js client (`assets.ts`).
+## Grid conversion is the contract props and tokens hang off. A room is centred on its own origin
+## in the world frame the server anchors at the entrance; +y on the grid is north, which is -Z in
+## the world — the same mapping as `toWorld` in the old Three.js client (`assets.ts`).
+##
+## Every room the party has stood in stays drawn. Crossing a threshold moves the camera, not the
+## dungeon: the origin table is never cleared and no room is ever re-centred, so the room behind
+## you is still where you left it. How much of each one is drawn is `Room.level_for`.
 
 const CameraRigScript := preload("res://world/camera_rig.gd")
 const PROP_TABLE := preload("res://world/prop_table.tres")
@@ -13,10 +17,9 @@ const TOKEN_SCENE := preload("res://world/tokens/token.tscn")
 
 var rig: CameraRigScript
 var _room_id := ""
-## Where each room sits in world space, and how big it is. The room the party is in is always
-## at the origin; a neighbour is offset so its answering door lines up with the one you came
-## through. Invariant #4 is untouched — this is one scene with two rectangles in it, not two
-## scenes.
+## Where each room sits in world space, and how big it is — absolute positions in the server's
+## world frame, not offsets from wherever the party happens to be. Invariant #4 is untouched:
+## this is one scene with several rectangles in it, not several scenes.
 var _origins: Dictionary = {}
 var _sizes: Dictionary = {}
 
@@ -80,16 +83,14 @@ func world_to_grid(point: Vector3) -> Vector2i:
 
 func _on_scene_changed() -> void:
 	var room_id := String(Table.scene.get("roomId", ""))
-	# A new room (hello, reconnect, restart into a different id) snaps. The same room
+	_register_rooms()
+	# A new room (a crossing, hello, reconnect, restart into a different id) snaps. The same room
 	# emitting scene_changed is a token moving or a lid opening — follow, do not settle,
 	# or the combat ceremony's pull-back never plays. Props rebuild on roomId only;
 	# a reveal is Table.prop_revealed, not a second pass over the list.
 	if room_id != _room_id:
 		_room_id = room_id
-		_origins.clear()
-		_sizes.clear()
-		register_room(room_id, Vector2i(_room_width(), _room_height()), Vector3.ZERO)
-		_rebuild_neighbours()
+		_rebuild_rooms()
 		_rebuild_props()
 		_rebuild_tokens()
 		_follow_party()
@@ -100,52 +101,77 @@ func _on_scene_changed() -> void:
 	_follow_party()
 
 
-## The rooms you can see through the doorways, as floor and walls only.
+## Where every room the server has named stands, and how big it is.
 ##
-## No torches, no props, no tokens, and nothing about them in the DM's prompt — spec §8b. The
-## payoff is that walking through a door lights and dresses a room that was already standing
-## there, instead of cutting to black and rebuilding the same rectangle.
-func _rebuild_neighbours() -> void:
+## Absolute, and never cleared. A room keeps the place it was first given for the life of the
+## session, so walking out of the crypt leaves the crypt where it was rather than sliding the
+## dungeon under the party.
+func _register_rooms() -> void:
+	for view in Table.scene.get("rooms", []):
+		var room_id := String(view.get("roomId", ""))
+		if room_id.is_empty():
+			continue
+		register_room(room_id,
+			Vector2i(int(view.get("width", 0)), int(view.get("height", 0))),
+			Vector3(float(view.get("originX", 0.0)), 0.0, float(view.get("originZ", 0.0))))
+
+
+## Every room the server has told us about, each drawn at the level `Room.level_for` decides.
+##
+## The room the party is in is the scene's own `Room` node, because that is the one thing on the
+## board that can be acted on — picking scans `Room/Walls`, and a click has to mean the room they
+## are standing in. Everything else goes under `Neighbours`: rooms already walked through, drawn
+## DIM, and rooms only ever glimpsed through a doorway, drawn BLACK. One build path for all of
+## them (`Room.build`), so the wall rule cannot come out differently on either side of a door.
+func _rebuild_rooms() -> void:
+	var here := get_node_or_null("Room") as Room
+	if here != null:
+		# Through the policy like everything else, rather than hardcoding LIT here. One decision
+		# site is the whole point of `level_for`; two is how they drift.
+		here.build(Table.room(), Room.level_for(Table.room(), _room_id))
+
 	var holder := get_node_or_null("Neighbours")
 	if holder == null:
 		holder = Node3D.new()
 		holder.name = "Neighbours"
 		add_child(holder)
+	# Out of the tree before it is freed, and freed now rather than at the end of the frame: the
+	# room being rebuilt is very often one that was already drawn, and a node still holding the
+	# name gets the newcomer renamed to `crypt2` — which is a room drawn twice, silently.
 	for child in holder.get_children():
-		child.queue_free()
-
-	# Every known room ships in one list now (RoomView), current room included, each carrying
-	# its own absolute origin in the world frame anchored at the entrance. The current room is
-	# always registered at Vector3.ZERO (_on_scene_changed), so a neighbour's offset is just its
-	# origin minus that one.
-	var current_origin := Vector3(
-		float(Table.room().get("originX", 0.0)), 0.0, float(Table.room().get("originZ", 0.0)))
+		holder.remove_child(child)
+		child.free()
 
 	for view in Table.scene.get("rooms", []):
 		var room_id := String(view.get("roomId", ""))
 		if room_id.is_empty() or room_id == _room_id:
 			continue
-		var size := Vector2i(int(view.get("width", 0)), int(view.get("height", 0)))
-		var origin := Vector3(
-			float(view.get("originX", 0.0)), 0.0, float(view.get("originZ", 0.0))) - current_origin
-		register_room(room_id, size, origin)
-
 		var node := Room.new()
 		node.name = room_id
 		holder.add_child(node)
-		# This room's own exits — the one thing said about the inside of a neighbour. Without
-		# it the far room is drawn with an unbroken perimeter and the doorway you are looking
-		# through is backed by stone.
-		node.build_unlit(room_id, size,
-			String(view.get("floorType", "STONE")),
-			String(view.get("wallType", "STONE")),
-			view.get("exits", []))
+		# Its own exits go in as openings — the doorway you are looking through has to be a hole
+		# from both sides, or the far room is a rectangle of unbroken stone behind an open door.
+		node.build(view, Room.level_for(view, _room_id))
 
 
+## A secret coming out is always a secret in the room the party is standing in.
+##
+## Diff.PropRevealed carries no roomId and does not need one: `reveal_prop` is only ever offered
+## the current room's hidden props, so the diff channel is current-room-scoped by convention.
 func _on_prop_revealed(prop: Dictionary) -> void:
-	_instance_prop(prop)
+	_instance_prop(prop, _room_id)
 
 
+## Everything standing on every floor the player can see, room by room.
+##
+## A room you have left keeps its furniture, and the secrets you found in it stay found — the
+## server ships a visited room's visible props, so "as you left it" is not something the client
+## has to remember.
+##
+## A room drawn BLACK is furnished by nobody. The server already withholds an unvisited room's
+## props (`RoomView`), so this is the same policy asked twice — worth asking, because the failure
+## it guards is a secret drawn on the floor of a room the player has never walked into, and the
+## props holder is nowhere `_darken` can reach.
 func _rebuild_props() -> void:
 	var holder := get_node_or_null("Props") as Node3D
 	if holder == null:
@@ -155,14 +181,22 @@ func _rebuild_props() -> void:
 		child.free()
 	if Table.scene.is_empty():
 		return
-	for prop in Table.room().get("props", []):
-		if bool(prop.get("hidden", false)):
+	for view in Table.scene.get("rooms", []):
+		if Room.level_for(view, _room_id) == Room.Level.BLACK:
 			continue
-		_instance_prop(prop)
+		var room_id := String(view.get("roomId", ""))
+		for prop in view.get("props", []):
+			_instance_prop(prop, room_id)
 
 
-func _instance_prop(prop: Dictionary) -> void:
-	var holder := get_node_or_null("Props") as Node3D
+## Props hang under `Props/<room id>`, not `Props/<prop id>`.
+##
+## A prop id is only unique within its room — PropRef is room-qualified for exactly that reason,
+## and PropPlacer calls every room's first pillar `pillar-0`. Keyed on the bare id, the second
+## room's pillar finds the name taken and returns here quietly, which is a prop that never
+## appears: this project's characteristic silent failure.
+func _instance_prop(prop: Dictionary, room_id: String) -> void:
+	var holder := _props_of(room_id)
 	if holder == null:
 		return
 	var id := String(prop.get("id", ""))
@@ -177,11 +211,23 @@ func _instance_prop(prop: Dictionary) -> void:
 	if node == null:
 		return
 	node.name = id
-	node.position = grid_to_world(_room_id, int(prop.get("x", 0)), int(prop.get("y", 0)))
+	node.position = grid_to_world(room_id, int(prop.get("x", 0)), int(prop.get("y", 0)))
 	node.rotation.y = deg_to_rad(float(prop.get("rotation", 0.0)))
 	holder.add_child(node)
 	if node.has_method("configure"):
-		node.configure(prop, _room_id)
+		node.configure(prop, room_id)
+
+
+func _props_of(room_id: String) -> Node3D:
+	var holder := get_node_or_null("Props") as Node3D
+	if holder == null or room_id.is_empty():
+		return null
+	var room := holder.get_node_or_null(NodePath(room_id)) as Node3D
+	if room == null:
+		room = Node3D.new()
+		room.name = room_id
+		holder.add_child(room)
+	return room
 
 
 func _on_mode_changed(mode: String) -> void:

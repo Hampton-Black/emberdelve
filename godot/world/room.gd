@@ -1,8 +1,11 @@
 class_name Room
 extends Node3D
 
-## Floor, walls, and the wall-torch lights. Rebuilt only when `roomId` changes (invariant #4).
-## Tile and segment picks are FNV-1a of the room id, matching `assets.ts` / `Renderer.ts`.
+## Floor, walls, and the wall-torch lights, for one room — the room the party is standing in or
+## any other room on the board. World owns the whole set and rebuilds it only when `roomId`
+## changes (invariant #4); this node reads nothing from Table, so both go through one build path.
+## Tile and segment picks are FNV-1a of the room id, matching `assets.ts` / `Renderer.ts`, which
+## is what makes a room you walk back into the same room you walked out of.
 
 ## Measured 2026-08-22 on the imported KayKit wall.gltf (kit units, before `1 / module`):
 ## AABB size (4.000, 4.000, 1.000). One square is the wall's width. Do not replace this
@@ -83,18 +86,30 @@ const FLOOR_VARIANTS := {
 	],
 }
 
+## How much of a room is drawn.
+##
+## Not the LightingPreset, which is a fact about the room itself — how many torches are on its
+## walls. This is how much of it the player is allowed to see from where they are standing, and
+## it is the only thing that decides how a room is built.
+enum Level {
+	BLACK,  ## never entered: geometry, painted near-black and unshaded
+	DIM,  ## visited and left behind: real surfaces and torch models, but no lights
+	LIT,  ## the room the party is standing in: torches burning
+}
+
 var _room_id := ""
 var _packed: Dictionary = {}
 
 
-func _ready() -> void:
-	# Neighbour rooms sit under World/Neighbours, not World. They must not rebuild from
-	# Table.scene — that is the current room, and would light a space the DM has not been told
-	# about (spec §8b).
-	if not (get_parent() is World):
-		return
-	Table.scene_changed.connect(_on_scene_changed)
-	_on_scene_changed()
+## How much of this room the player is allowed to see, from where they are standing.
+##
+## The one policy. Everything about drawing a room keys off the answer, so making visited rooms
+## as bright as the one you are in is the single `Level.DIM` below — that is the agreed fallback
+## if DIM reads wrong in play, and it is meant to stay one line.
+static func level_for(view: Dictionary, current_room_id: String) -> Level:
+	if String(view.get("roomId", "")) == current_room_id:
+		return Level.LIT
+	return Level.DIM if bool(view.get("visited", false)) else Level.BLACK
 
 
 ## Unsigned FNV-1a. Same numbers as `hash32` in `client/src/scene/assets.ts`.
@@ -106,36 +121,37 @@ static func hash32(text: String) -> int:
 	return h
 
 
-func rebuild() -> void:
+## Lay out one room, in a RoomView from the wire, at the level `level_for` decided.
+##
+## The only build path there is, for the room the party is standing in and for every room it
+## can see. World drives it — this node reads nothing from Table, so the same code draws a room
+## whether or not it is the current one. Two paths would mean the shared-wall rule implemented
+## twice, and that rule is decided by distance from the entrance rather than by where the party
+## happens to be standing.
+##
+## What each level costs, and why:
+##
+## [b]LIT[/b] is the room the party is in — torches with fires in them. [b]DIM[/b] is a room they
+## have stood in and left: its own surfaces and the brackets still on the walls, but no
+## OmniLight3D and no flame, which is what keeps MAX_TORCH_LIGHTS a per-room budget however far
+## the dungeon runs. [b]BLACK[/b] is a room only ever seen through a doorway — geometry, painted
+## out. Nothing stands on its floor either, but that is `RoomView` withholding an unvisited room's
+## props and `World._rebuild_props` declining to draw them; no room node has ever drawn a prop.
+func build(view: Dictionary, level: Level) -> void:
+	_room_id = String(view.get("roomId", ""))
 	_clear(_ensure_group("Floor"))
 	_clear(_ensure_group("Walls"))
 	_clear(_ensure_group("Torches"))
-	if Table.scene.is_empty():
+	var size := Vector2i(int(view.get("width", 0)), int(view.get("height", 0)))
+	if size.x <= 0 or size.y <= 0:
 		return
-	var here := Table.room()
-	var size := Vector2i(_width(), _height())
-	_build_floor(_room_id, size, String(here.get("floorType", "STONE")))
-	_build_walls(_room_id, size, String(here.get("wallType", "STONE")),
-		here.get("exits", []))
-	_build_wall_torches()
-
-
-## Floor and walls, and no lights at all.
-##
-## The lit build takes its torch spacing from a LightingPreset. A neighbour has no preset, on
-## purpose: it is a room the DM has not been told about, and a lit one would be a room on screen
-## the narrator can contradict. It also keeps MAX_TORCH_LIGHTS a per-room budget rather than a
-## number two rooms quietly share.
-func build_unlit(room_id: String, size: Vector2i, floor_type: String, wall_type: String,
-		openings: Array = []) -> void:
-	if Table.scene_changed.is_connected(_on_scene_changed):
-		Table.scene_changed.disconnect(_on_scene_changed)
-	_room_id = room_id
-	_clear(_ensure_group("Floor"))
-	_clear(_ensure_group("Walls"))
-	_build_floor(room_id, size, floor_type)
-	_build_walls(room_id, size, wall_type, openings, true)
-	_darken(self)
+	_build_floor(_room_id, size, String(view.get("floorType", "STONE")))
+	_build_walls(_room_id, size, String(view.get("wallType", "STONE")),
+		view.get("exits", []), level != Level.LIT)
+	if level != Level.BLACK:
+		_build_wall_torches(size, String(view.get("lighting", "TORCHLIT")), level == Level.LIT)
+	if level == Level.BLACK:
+		_darken(self)
 
 
 ## Paint every surface in an unvisited room near-black and unshaded.
@@ -152,16 +168,6 @@ func _darken(root: Node) -> void:
 	for mesh in _meshes(root):
 		mesh.material_override = dark
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-
-
-func _on_scene_changed() -> void:
-	if Table.scene.is_empty():
-		return
-	var room_id := String(Table.scene.get("roomId", ""))
-	if room_id == _room_id:
-		return
-	_room_id = room_id
-	rebuild()
 
 
 func _build_floor(room_id: String, size: Vector2i, floor_type: String) -> void:
@@ -191,25 +197,25 @@ func _build_floor(room_id: String, size: Vector2i, floor_type: String) -> void:
 ## that picks a face is the placement index: reordering this loop reshuffles every wall in the
 ## crypt for no reason.
 ##
-## `omit_shared_wall` is set for a neighbour, and it drops that whole wall rather than the one
-## segment. Two rooms joined by a door share the wall it is in: the server places them so the
-## doors line up, which puts both perimeters on the same plane. Drawing both is two walls
-## fighting for the same depth — it showed first as the crypt's north door growing a second
-## ring handle, and then as the wall either side of it going to noise. The room the party is
-## standing in owns that plane; the room beyond leaves the whole run alone rather than trying
-## to interleave with it, which cannot half-work the way matching segment against segment can.
+## `omit_shared_wall` is set for every room but the one the party is in, and it drops that whole
+## wall rather than the one segment. Two rooms joined by a door share the wall it is in: the
+## server places them so the doors line up, which puts both perimeters on the same plane.
+## Drawing both is two walls fighting for the same depth — it showed first as the crypt's north
+## door growing a second ring handle, and then as the wall either side of it going to noise.
+##
+## This is not the rule any more, it is what is drawn until the rule arrives. `Rooms.coveredWalls()`
+## decides ownership by distance from the entrance and omits by 1D interval overlap, which is what
+## closes the 1-unit holes a whole-run omission leaves at the crypt's north corners. Wiring it
+## needs a field on RoomView; until then the room the party is in owns the plane.
 func _build_walls(room_id: String, size: Vector2i, wall_type: String,
 		openings: Array = [], omit_shared_wall: bool = false) -> void:
 	var width := size.x
 	var height := size.y
 	var half_w := float(width) / 2.0
 	var half_h := float(height) / 2.0
-	# The live room sits at the origin. A neighbour's parent is not World, so its local
-	# wall placements would otherwise land on the crypt — shift them by the registered origin.
-	var origin := Vector3.ZERO
-	var world := _host_world()
-	if world != null and not (get_parent() is World):
-		origin = world.room_origin(room_id)
+	# Every room stands where the world frame puts it, the current one included — it is only at
+	# Vector3.ZERO when it happens to be the entrance.
+	var origin := _origin()
 	var placements: Array[Dictionary] = []
 	for gx in width:
 		var x := float(gx) - half_w + 0.5
@@ -274,33 +280,39 @@ func _add_wall_segment(holder: Node3D, variant: Dictionary, placement: Dictionar
 	return piece
 
 
-func _build_wall_torches() -> void:
-	var lighting := String(Table.room().get("lighting", "TORCHLIT"))
+## Brackets on the walls, and fires in them only if this is the room the party is in.
+##
+## `lighting` is the room's own LightingPreset and decides how many brackets there are; `burning`
+## is the render level and decides whether any of them is a light. A room you have left keeps its
+## torches and loses its fires, so MAX_TORCH_LIGHTS stays a budget one room spends, not a number
+## every room on screen shares.
+func _build_wall_torches(size: Vector2i, lighting: String, burning: bool) -> void:
 	var spacing: int = int(TORCH_SPACING.get(lighting, 0))
 	if spacing <= 0:
 		return
-	var width := _width()
-	var height := _height()
+	var width := size.x
+	var height := size.y
 	var half_w := float(width) / 2.0
 	var half_h := float(height) / 2.0
+	var origin := _origin()
 	var mounts: Array[Dictionary] = []
 	for gx in width:
 		if gx % spacing != 0:
 			continue
-		var x := float(gx) - half_w + 0.5
-		mounts.append({"x": x, "z": -half_h + TORCH_INSET, "ry": 0.0})
-		mounts.append({"x": x, "z": half_h - TORCH_INSET, "ry": PI})
+		var x := float(gx) - half_w + 0.5 + origin.x
+		mounts.append({"x": x, "z": -half_h + TORCH_INSET + origin.z, "ry": 0.0})
+		mounts.append({"x": x, "z": half_h - TORCH_INSET + origin.z, "ry": PI})
 	for gy in height:
 		if gy % spacing != 0:
 			continue
-		var z := -(float(gy) - half_h + 0.5)
-		mounts.append({"x": -half_w + TORCH_INSET, "z": z, "ry": PI / 2.0})
-		mounts.append({"x": half_w - TORCH_INSET, "z": z, "ry": -PI / 2.0})
+		var z := -(float(gy) - half_h + 0.5) + origin.z
+		mounts.append({"x": -half_w + TORCH_INSET + origin.x, "z": z, "ry": PI / 2.0})
+		mounts.append({"x": half_w - TORCH_INSET + origin.x, "z": z, "ry": -PI / 2.0})
 
 	var lights := 0
-	var holder: Node3D = $Torches
+	var holder: Node3D = _ensure_group("Torches")
 	for mount in mounts:
-		var lit := lights < MAX_TORCH_LIGHTS
+		var lit := burning and lights < MAX_TORCH_LIGHTS
 		if lit:
 			lights += 1
 		holder.add_child(_make_wall_torch(mount, lit))
@@ -503,25 +515,26 @@ func _host_world() -> World:
 	return null
 
 
+## Where this room sits in the world frame, which World was told by the server.
+##
+## Vector3.ZERO only for the entrance. A Room node's own transform stays at the identity and its
+## pieces are placed in world space, so a room that has not been registered draws on top of the
+## entrance rather than at NaN.
+func _origin() -> Vector3:
+	var world := _host_world()
+	return Vector3.ZERO if world == null else world.room_origin(_room_id)
+
+
 func _to_world(room_id: String, gx: int, gy: int, size: Vector2i) -> Vector3:
 	var world := _host_world()
-	# Neighbour parent is not World. Floors are world-space via grid_to_world, which already
-	# includes the registered origin — do not also move this node, or the offset applies twice.
-	if world != null and not (get_parent() is World):
+	# grid_to_world already carries the registered origin, so nothing here moves the node too.
+	if world != null:
 		return world.grid_to_world(room_id, gx, gy)
 	return Vector3(
 		gx - float(size.x) / 2.0 + 0.5,
 		0.0,
 		-(gy - float(size.y) / 2.0 + 0.5),
 	)
-
-
-func _width() -> int:
-	return int(Table.room().get("width", 12))
-
-
-func _height() -> int:
-	return int(Table.room().get("height", 12))
 
 
 func _clear(node: Node) -> void:

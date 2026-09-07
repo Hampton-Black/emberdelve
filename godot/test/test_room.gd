@@ -518,3 +518,122 @@ func _floor_roots(room: Node) -> Array[Node]:
 		for child in node.get_children():
 			stack.append(child)
 	return found
+
+
+func test_the_render_level_is_lit_here_dim_where_you_have_been_black_where_you_have_not() -> void:
+	# One policy function, so switching visited rooms from DIM to LIT is one line in one place.
+	assert_eq(RoomScript.level_for({"roomId": "crypt", "visited": true}, "crypt"),
+		RoomScript.Level.LIT, "the room the party is standing in")
+	assert_eq(RoomScript.level_for({"roomId": "gallery", "visited": true}, "crypt"),
+		RoomScript.Level.DIM, "somewhere they have been and left")
+	assert_eq(RoomScript.level_for({"roomId": "vault", "visited": false}, "crypt"),
+		RoomScript.Level.BLACK, "somewhere they have only seen through a door")
+
+
+## The crypt and the gallery, with the party in whichever one is named. Both visited unless
+## `unseen` says otherwise — the shape GameEngine.scene() ships once you have crossed once.
+func _two_rooms(current: String, unseen: Array = []) -> Dictionary:
+	return {
+		"roomId": current, "mode": "EXPLORATION", "entities": [], "combat": null,
+		"rooms": [
+			{"roomId": "crypt", "width": 12, "height": 12,
+				"floorType": "CRACKED_STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "originX": 0.0, "originZ": 0.0,
+				"visited": not ("crypt" in unseen),
+				"exits": [{"id": "door-north", "x": 6, "y": 11,
+					"direction": "NORTH", "toRoomId": "gallery"}]},
+			{"roomId": "gallery", "width": 10, "height": 16,
+				"floorType": "TILED", "wallType": "CARVED", "lighting": "TORCHLIT",
+				"props": [], "originX": 0.0, "originZ": -14.0,
+				"visited": not ("gallery" in unseen),
+				"exits": [{"id": "door-south", "x": 5, "y": 0,
+					"direction": "SOUTH", "toRoomId": "crypt"}]},
+		],
+	}
+
+
+func test_a_room_you_have_left_keeps_its_surfaces_and_gives_up_its_lights() -> void:
+	var world := _world_with_scene(_two_rooms("gallery"))
+	await wait_frames(2)
+	var left := world.get_node_or_null("Neighbours/crypt") as Node3D
+	assert_not_null(left, "the crypt is still on the board after you walk out of it")
+	if left == null:
+		return
+
+	for mesh in left.find_children("*", "MeshInstance3D", true, false):
+		var mat := mesh.material_override as StandardMaterial3D
+		if mat != null:
+			assert_ne(mat.albedo_color, RoomScript.UNLIT_TINT,
+				"a room you have stood in is remembered, not blacked out")
+	assert_gt(_torch_count(left), 0, "the brackets stay on its walls")
+	assert_eq(_omni_count(left), 0, "but nothing in it burns")
+	# The budget stays per-room however far the dungeon runs: only the room the party is in
+	# ever adds a light.
+	assert_eq(_omni_count(world), _omni_count(world.get_node("Room") as Node3D),
+		"every OmniLight3D in the world belongs to the current room")
+	assert_gt(_omni_count(world), 0, "and the current room is lit")
+
+
+func _torch_count(room: Node) -> int:
+	var holder := room.get_node_or_null("Torches") as Node3D
+	return 0 if holder == null else holder.get_child_count()
+
+
+func test_crossing_a_threshold_moves_the_camera_and_not_the_dungeon() -> void:
+	var world := _world_with_scene(_two_rooms("crypt"))
+	await wait_frames(2)
+	assert_eq(world.room_origin("crypt"), Vector3.ZERO, "the entrance anchors the world frame")
+	assert_eq(world.room_origin("gallery"), Vector3(0.0, 0.0, -14.0))
+
+	Table.set_scene(_two_rooms("gallery"))
+	await wait_frames(2)
+	assert_eq(world.room_origin("crypt"), Vector3.ZERO,
+		"the room you walked out of stays where it was drawn")
+	assert_eq(world.room_origin("gallery"), Vector3(0.0, 0.0, -14.0),
+		"and the room you walked into is not re-centred on the world origin")
+	assert_not_null(world.get_node_or_null("Neighbours/crypt"),
+		"the crypt is still on the board from the gallery")
+
+
+func test_the_room_the_party_is_in_is_built_where_the_server_put_it() -> void:
+	var world := _world_with_scene(_two_rooms("gallery"))
+	await wait_frames(2)
+	var here := world.get_node("Room") as Node3D
+
+	# The gallery is 10 x 16 at (0, -14), so its south wall sits at z = -14 + 8 = -6 and the
+	# door in it — square (5, 0) — at x = 5 - 5 + 0.5. Nothing about it is centred on the world
+	# origin any more.
+	var doorway := _segment_named(here, "wall_doorway")
+	assert_not_null(doorway, "the gallery's own door back to the crypt")
+	if doorway == null:
+		return
+	assert_almost_eq(doorway.position.x, 0.5, 0.001)
+	assert_almost_eq(doorway.position.z, -6.0, 0.001)
+
+	# Its fires burn in it, not fourteen squares south in the room it came from.
+	for light in here.find_children("*", "OmniLight3D", true, false):
+		var at: Vector3 = (light as Node3D).global_position
+		assert_between(at.z, -22.0, -6.0, "a torch outside the room it belongs to")
+		assert_between(at.x, -5.0, 5.0, "a torch outside the room it belongs to")
+
+
+func test_crossing_back_finds_the_room_you_left_where_you_left_it() -> void:
+	var world := _world_with_scene(_two_rooms("crypt"))
+	await wait_frames(2)
+	Table.set_scene(_two_rooms("gallery"))
+	await wait_frames(2)
+	Table.set_scene(_two_rooms("crypt"))
+	await wait_frames(2)
+
+	var here := world.get_node("Room") as Node3D
+	assert_eq(int(_floor_mix(here)["total"]), 144, "the party is back in the 12x12 crypt")
+	assert_gt(_omni_count(here), 0, "and it is burning again")
+
+	var gallery := world.get_node_or_null("Neighbours/gallery") as Node3D
+	assert_not_null(gallery, "the gallery stays on the board behind them")
+	if gallery == null:
+		return
+	assert_gt(_torch_count(gallery), 0, "with its brackets")
+	assert_eq(_omni_count(gallery), 0, "and its fires out")
+	assert_eq(world.room_origin("gallery"), Vector3(0.0, 0.0, -14.0),
+		"two crossings and nothing has moved")

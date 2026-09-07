@@ -47,12 +47,14 @@ func _world_tree() -> Node3D:
 	return node
 
 
-func _props(world: Node) -> Node3D:
-	return world.get_node_or_null("Props") as Node3D
+## Props hang under their own room: an id is only unique inside one (PropRef), and two
+## generated rooms both call their first pillar `pillar-0`.
+func _props(world: Node, room_id: String = "crypt") -> Node3D:
+	return world.get_node_or_null("Props/%s" % room_id) as Node3D
 
 
-func _prop(world: Node, id: String) -> Node3D:
-	var holder := _props(world)
+func _prop(world: Node, id: String, room_id: String = "crypt") -> Node3D:
+	var holder := _props(world, room_id)
 	if holder == null:
 		return null
 	return holder.get_node_or_null(id) as Node3D
@@ -156,13 +158,14 @@ func test_a_new_room_rebuilds_props() -> void:
 		{"id": "tomb", "type": "SARCOPHAGUS", "x": 4, "y": 4, "rotation": 90, "hidden": false},
 	]
 	Table.set_scene(SceneFixtures.scene(next))
-	var rebuilt := _prop(world, "tomb")
+	var rebuilt := _prop(world, "tomb", "crypt-2")
 	assert_not_null(rebuilt, "fresh room still has the tomb")
 	if rebuilt == null:
 		return
 	assert_ne(rebuilt.get_instance_id(), old_id, "a new roomId rebuilds the props")
 	assert_eq(rebuilt.position, world.grid_to_world("crypt-2", 4, 4))
-	assert_eq(_props(world).get_child_count(), 1)
+	assert_eq(_props(world, "crypt-2").get_child_count(), 1)
+	assert_null(_props(world), "the room that is no longer in the scene takes its props with it")
 
 
 func test_the_sarcophagus_is_a_tomb_not_a_crate() -> void:
@@ -244,3 +247,53 @@ func _find_omni(root: Node) -> OmniLight3D:
 		for child in node.get_children():
 			stack.append(child)
 	return null
+
+
+## Two rooms, each with a pillar the generator called `pillar-0`. Prop ids are unique within a
+## room and nowhere else (PropRef is room-qualified), and PropPlacer names every room's first
+## pillar the same thing.
+const TWO_ROOMS := {
+	"roomId": "crypt", "mode": "EXPLORATION", "combat": null, "entities": [],
+	"rooms": [
+		{"roomId": "crypt", "width": 12, "height": 12,
+			"floorType": "STONE", "wallType": "CARVED", "lighting": "TORCHLIT",
+			"originX": 0.0, "originZ": 0.0, "visited": true, "exits": [],
+			"props": [{"id": "pillar-0", "type": "PILLAR", "x": 3, "y": 4,
+				"rotation": 0, "hidden": false}]},
+		{"roomId": "gallery", "width": 10, "height": 16,
+			"floorType": "TILED", "wallType": "CARVED", "lighting": "TORCHLIT",
+			"originX": 0.0, "originZ": -14.0, "visited": true, "exits": [],
+			"props": [{"id": "pillar-0", "type": "PILLAR", "x": 2, "y": 9,
+				"rotation": 0, "hidden": false}]},
+	],
+}
+
+
+func test_two_rooms_carrying_the_same_prop_id_both_draw_it() -> void:
+	Table.set_scene(TWO_ROOMS)
+	var world := _world_tree()
+	await wait_frames(2)
+
+	var here := world.get_node_or_null("Props/crypt/pillar-0") as Node3D
+	var there := world.get_node_or_null("Props/gallery/pillar-0") as Node3D
+	assert_not_null(here, "the crypt's pillar")
+	assert_not_null(there, "the gallery's pillar, which shares its id and is not the same prop")
+	if here == null or there == null:
+		return
+	assert_eq(here.position, world.grid_to_world("crypt", 3, 4))
+	assert_eq(there.position, world.grid_to_world("gallery", 2, 9),
+		"a room you have left keeps its furniture, in its own room")
+
+
+func test_a_room_you_have_only_looked_into_is_furnished_by_nobody() -> void:
+	# The server withholds an unvisited room's props. If it ever slips, a secret would be drawn
+	# on the floor of a room nobody has walked into — and props hang outside the room node, so
+	# nothing paints them out.
+	var glimpsed := TWO_ROOMS.duplicate(true)
+	glimpsed["rooms"][1]["visited"] = false
+	Table.set_scene(glimpsed)
+	var world := _world_tree()
+	await wait_frames(2)
+
+	assert_not_null(_prop(world, "pillar-0"), "the crypt is furnished")
+	assert_null(_props(world, "gallery"), "the room beyond the door is not")
