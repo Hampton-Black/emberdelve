@@ -31,6 +31,35 @@ class ThresholdContextTest {
     }
 
     @Test
+    @DisplayName("ways out say they are open, because the engine has no way for them not to be")
+    void waysOutStatePassability() {
+        var block = DmService.waysOut(CONTENT.room("crypt"));
+
+        // crossExit refuses exactly one thing. Listing a way out without saying so left the
+        // model to reconcile "no handle on this side" against a bare line saying a way out
+        // exists, and it decided differently every turn — inventing a DC 20 kick for a door
+        // that was never shut. See emberdelve-xgg.10.
+        assertTrue(block.contains("locked"), block);
+        assertTrue(block.contains("fight"), "the one case where they cannot leave");
+    }
+
+    @Test
+    @DisplayName("no authored door claims to be shut, which nothing can make true")
+    void authoredDoorsDoNotClaimToBeShut() {
+        for (var roomId : java.util.List.of("crypt", "gallery")) {
+            var room = CONTENT.room(roomId);
+            for (var exit : room.exits()) {
+                var door = room.props().stream()
+                        .filter(prop -> prop.id().equals(exit.id()))
+                        .findFirst()
+                        .orElseThrow();
+                assertFalse(door.description().toLowerCase().contains("shut"),
+                        roomId + "'s " + door.id() + " says it is shut, and no exit ever is");
+            }
+        }
+    }
+
+    @Test
     @DisplayName("a room with no way out says so rather than printing an empty heading")
     void noExitsNoHeading() {
         var sealed = new dm.content.RoomDefinition(

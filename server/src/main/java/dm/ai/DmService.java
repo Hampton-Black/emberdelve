@@ -859,12 +859,30 @@ public final class DmService {
      *
      * <p>Empty when there are none, heading included. A "## Ways out" with nothing under it is an
      * invitation to invent one, the same way an empty tool enum is.
+     *
+     * <p><b>It also says they are open, because the engine has no way for them not to be.</b>
+     * {@link dm.engine.GameEngine#crossExit} refuses exactly one thing — leaving mid-fight. There
+     * is no locked, no barred, no stuck. Listing a way out without saying so left the model
+     * holding an authored description that reads sealed ("no handle on this side"), a bare line
+     * saying a way out exists, and a {@code use_exit} instruction ending "when in doubt, do not" —
+     * and nothing to decide between them. It re-improvised the answer every turn, and the
+     * playtest of 2026-09-07 could not tell from one turn to the next whether a door was locked,
+     * unlocked, or crossable yet. Both sessions invented an ATHLETICS DC 20 to kick the door down;
+     * the door was open before the roll and open after, so the check adjudicated nothing. One
+     * session then spent two turns trying a found key on a lock that does not exist.
+     *
+     * <p>The fix is the prompt telling the truth, not the engine growing a door state. If exits
+     * ever do lock, this block is where that becomes visible to the model.
      */
     static String waysOut(RoomDefinition room) {
         if (room.exits().isEmpty()) {
             return "";
         }
         var sb = new StringBuilder("\n## Ways out\n\n");
+        sb.append("These are open. None of them is locked, barred or stuck, and nothing has to "
+                + "be found, forced or unlocked first. If the player says they are leaving "
+                + "through one, they leave. The only time they cannot is in the middle of a "
+                + "fight.\n\n");
         for (var exit : room.exits()) {
             sb.append("- a way out in the ").append(exit.direction().lowerName())
                     .append(" wall\n");
