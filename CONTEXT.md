@@ -48,11 +48,20 @@ place model text enters the prompt. It makes a round trip into the next prompt a
 roll, no legal move and no renderer.
 
 **Diff** — what the server sends the client after a turn (`dm.model.Diff`, sealed:
-`EntityAdded`, `EntityMoved`, `StatChanged`, `PropRevealed`, `ModeChanged`, `CombatChanged`).
+`EntityAdded`, `EntityRemoved`, `EntityMoved`, `StatChanged`, `PropRevealed`, `ModeChanged`,
+`CombatChanged`). Scoped to the room the party is standing in — a diff never names a room.
 The client applies diffs; it never derives them.
 
-**Scene state** — the client's whole current picture of a room (`SceneState`): entities, props,
-mode, and combat.
+**Scene state** — the client's whole current picture of the world (`SceneState`): a `RoomView`
+per room it may draw, plus the entities, blocked squares, mode and combat of the room the party
+is standing in. *Not: the picture of one room* — it stopped being that when visited rooms stayed
+on the board.
+
+**Room view** — one room as far as the client is allowed to draw it (`RoomView`), current or not:
+size, floor and wall type, lighting, exits, visible props, its origin in the world frame, and
+whether it has been visited. One shape for every room, because the shared-wall owner is decided
+by distance from the entrance rather than by where the party stands. Entities never appear in
+one.
 
 ## The world
 
@@ -83,6 +92,12 @@ _Not: "the player" as a singleton in code — the word is fine in prose._
 **Square** — one grid cell (`Square`). Distance is **Chebyshev everywhere**: a diagonal costs
 one. Two metrics in one combat system is how "why can it hit me from there" starts.
 
+**World frame** — the single coordinate space every room is placed in, anchored at the entrance
+(`Rooms.origins()`, `RoomOrigin`). The entrance is at `(0, 0)` and never moves; a room's origin is
+composed breadth-first from `RoomOutline.beside` offsets, server-side, so there is one
+implementation of the arithmetic and it is testable without a renderer.
+_Not: "the offset", which was the one-hop, party-relative thing this replaced._
+
 ## The table
 
 **Table** — the client-side owner of game state (`godot/autoload/table.gd`). Chrome and World
@@ -93,6 +108,11 @@ both subscribe to it. Game state never lives in a `Control` or a `Node3D`.
 **World** — the 3D scene. One scene, created once.
 
 **Token** — a KayKit figure on a base representing an entity (`godot/world/tokens/token.gd`).
+
+**Render level** — how much of a room is drawn (`Room.Level`): `LIT` for the room the party is in,
+`DIM` for one they have visited and left, `BLACK` for one only ever glimpsed through a doorway.
+Chosen by a single policy function, `Room.level_for`. Only a `LIT` room contributes lights, which
+is what keeps `MAX_TORCH_LIGHTS` a per-room budget however far the dungeon runs.
 
 **Clock** — the ordered narration queue (`godot/autoload/clock.gd`). One line at a time, in
 arrival order. `Clock.hold` is what gates the transcript behind a dramatic roll.
