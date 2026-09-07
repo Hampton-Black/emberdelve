@@ -279,11 +279,11 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_not_null(chin, "Chin holds the log below the crypt")
 	if chin == null:
 		return
-	var record: RichTextLabel = chrome.get_node("%Chin/Log/VBox/Transcript")
+	var record: RichTextLabel = chrome.get_node("%Chin/Row/Log/VBox/Transcript")
 	assert_true(record.bbcode_enabled)
 	assert_true(record.scroll_following)
 	assert_true(record.selection_enabled)
-	var input: LineEdit = chrome.get_node("%Chin/Log/VBox/InputBox")
+	var input: LineEdit = chrome.get_node("%Chin/Row/Log/VBox/InputBox")
 	assert_eq(input.placeholder_text, "What do you do?")
 	assert_gt(chin.global_position.y + 1.0, view.global_position.y + view.size.y,
 		"the chin sits below the playfield")
@@ -308,7 +308,12 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_not_null(chrome.get_node("Overlay/Toast"))
 	assert_not_null(chrome.get_node("Overlay/Banner"))
 	assert_not_null(chrome.get_node("Overlay/Title"))
-	assert_not_null(chrome.get_node("Overlay/CombatBar"))
+	assert_eq(chrome.get_node_or_null("Overlay/CombatBar"), null,
+		"the old 42px sky strip is gone")
+	assert_not_null(chrome.get_node_or_null("%CombatChips"),
+		"initiative lives over the playfield")
+	assert_not_null(chrome.get_node_or_null("%CombatVerbs"),
+		"verbs live in the chin")
 	assert_not_null(chrome.get_node("Overlay/Defeat"))
 	assert_not_null(chrome.get_node("Overlay/Defeat/Restart"),
 		"the script references $Restart")
@@ -633,6 +638,87 @@ func test_health_colour_is_allegiance_and_length_is_hit_points() -> void:
 	assert_almost_eq(bar.hp_fraction(6, 12), 0.5, 0.0001)
 	assert_almost_eq(bar.hp_fraction(0, 7), 0.0, 0.0001)
 	assert_almost_eq(bar.hp_fraction(7, 7), 1.0, 0.0001)
+
+
+func test_attack_and_move_dim_from_the_servers_combat_view() -> void:
+	Table.awaiting_dm = false
+	_open_our_turn()
+	var bar := _combat_bar()
+	await wait_frames(1)
+	var attack: Button = bar.find_child("Attack", true, false)
+	var move: Button = bar.find_child("Move", true, false)
+	assert_not_null(attack, "Attack")
+	assert_not_null(move, "Move")
+	if attack == null or move == null:
+		return
+	assert_gt(attack.modulate.a, 0.9)
+	assert_gt(move.modulate.a, 0.9)
+
+	Table.combat_beat["view"]["actionAvailable"] = false
+	Table.combat_beat["view"]["movementRemaining"] = 0
+	Table.combat_changed.emit()
+	assert_lt(attack.modulate.a, 0.5, "actionAvailable gates Attack")
+	assert_lt(move.modulate.a, 0.5, "movementRemaining gates Move")
+	attack.pressed.emit()
+	move.pressed.emit()
+	assert_eq(Net.outbound.size(), 0, "Attack and Move are verbs, not new click modes")
+
+
+func test_exploration_shows_no_chips_or_verbs() -> void:
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	var chips: Control = chrome.get_node_or_null("%CombatChips")
+	var verbs: Control = chrome.get_node_or_null("%CombatVerbs")
+	assert_not_null(chips, "CombatChips")
+	assert_not_null(verbs, "CombatVerbs")
+	if chips == null or verbs == null:
+		return
+	assert_false(chips.visible)
+	assert_false(verbs.visible)
+
+
+func test_combat_puts_chips_over_the_playfield_and_verbs_in_the_chin() -> void:
+	Table.set_started()
+	_open_our_turn()
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	var title: Control = chrome.get_node_or_null("Overlay/Title")
+	if title != null:
+		title.visible = false
+	var chips: Control = chrome.get_node_or_null("%CombatChips")
+	var verbs: Control = chrome.get_node_or_null("%CombatVerbs")
+	var view: Control = chrome.get_node_or_null("%WorldView")
+	var chin: Control = chrome.get_node_or_null("%Chin")
+	assert_not_null(chips, "CombatChips")
+	assert_not_null(verbs, "CombatVerbs")
+	assert_not_null(view, "WorldView")
+	assert_not_null(chin, "Chin")
+	if chips == null or verbs == null or view == null or chin == null:
+		return
+	assert_true(chips.visible)
+	assert_true(verbs.visible)
+	var chip := chips.find_child("Chip_fighter", true, false)
+	assert_not_null(chip, "Chip_fighter")
+	if chip != null and view.size.x > 0.0:
+		assert_true(view.get_global_rect().has_point(chip.global_position + chip.size * 0.5),
+			"chips sit over the crypt")
+	if verbs.size.x > 0.0:
+		assert_true(chin.get_global_rect().has_point(verbs.global_position + Vector2(8, 8)),
+			"verbs sit in the chin")
+	assert_not_null(verbs.find_child("Attack", true, false))
+	assert_not_null(verbs.find_child("Move", true, false))
+	assert_not_null(verbs.find_child("EndTurn", true, false))
+	assert_eq(chips.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 
 
 # ---- Debug bar: eight buttons, exact wire dictionaries, locked while the DM has the floor

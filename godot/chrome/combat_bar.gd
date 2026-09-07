@@ -1,6 +1,6 @@
 extends Control
 
-## The combat HUD: who is up, what is left of their turn, and how to end it.
+## Combat chrome: who is up, what is left of their turn, and how to end it.
 ##
 ## Reads the server's CombatView and displays it. Nothing here decides whose turn it is or
 ## whether a button should work — movementRemaining and actionAvailable arrive already decided.
@@ -12,6 +12,9 @@ extends Control
 ## backdates past the ceremony and the bar appears already assembled. Chip delays are
 ## [member Sfx.CHIP_DELAY_MS] / [member Sfx.CHIP_STAGGER_MS] — the same numbers the sting
 ## uses, so the two rhythms interleave instead of colliding.
+##
+## Chips live on this node (over the playfield). Attack / Move / End Turn live on
+## %CombatVerbs in the chin when that host exists; isolation tests host them here.
 
 const BAR_IN_DELAY_MS := 120
 const BAR_IN_MS := 200
@@ -28,11 +31,11 @@ var _font: SystemFont
 var _row: HBoxContainer
 var _round: Label
 var _track: HBoxContainer
-var _movement: Label
-var _action: Label
+var _attack: Button
+var _move: Button
 var _end: Button
 var _waiting: Label
-var _controls: HBoxContainer
+var _controls: VBoxContainer
 
 
 func chip_delay(which: int) -> int:
@@ -58,9 +61,13 @@ func hp_fraction(hp: int, max_hp: int) -> float:
 	return clampf(float(hp) / float(maxi(max_hp, 1)), 0.0, 1.0)
 
 
+func _verbs_host() -> Control:
+	var host := get_node_or_null("%CombatVerbs") as Control
+	return host if host != null else self
+
+
 func _ready() -> void:
-	mouse_filter = MOUSE_FILTER_STOP
-	custom_minimum_size = Vector2(0, 42)
+	mouse_filter = MOUSE_FILTER_IGNORE
 	_font = SystemFont.new()
 	_font.font_names = PackedStringArray(["Menlo", "Monaco", "Courier New", "monospace"])
 	_build()
@@ -73,33 +80,11 @@ func _ready() -> void:
 
 
 func _build() -> void:
-	var bg := ColorRect.new()
-	bg.name = "Bg"
-	bg.color = Color(13.0 / 255.0, 12.0 / 255.0, 18.0 / 255.0, 0.9)
-	bg.mouse_filter = MOUSE_FILTER_IGNORE
-	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	bg.offset_bottom = 0
-	add_child(bg)
-
-	var edge := ColorRect.new()
-	edge.name = "Edge"
-	edge.color = Color("3a3444")
-	edge.mouse_filter = MOUSE_FILTER_IGNORE
-	edge.set_anchors_preset(PRESET_BOTTOM_WIDE)
-	edge.anchor_top = 1.0
-	edge.offset_top = -1.0
-	edge.offset_bottom = 0.0
-	add_child(edge)
-
 	_row = HBoxContainer.new()
 	_row.name = "Row"
 	_row.mouse_filter = MOUSE_FILTER_IGNORE
 	_row.add_theme_constant_override("separation", 9)
 	_row.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	_row.offset_left = 13.0
-	_row.offset_right = -13.0
-	_row.offset_top = 8.0
-	_row.offset_bottom = -8.0
 	add_child(_row)
 
 	_round = _label("Round", 10)
@@ -110,33 +95,25 @@ func _build() -> void:
 	_track.name = "Track"
 	_track.mouse_filter = MOUSE_FILTER_IGNORE
 	_track.add_theme_constant_override("separation", 5)
+	_track.size_flags_horizontal = SIZE_EXPAND_FILL
+	_track.alignment = BoxContainer.ALIGNMENT_CENTER
 	_row.add_child(_track)
 
-	var spacer := Control.new()
-	spacer.name = "Spacer"
-	spacer.mouse_filter = MOUSE_FILTER_IGNORE
-	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
-	_row.add_child(spacer)
-
-	_controls = HBoxContainer.new()
+	_controls = VBoxContainer.new()
 	_controls.name = "Controls"
 	_controls.mouse_filter = MOUSE_FILTER_IGNORE
-	_controls.add_theme_constant_override("separation", 9)
-	_row.add_child(_controls)
+	_controls.add_theme_constant_override("separation", 8)
+	_controls.size_flags_horizontal = SIZE_EXPAND_FILL
+	_controls.size_flags_vertical = SIZE_EXPAND_FILL
+	_verbs_host().add_child(_controls)
 
-	_movement = _label("Movement", 10)
-	_movement.modulate = Color(INK, 0.7)
-	_controls.add_child(_movement)
+	_attack = _verb("Attack", "ATTACK")
+	_controls.add_child(_attack)
 
-	_action = _label("Action", 10)
-	_action.modulate = Color(INK, 0.7)
-	_controls.add_child(_action)
+	_move = _verb("Move", "MOVE")
+	_controls.add_child(_move)
 
-	_end = Button.new()
-	_end.name = "EndTurn"
-	_end.text = "end turn"
-	_end.add_theme_font_override("font", _font)
-	_end.add_theme_font_size_override("font_size", 10)
+	_end = _verb("EndTurn", "END TURN")
 	_end.add_theme_color_override("font_color", Color("e8c7b8"))
 	_end.add_theme_color_override("font_hover_color", Color("e8c7b8"))
 	_end.add_theme_color_override("font_disabled_color", Color("e8c7b8"))
@@ -149,7 +126,27 @@ func _build() -> void:
 
 	_waiting = _label("Waiting", 10)
 	_waiting.modulate = Color(INK, 0.6)
+	_waiting.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_controls.add_child(_waiting)
+
+
+func _verb(node_name: String, caption: String) -> Button:
+	var btn := Button.new()
+	btn.name = node_name
+	btn.text = caption
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = MOUSE_FILTER_STOP
+	btn.size_flags_horizontal = SIZE_EXPAND_FILL
+	btn.add_theme_font_override("font", _font)
+	btn.add_theme_font_size_override("font_size", 11)
+	btn.add_theme_color_override("font_color", INK)
+	btn.add_theme_color_override("font_hover_color", Color("e8dcc8"))
+	btn.add_theme_color_override("font_disabled_color", INK)
+	btn.add_theme_stylebox_override("normal", _btn_style(Color("1b1a23"), Color("3a3444")))
+	btn.add_theme_stylebox_override("hover", _btn_style(Color("2a2833"), Color("5a5464")))
+	btn.add_theme_stylebox_override("pressed", _btn_style(Color("1b1a23"), Color("3a3444")))
+	btn.add_theme_stylebox_override("disabled", _btn_style(Color("1b1a23"), Color("3a3444")))
+	return btn
 
 
 func _label(node_name: String, size_px: int) -> Label:
@@ -159,6 +156,7 @@ func _label(node_name: String, size_px: int) -> Label:
 	label.add_theme_font_size_override("font_size", size_px)
 	label.add_theme_color_override("font_color", INK)
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = MOUSE_FILTER_IGNORE
 	return label
 
 
@@ -170,8 +168,8 @@ func _btn_style(bg: Color, border: Color) -> StyleBoxFlat:
 	style.set_corner_radius_all(3)
 	style.content_margin_left = 13.0
 	style.content_margin_right = 13.0
-	style.content_margin_top = 4.0
-	style.content_margin_bottom = 4.0
+	style.content_margin_top = 6.0
+	style.content_margin_bottom = 6.0
 	return style
 
 
@@ -194,13 +192,18 @@ func _chip_style(active: bool) -> StyleBoxFlat:
 
 func _redraw() -> void:
 	var beat = Table.combat_beat
+	var verbs := _verbs_host()
 	if beat == null:
 		visible = false
+		if verbs != self:
+			verbs.visible = false
 		mouse_filter = MOUSE_FILTER_IGNORE
 		set_process(false)
 		return
 	visible = true
-	mouse_filter = MOUSE_FILTER_STOP if beat["closing_at"] == null else MOUSE_FILTER_IGNORE
+	if verbs != self:
+		verbs.visible = true
+	mouse_filter = MOUSE_FILTER_IGNORE
 	_sync(beat)
 	_paint()
 	set_process(not _settled())
@@ -246,18 +249,17 @@ func _sync(beat: Dictionary) -> void:
 
 	var active := Table.entity(String(combat.get("activeId", "")))
 	var yours := (not active.is_empty() and bool(active["isPlayerControlled"])) and not closing
-	_movement.visible = yours
-	_action.visible = yours
+	_attack.visible = yours
+	_move.visible = yours
 	_end.visible = yours
 	_waiting.visible = not yours
 	if yours:
 		var squares := int(combat.get("movementRemaining", 0))
-		_movement.text = "%d %s" % [squares, "square" if squares == 1 else "squares"]
+		_move.modulate.a = 1.0 if squares > 0 else 0.32
 		var attack_ready := bool(combat.get("actionAvailable", false))
-		_action.text = "attack ready" if attack_ready else "attack spent"
-		_action.modulate.a = 1.0 if attack_ready else 0.32
+		_attack.modulate.a = 1.0 if attack_ready else 0.32
 		_end.disabled = Table.awaiting_dm
-		_end.text = "…" if Table.awaiting_dm else "end turn"
+		_end.text = "…" if Table.awaiting_dm else "END TURN"
 		_end.modulate.a = 0.35 if Table.awaiting_dm else 1.0
 	else:
 		var who := String(active.get("name", "Something")) if not active.is_empty() else "Something"
@@ -353,6 +355,9 @@ func _paint() -> void:
 	modulate.a = bar_t
 	_round.modulate.a = 0.45 * chrome_t
 	_controls.modulate.a = chrome_t
+	var verbs := _verbs_host()
+	if verbs != self:
+		verbs.modulate.a = bar_t
 
 	var i := 0
 	for combatant in beat["view"].get("order", []):
