@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-## The overlay over the room. Owns no game facts (invariant #3) — World, Chrome and SFX all
+## The frame around the room. Owns no game facts (invariant #3) — World, Chrome and SFX all
 ## subscribe to Table.
 ##
 ## Sfx is an autoload, not a child. The lid is hung off a hostile arriving, which in M0 is the
@@ -36,13 +36,12 @@ func _ready() -> void:
 	$Overlay/Banner.visible = not Table.connected
 	# World sits in a SubViewport. Clicks hit this Control. Viewport.gui_input
 	# already made `event.position` local to WorldView — which is SubViewport
-	# pixels. The container fills the window 1:1; converting `global_position`
-	# a second time parks the hover a board away.
-	$WorldView.gui_input.connect(_on_world_gui_input)
+	# pixels while stretch is on, whether or not the playfield fills the window.
+	%WorldView.gui_input.connect(_on_world_gui_input)
 
 
 func _on_world_gui_input(event: InputEvent) -> void:
-	var world := get_node_or_null("WorldView/SubViewport/World")
+	var world := get_node_or_null("%WorldView/SubViewport/World")
 	if world == null or not world.has_method("handle_pointer"):
 		return
 	if not (event is InputEventMouse):
@@ -68,7 +67,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if key.keycode != KEY_Q and key.keycode != KEY_E:
 		return
-	var world := get_node_or_null("WorldView/SubViewport/World")
+	var world := get_node_or_null("%WorldView/SubViewport/World")
 	if world == null or world.rig == null:
 		return
 	world.rig.handle_rotate_keys(key)

@@ -1,8 +1,9 @@
 extends GutTest
 const SceneFixtures := preload("res://test/scene_fixtures.gd")
 
-## Headless pins for the overlay: the log is rebuilt from Table, the box locks while the
-## DM has the floor, and the title click takes the floor before it asks the server to begin.
+## Headless pins for the chrome: the crypt sits in a playfield, the log is rebuilt from
+## Table, the box locks while the DM has the floor, and the title click takes the floor
+## before it asks the server to begin.
 
 const CRYPT := {
 	"roomId": "crypt", "width": 12, "height": 12,
@@ -242,12 +243,15 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 		return
 	var chrome: Node = packed.instantiate()
 	add_child_autofree(chrome)
-	await wait_process_frames(2)
+	await wait_process_frames(4)
 
 	assert_eq(chrome.get_node_or_null("World"), null,
 		"one World — the Node3D inside the SubViewport, not a second container")
 
-	var view: SubViewportContainer = chrome.get_node("WorldView")
+	var view: SubViewportContainer = chrome.get_node_or_null("%WorldView")
+	assert_not_null(view, "WorldView is the playfield hole, addressed by unique name")
+	if view == null:
+		return
 	assert_true(view.stretch)
 	assert_eq(view.texture_filter, CanvasItem.TEXTURE_FILTER_LINEAR,
 		"locked look: linear sample at native resolution")
@@ -255,8 +259,10 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	var sub: SubViewport = view.get_node("SubViewport")
 	assert_false(sub.snap_2d_transforms_to_pixel)
 	var win := chrome.get_viewport().get_visible_rect().size
-	assert_eq(sub.size.x, int(win.x), "the world follows the window, not a 960px buffer")
-	assert_eq(sub.size.y, int(win.y), "height follows the window")
+	assert_lt(view.size.x, win.x, "the crypt sits in the bezel hole, not the whole window")
+	assert_lt(view.size.y, win.y, "the chin is below the crypt, not over it")
+	assert_eq(sub.size.x, int(view.size.x), "the SubViewport is the playfield, not the window")
+	assert_eq(sub.size.y, int(view.size.y), "height follows the playfield Control")
 
 	var world: Node3D = sub.get_node("World")
 	assert_not_null(world.get_node_or_null("Camera3D"))
@@ -267,11 +273,33 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	var cam: Camera3D = world.get_node("Camera3D")
 	assert_eq(cam.projection, Camera3D.PROJECTION_ORTHOGONAL)
 
-	var record: RichTextLabel = chrome.get_node("Overlay/Log/VBox/Transcript")
+	assert_eq(chrome.get_node_or_null("Overlay/Log"), null,
+		"the log left the overlay; it lives in the chin")
+	var chin: Control = chrome.get_node_or_null("%Chin")
+	assert_not_null(chin, "Chin holds the log below the crypt")
+	if chin == null:
+		return
+	var record: RichTextLabel = chrome.get_node("%Chin/Log/VBox/Transcript")
 	assert_true(record.bbcode_enabled)
 	assert_true(record.scroll_following)
 	assert_true(record.selection_enabled)
-	assert_not_null(chrome.get_node("Overlay/Log/VBox/InputBox"))
+	var input: LineEdit = chrome.get_node("%Chin/Log/VBox/InputBox")
+	assert_eq(input.placeholder_text, "What do you do?")
+	assert_gt(chin.global_position.y + 1.0, view.global_position.y + view.size.y,
+		"the chin sits below the playfield")
+	assert_gt(chin.size.x, win.x * 0.7, "the log takes the chin's width, not a corner veil")
+	var chin_panel := (chin as PanelContainer).get_theme_stylebox("panel") as StyleBoxFlat
+	assert_not_null(chin_panel, "Chin wears a StyleBoxFlat")
+	if chin_panel != null:
+		assert_gte(chin_panel.bg_color.a, 0.85, "the chin is a wall, not a veil over the room")
+
+	var lintel: Label = chrome.get_node_or_null("%Lintel")
+	assert_not_null(lintel, "the room name sits on the lintel")
+	if lintel == null:
+		return
+	assert_eq(lintel.text, "THE CRYPT")
+	assert_true(lintel.visible)
+
 	assert_not_null(chrome.get_node_or_null("Overlay/DiceTray"),
 		"the tray is overlay chrome, not a 3D object")
 	assert_eq(world.get_node_or_null("DiceTray"), null,
@@ -294,13 +322,6 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 		"the banner is the developer's loop, not a modal")
 	assert_true(chrome.get_node("Overlay/Title").visible)
 
-	var chat: PanelContainer = chrome.get_node("Overlay/Log")
-	var panel := chat.get_theme_stylebox("panel") as StyleBoxFlat
-	assert_not_null(panel, "Log wears a StyleBoxFlat")
-	if panel != null:
-		assert_lt(panel.bg_color.a, 0.35, "the log is a veil over the room, not a wall")
-		assert_gt(panel.bg_color.a, 0.15)
-
 	var record_size := record.get_theme_font_size("normal_font_size")
 	assert_eq(record_size, 13, "chrome type matches the browser log, not the engine default")
 
@@ -308,6 +329,11 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_eq(tray.anchor_left, 1.0)
 	assert_eq(tray.anchor_right, 1.0)
 	assert_eq(tray.anchor_bottom, 1.0)
+
+	var gallery := CRYPT.duplicate(true)
+	gallery["roomId"] = "gallery"
+	Table.set_scene(SceneFixtures.scene(gallery))
+	assert_eq(lintel.text, "THE LONG GALLERY")
 
 
 func test_q_and_e_step_the_corner_through_chrome() -> void:
@@ -320,7 +346,10 @@ func test_q_and_e_step_the_corner_through_chrome() -> void:
 	var chrome: Node = packed.instantiate()
 	add_child_autofree(chrome)
 	await wait_process_frames(2)
-	var world: Node3D = chrome.get_node("WorldView/SubViewport/World")
+	var world: Node3D = chrome.get_node_or_null("%WorldView/SubViewport/World")
+	assert_not_null(world, "World sits in the playfield SubViewport")
+	if world == null:
+		return
 	assert_not_null(world.rig, "World.rig")
 	if world.rig == null:
 		return
@@ -608,7 +637,10 @@ func test_a_click_on_the_world_view_sends_move_to() -> void:
 	var title: Control = chrome.get_node_or_null("Overlay/Title")
 	if title != null:
 		title.visible = false
-	var world: Node3D = chrome.get_node("WorldView/SubViewport/World")
+	var world: Node3D = chrome.get_node_or_null("%WorldView/SubViewport/World")
+	assert_not_null(world, "World sits in the playfield SubViewport")
+	if world == null:
+		return
 	assert_true(world.has_method("handle_pointer"),
 		"World.handle_pointer is the viewport-local click seam Chrome forwards onto")
 	var cam: Camera3D = world.get_node("Camera3D") as Camera3D
@@ -618,7 +650,7 @@ func test_a_click_on_the_world_view_sends_move_to() -> void:
 	var square := Vector2i(4, 3)
 	var ground: Vector3 = world.grid_to_world("crypt", square.x, square.y)
 	var viewport_pos: Vector2 = cam.unproject_position(ground)
-	var view: SubViewportContainer = chrome.get_node("WorldView")
+	var view: SubViewportContainer = chrome.get_node("%WorldView")
 	var window_pos: Vector2 = view.get_global_transform_with_canvas() * viewport_pos
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
@@ -650,7 +682,10 @@ func test_hover_uses_control_local_position() -> void:
 	var title: Control = chrome.get_node_or_null("Overlay/Title")
 	if title != null:
 		title.visible = false
-	var view: SubViewportContainer = chrome.get_node("WorldView")
+	var view: SubViewportContainer = chrome.get_node_or_null("%WorldView")
+	assert_not_null(view, "WorldView")
+	if view == null:
+		return
 	var world: Node3D = view.get_node("SubViewport/World")
 	var cam: Camera3D = world.get_node("Camera3D") as Camera3D
 	assert_not_null(cam, "Camera3D")
@@ -683,7 +718,10 @@ func test_world_inside_a_subviewport_does_not_rehandle_the_pointer() -> void:
 	var chrome: Node = packed.instantiate()
 	add_child_autofree(chrome)
 	await wait_process_frames(4)
-	var world: Node3D = chrome.get_node("WorldView/SubViewport/World")
+	var world: Node3D = chrome.get_node_or_null("%WorldView/SubViewport/World")
+	assert_not_null(world, "World sits in the playfield SubViewport")
+	if world == null:
+		return
 	assert_true(world.get_viewport() is SubViewport)
 	var motion := InputEventMouseMotion.new()
 	motion.position = Vector2(800, 400)

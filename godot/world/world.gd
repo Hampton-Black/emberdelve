@@ -423,8 +423,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_route_pointer(mouse, true)
 
 
-## Window pixels → SubViewport pixels. WorldView fills the window 1:1; this
-## still converts through the container so a scaled or offset host cannot lie.
+## Window pixels → SubViewport pixels. Converts through the host container so an
+## inset playfield cannot lie the way a 1:1 window-sized view used to get away with.
 static func viewport_from_host(host: SubViewportContainer, window_pos: Vector2) -> Vector2:
 	if host == null:
 		return window_pos
