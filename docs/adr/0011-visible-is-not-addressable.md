@@ -1,6 +1,6 @@
 # ADR-0011: Visible is not addressable
 
-**Status:** Proposed — becomes Accepted when the picking confinement lands (`emberdelve-xgg.5`)
+**Status:** Accepted 2026-09-07 — the picking confinement landed (`emberdelve-xgg.5`) and held in play (`emberdelve-xgg.8`)
 **Milestone:** M3 — traversal, extended past the gate
 
 ## Context
@@ -42,6 +42,18 @@ entities. A pick that lands outside the current room's rectangle resolves to not
   ([ADR-0008](0008-model-picks-come-from-played-sessions.md)).
 - **Reopen when** fleeing or party splits arrive. Both put a party in more than one room's worth of
   space and neither can hold this line.
+
+## Held in play — 2026-09-07
+
+Compiled is not the same as exercised, so this stayed Proposed until someone clicked at it. The
+played session of 2026-09-07 (`emberdelve-xgg.8`) confirmed each half:
+
+- A click in a non-current room resolves to nothing and **swallows no move** — the failure mode
+  that mattered, because a pick that silently eats the click reads as a frozen game rather than as
+  a refusal.
+- The door back stays clickable from the current room, and `brazier-east` does not shadow it.
+- A goblin left alive in the crypt was not drawn from the gallery. It **read as absence rather
+  than as a bug** — the accepted cost above, accepted again by someone looking at it.
 
 ## Related
 

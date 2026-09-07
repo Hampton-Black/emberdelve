@@ -509,8 +509,9 @@ The full list is `docs/milestones/m3-evaluation.md` §8.
 - **`reveal_prop` can beat the sentence.** A look-around was enough to put the gallery niche on
   the board before the prose named it.
 - **Authored secrets still have no spawn.** Listening at the lid produced a fact and no goblin.
-- **Dark neighbour unread.** The gate session was headless. Whether the unlit room through the
-  doorway reads as a dungeon or as a hole is still a Godot judgement.
+- ~~**Dark neighbour unread.**~~ **Read on 2026-09-07, and DIM stands** — see the playtest section
+  below. Kept as a line because the reason it sat unanswered for a day is worth remembering: a
+  headless gate cannot settle a question about what something looks like.
 - **Generated rooms have nothing to find** (spec §12a). `PropPlacer` marks nothing hidden, so
   `reveal_prop` is never offered. A generated room has no alcove and no niche. The wrong fix is
   free-form dress-pass secrets with no mechanism; the right fix is hidden props the generator
@@ -593,6 +594,67 @@ out to be.
 
 **`TurnMetrics` mislabels its counter** — see the latency section. One line; left alone so the
 numbers in `m0-evaluation.md` match the logs as they were written.
+
+### Judged in play — playtest 2026-09-07
+
+Two played sessions, in the real client, against the list in `emberdelve-xgg.8`. The logs are
+`server/sessions/20260907-030629-e6571025.jsonl` and `20260907-195254-82a68212.jsonl`.
+
+**DIM stands, and the darker end is the better-looking one.** A visited room stays at
+`Room.Level.DIM` and the fallback to LIT is not taken. The design predicted the ambient drift
+between the two directions and accepted it as a cost — standing in the gallery puts the crypt under
+`EnvDim`'s 0.7, standing in the crypt puts the gallery under `EnvTorchlit`'s 1.1. Play inverted
+that: 0.7 was judged the better look, and the crypt is the room it was judged on. The cost was not
+a cost. **`EnvTorchlit`'s 1.1 is now the suspect number, not `EnvDim`'s 0.7** — recorded, and
+deliberately not acted on, because § *Anti-goals* timeboxes lighting and one observation is not a
+tuning session. `emberdelve-27l` if it is ever worth an evening.
+
+**ADR-0011 held where it mattered.** A click in a non-current room resolved to nothing and
+swallowed no move; the door back stayed clickable; `brazier-east` did not shadow it. A goblin left
+alive in the crypt was not drawn from the gallery and read as absence rather than as a bug. That
+moved the ADR from Proposed to Accepted — the confinement had compiled since `xgg.5` and had never
+been clicked at.
+
+**Nobody missed the narration on a crossing.** Clicking a door crosses in silence: 15 of the 17
+crossings across both sessions produced no narration, because `WsHandler.enterExit` arms
+`pendingArrival` and never runs a prose phase. Judged in play to be right. Clicking a door and
+walking through *is* the honest path, and the arrival beat was not what was missing.
+`emberdelve-xgg.12` — recorded, not scheduled, the same way M0's tool-free-turn latency was.
+
+**What was missing was knowing whether a door could be crossed at all.** `crossExit` refuses
+exactly one thing, leaving mid-fight. There is no locked, no barred, no stuck — and every authored
+door description said otherwise ("no handle on this side", "shut on a dark stair-head"), while
+`waysOut()` listed a door and said nothing about its state and `use_exit`'s instruction closed
+"when in doubt, do not". The model reconciled that afresh every turn, which is what the player
+felt. **Both sessions independently invented an ATHLETICS DC 20 to kick a door that was never
+shut**, and one then spent two turns trying a key found on a corpse against a lock that does not
+exist. Fixed by the prompt telling the truth: `## Ways out` now states the exits are open and
+names the fight as the only exception. A real door state is `emberdelve-ql3` and wants the content
+that justifies it.
+
+**A rule the model reads two ways is a rule that decides nothing.** Both sessions opened on the
+identical move — inspect the sarcophagus, failed check, the first of the session. One spawned the
+goblin and let five turns of parley run. The other spawned it and called `start_combat` in the same
+response, putting the player in initiative before they had done anything hostile.
+`dm-tools.md` says the situation must change on the *second* consecutive failure; both escalated on
+the first. `emberdelve-vy7`. This is M2's "talking to yourself can start a fight" wearing a new
+hat, and it decides what kind of game the session is on turn one.
+
+**`roll_check` twice did not recur.** Carried out of M2 and out of the M3 gate; absent from both
+of these sessions. Not called fixed on two sessions, but worth knowing it moved.
+
+**Rejections are doing their job quietly.** A duplicate `spawn_entity` was refused twice and a
+stale `move_entity` once, and no turn was visibly damaged by any of it.
+
+**Latency held.** First feedback median 1.3s over 26 typed turns, range 1.0–2.6s. Three turns were
+tool-free — 12%, against M0's 42%, which is the number that made the dead-air question worth asking
+in the first place.
+
+**Still not exercised: a prop revealed and then crossed away from.** Neither session managed it.
+One revealed nothing at all; the other found the crypt alcove after its last crossing. The gallery
+niche was never found in either — its `revealHint` is on the west wall and both players searched
+the brazier and the pillars. So the room-qualified `PropRef` is correct by test and untried by
+hand.
 
 ---
 
