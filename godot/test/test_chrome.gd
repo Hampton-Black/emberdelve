@@ -335,6 +335,74 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	Table.set_scene(SceneFixtures.scene(gallery))
 	assert_eq(lintel.text, "THE LONG GALLERY")
 
+	var playfield: Control = chrome.get_node_or_null("Frame/Playfield")
+	assert_not_null(playfield, "Playfield")
+	if playfield != null:
+		assert_lt(playfield.anchor_left, 0.06, "no left character column")
+	var badge: Control = chrome.get_node_or_null("%PartyBadge")
+	assert_not_null(badge, "the party floats over the playfield")
+	if badge != null and view.size.x > 0.0:
+		var over := view.get_global_rect()
+		var at := badge.global_position + badge.size * 0.5
+		assert_true(over.has_point(at), "the badge sits on the crypt, not beside it")
+
+
+# ---- Party badge: reads Table, floats over the playfield, ignores the pointer
+
+func _badge() -> Control:
+	var script: GDScript = load("res://chrome/party_badge.gd")
+	assert_not_null(script, "party_badge.gd")
+	if script == null:
+		return Control.new()
+	var node: Control = script.new()
+	add_child_autofree(node)
+	return node
+
+
+func test_the_party_badge_names_the_player_and_their_armour() -> void:
+	var badge := _badge()
+	var name_l: Label = badge.find_child("Name", true, false)
+	var hp_l: Label = badge.find_child("Hp", true, false)
+	var ac_l: Label = badge.find_child("Ac", true, false)
+	assert_not_null(name_l, "Name")
+	assert_not_null(hp_l, "Hp")
+	assert_not_null(ac_l, "Ac")
+	if name_l == null or hp_l == null or ac_l == null:
+		return
+	assert_eq(name_l.text, "Roderick")
+	assert_eq(hp_l.text, "12/12")
+	assert_eq(ac_l.text, "AC 16")
+	assert_eq(badge.ac_for("fighter"), 16)
+	assert_eq(badge.ac_for("goblin"), 15)
+
+
+func test_the_hp_bar_shortens_without_changing_colour() -> void:
+	var badge := _badge()
+	var fill: ColorRect = badge.find_child("HpFill", true, false)
+	assert_not_null(fill, "HpFill")
+	if fill == null:
+		return
+	assert_eq(fill.color, Color("7fae56"))
+	assert_almost_eq(fill.anchor_right, 1.0, 0.001)
+
+	Table.scene["entities"][0]["hp"] = 6
+	Table.scene_changed.emit()
+	var hp_l: Label = badge.find_child("Hp", true, false)
+	assert_not_null(hp_l, "Hp")
+	if hp_l == null:
+		return
+	assert_eq(hp_l.text, "6/12")
+	assert_almost_eq(fill.anchor_right, 0.5, 0.001)
+	assert_eq(fill.color, Color("7fae56"), "green is allegiance, not a wound warning")
+
+
+func test_the_badge_ignores_the_pointer() -> void:
+	var badge := _badge()
+	assert_eq(badge.mouse_filter, Control.MOUSE_FILTER_IGNORE)
+	for child in badge.find_children("*", "Control", true, false):
+		assert_eq((child as Control).mouse_filter, Control.MOUSE_FILTER_IGNORE,
+			"%s must not shadow the board" % child.name)
+
 
 func test_q_and_e_step_the_corner_through_chrome() -> void:
 	# Production: the rig sits in a SubViewport and never sees window keys. Chrome forwards.
