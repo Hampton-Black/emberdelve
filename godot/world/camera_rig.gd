@@ -134,10 +134,15 @@ func _advance_camera(delta: float) -> void:
 
 func _framing_target() -> Dictionary:
 	var hh := _combat_half_height() if _framing == "COMBAT" else EXPLORATION_HALF_HEIGHT
-	var wanted := Vector3.ZERO if _framing == "COMBAT" else _follow_point
+	# The tactical view squares up the room the party is fighting in. Centred on the world
+	# origin it is a picture of the entrance, which after one crossing is the room they left.
+	var wanted := _room_origin() if _framing == "COMBAT" else _follow_point
 	return {"half_height": hh, "focus": _clamp_to_room(wanted, hh)}
 
 
+## How tall the view has to be for the room to fit. A span about the room's own centre, so
+## unlike _clamp_to_room's corners these stay offsets — where the room stands cannot change
+## how big it is, and adding the origin here would scale the framing with the walk.
 func _combat_half_height() -> float:
 	var vp := _vp_size()
 	var right := global_transform.basis.x
@@ -163,11 +168,15 @@ func _clamp_to_room(focus: Vector3, p_half_height: float) -> Vector3:
 	var extent := _room_extent()
 	var x := extent.x
 	var z := extent.y
+	# Around the current room, not around the entrance. Left at the origin this clamp holds the
+	# camera over the first room while the follow asks it to chase a party in the second — which
+	# is the failure FOLLOW_SLACK is commented against, arriving by a different door.
+	var at := _room_origin()
 	var corners: Array[Vector3] = [
-		Vector3(-x, 0.0, -z),
-		Vector3(x, 0.0, -z),
-		Vector3(x, 0.0, z),
-		Vector3(-x, 0.0, z),
+		at + Vector3(-x, 0.0, -z),
+		at + Vector3(x, 0.0, -z),
+		at + Vector3(x, 0.0, z),
+		at + Vector3(-x, 0.0, z),
 	]
 	var clamped := focus
 	clamped = _clamp_axis(clamped, focus, global_transform.basis.x, half_width, corners)
@@ -216,6 +225,13 @@ func _room_extent() -> Vector2:
 		float(int(here.get("width", 12))) / 2.0,
 		float(int(here.get("height", 12))) / 2.0,
 	)
+
+
+## Where the current room stands in the world frame. Read from Table for the same reason its
+## size is: the server owns the frame, and only the entrance is ever at (0, 0).
+func _room_origin() -> Vector3:
+	var here := Table.room()
+	return Vector3(float(here.get("originX", 0.0)), 0.0, float(here.get("originZ", 0.0)))
 
 
 func _vp_size() -> Vector2:

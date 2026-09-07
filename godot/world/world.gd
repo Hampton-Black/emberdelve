@@ -60,7 +60,7 @@ func current_room_id() -> String:
 ## falls back to the current one rather than to NaN — a diff naming an unknown room is a bug
 ## worth seeing as a token in the wrong place, not as a token that has vanished.
 func grid_to_world(room_id: String, x: int, y: int) -> Vector3:
-	var size: Vector2i = _sizes.get(room_id, Vector2i(_room_width(), _room_height()))
+	var size := _size_of(room_id)
 	var origin: Vector3 = _origins.get(room_id, Vector3.ZERO)
 	return origin + Vector3(
 		x - float(size.x) / 2.0 + 0.5,
@@ -69,16 +69,53 @@ func grid_to_world(room_id: String, x: int, y: int) -> Vector3:
 	)
 
 
-## The inverse, for the room the party is in — which is the only room anything is picked in.
-## A neighbour is scenery until you walk into it, and clicking one is not a move the server
-## would accept.
-func world_to_grid(point: Vector3) -> Vector2i:
-	var width := float(_room_width())
-	var height := float(_room_height())
+## The exact inverse of grid_to_world, for the same room.
+##
+## Defaults to the room the party is in, which is what every caller holding a world-space point
+## off the current board — a token's position, an overlay quad — actually means. It has to take
+## the origin: read against a room standing anywhere but the entrance, an origin-centred inverse
+## answers with a square that is off the board, and a click that resolves to nowhere is dropped
+## in silence.
+func world_to_grid(point: Vector3, room_id: String = "") -> Vector2i:
+	var id := _room_id if room_id.is_empty() else room_id
+	var size := _size_of(id)
+	var origin: Vector3 = _origins.get(id, Vector3.ZERO)
 	return Vector2i(
-		roundi(point.x + width / 2.0 - 0.5),
-		roundi(-point.z + height / 2.0 - 0.5),
+		roundi(point.x - origin.x + float(size.x) / 2.0 - 0.5),
+		roundi(origin.z - point.z + float(size.y) / 2.0 - 0.5),
 	)
+
+
+## Whose floor a world-space point stands on — "" for a point on no floor at all.
+##
+## The current room answers first, because it is the only one whose answer is ever acted on and
+## the only one that can be missing from the origin table (`_covers`).
+func room_at(point: Vector3) -> String:
+	if _covers(_room_id, point):
+		return _room_id
+	for id in _origins:
+		var room_id := String(id)
+		if room_id != _room_id and _covers(room_id, point):
+			return room_id
+	return ""
+
+
+## Through _size_of, so a current room the server has somehow not placed is still clickable at
+## the origin — the same guess grid_to_world makes. Refusing it here would leave a room drawn
+## and every click on it dropped without a word.
+func _covers(room_id: String, point: Vector3) -> bool:
+	if room_id.is_empty():
+		return false
+	var size := _size_of(room_id)
+	var at := world_to_grid(point, room_id)
+	return at.x >= 0 and at.y >= 0 and at.x < size.x and at.y < size.y
+
+
+## A room the client has not been told about is drawn at the current room's size, so that a diff
+## naming one puts a token somewhere visibly wrong rather than at NaN. grid_to_world and its
+## inverse have to make that guess identically or they stop being inverses.
+func _size_of(room_id: String) -> Vector2i:
+	return _sizes.get(room_id, Vector2i(_room_width(), _room_height()))
 
 
 func _on_scene_changed() -> void:
@@ -439,11 +476,18 @@ func pick_at(viewport_pos: Vector2) -> Dictionary:
 	var floor_square: Variant = null
 	var floor_t := INF
 	var hit: Variant = Plane(Vector3.UP, 0.0).intersects_ray(origin, dir)
-	if hit != null:
-		var at := world_to_grid(hit)
-		if at.x >= 0 and at.y >= 0 and at.x < _room_width() and at.y < _room_height():
-			floor_square = at
-			floor_t = origin.distance_to(hit)
+	# Which room the ray landed in, not merely whether it landed. A room the party has left is
+	# still drawn and can still be pointed at, and read against the current room its floor
+	# resolves to a perfectly plausible square in a room nobody clicked — the party walks
+	# somewhere no one pointed at. Visible is not addressable.
+	#
+	# Dropped here rather than sent for the server to refuse, which is the opposite of what a
+	# blocked square does. The two questions are different: whether a move is legal is the
+	# server's (invariant #1), but which room the pointer is over is a fact about this frame
+	# and this camera, and there is no square in the current room to name.
+	if hit != null and room_at(hit) == _room_id:
+		floor_square = world_to_grid(hit)
+		floor_t = origin.distance_to(hit)
 
 	return {"entity_id": "", "target_id": _target_under(origin, dir, floor_t),
 		"square": floor_square}
@@ -465,6 +509,13 @@ func pick_at(viewport_pos: Vector2) -> Dictionary:
 ## `floor_t` is what keeps the door from stealing ordinary moves: every floor square in the room
 ## is nearer to the camera than the wall behind it, so the doorway only wins when the ray leaves
 ## the room without touching floor — which is what pointing at a door in a wall looks like.
+##
+## With a neighbour drawn, that ray now lands on something: the row of the far room just past
+## the opening. The doorway still wins there, and that is the decision — you are looking through
+## an open door at the floor beyond it, and the door is the only thing on that ray anyone can
+## act on. It is the sole thing a click on a room the party is not in can do, and it does the
+## one crossing the server would accept anyway. `test_no_camera_corner_makes_a_room_you_are_not
+## _in_clickable` sweeps all four corners over that whole floor to keep it the only thing.
 func _target_under(origin: Vector3, dir: Vector3, floor_t: float) -> String:
 	var walls := get_node_or_null("Room/Walls") as Node3D
 	if walls == null:

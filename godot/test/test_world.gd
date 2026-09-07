@@ -2,7 +2,8 @@ extends GutTest
 const SceneFixtures := preload("res://test/scene_fixtures.gd")
 
 ## Grid conversion is the one number later tasks all hang off. Square (0, 0) is the north-west
-## corner of a room centred on the origin; +y on the grid is north, which is -Z in the world.
+## corner of a room centred on its own origin in the server's world frame — only the entrance
+## is at (0, 0); +y on the grid is north, which is -Z in the world.
 
 const CRYPT := {
 	"roomId": "crypt", "width": 12, "height": 12,
@@ -30,14 +31,26 @@ func _world() -> Node3D:
 
 
 func _world_with_room(w: int, h: int) -> Node3D:
-	var scene := CRYPT.duplicate(true)
-	scene["width"] = w
-	scene["height"] = h
-	Table.set_scene(SceneFixtures.scene(scene))
+	return _world_at(w, h, Vector3.ZERO)
+
+
+## The party's own room, standing where the server put it. Only the entrance is at the origin,
+## so a fixture that always uses (0, 0) tests the one room every conversion happens to get right.
+func _world_at(w: int, h: int, origin: Vector3) -> Node3D:
+	Table.set_scene(SceneFixtures.scene(_room_at(w, h, origin)))
 	return _world()
 
 
-func test_the_current_room_is_still_centred_on_the_origin() -> void:
+static func _room_at(w: int, h: int, origin: Vector3) -> Dictionary:
+	var scene := CRYPT.duplicate(true)
+	scene["width"] = w
+	scene["height"] = h
+	scene["originX"] = origin.x
+	scene["originZ"] = origin.z
+	return scene
+
+
+func test_the_entrance_is_still_centred_on_the_world_origin() -> void:
 	var world := _world_with_room(12, 12)
 	# Unchanged behaviour for the room the party is in — the whole point of taking the room id
 	# as an argument now is that a second room can exist without moving the first.
@@ -61,12 +74,35 @@ func test_an_unregistered_room_falls_back_to_the_current_one() -> void:
 	assert_eq(world.grid_to_world("nowhere", 2, 2), world.grid_to_world("crypt", 2, 2))
 
 
-func test_world_to_grid_still_inverts_the_current_room() -> void:
-	var world := _world_with_room(12, 12)
-	for x in range(12):
-		for y in range(12):
+func test_world_to_grid_inverts_the_room_wherever_it_stands() -> void:
+	# The exact inverse of grid_to_world, for a room that is not the entrance. An origin-centred
+	# inverse reads every square in the gallery as a square somewhere off the board, which is a
+	# click that lands nowhere and is never sent.
+	var world := _world_at(10, 16, Vector3(0.0, 0.0, -14.0))
+	for x in range(10):
+		for y in range(16):
 			var point: Vector3 = world.grid_to_world("crypt", x, y)
 			assert_eq(world.world_to_grid(point), Vector2i(x, y), "square (%d, %d)" % [x, y])
+
+
+func test_world_to_grid_takes_the_room_like_its_inverse_does() -> void:
+	var world := _world_with_room(12, 12)
+	world.register_room("gallery", Vector2i(10, 16), Vector3(0.0, 0.0, -14.0))
+	var point: Vector3 = world.grid_to_world("gallery", 3, 9)
+	assert_eq(world.world_to_grid(point, "gallery"), Vector2i(3, 9))
+	assert_ne(world.world_to_grid(point), Vector2i(3, 9),
+		"read against the crypt, the same point is a different square — which is the bug")
+
+
+func test_room_at_names_the_floor_a_point_stands_on() -> void:
+	var world := _world_with_room(12, 12)
+	world.register_room("gallery", Vector2i(10, 16), Vector3(0.0, 0.0, -14.0))
+	assert_eq(world.room_at(world.grid_to_world("crypt", 6, 6)), "crypt")
+	assert_eq(world.room_at(world.grid_to_world("gallery", 5, 8)), "gallery")
+	# The two rooms meet at z = -6 and the gallery runs to z = -22. Past that is stone.
+	assert_eq(world.room_at(Vector3(0.0, 0.0, -23.0)), "",
+		"a point on no room's floor belongs to no room")
+	assert_eq(world.room_at(Vector3(20.0, 0.0, 0.0)), "")
 
 
 func test_grid_conversion_reads_the_live_room_size_from_table() -> void:
@@ -300,3 +336,41 @@ func test_the_pixel_pipeline_is_gone() -> void:
 	assert_false(scene.contains("pixel.gdshader"))
 	assert_false(_rig().has_method("_snap_focus"),
 		"camera focus is not quantised to a pixel grid")
+
+
+# ---- The camera, in a room that is not the entrance
+
+
+func test_the_clamp_follows_the_room_the_party_is_in() -> void:
+	# camera_rig.gd's own warning: a clamp fighting the follow "quietly cancels" it. Built
+	# around Vector3.ZERO, the clamp holds the camera over the entrance while the follow asks
+	# it to chase a party fourteen squares north, and the party walks out of shot.
+	Table.set_scene(SceneFixtures.scene(_room_at(12, 12, Vector3(0.0, 0.0, -14.0))))
+	var rig := _rig()
+	rig.set_process(false)
+	# The order World uses: the party is followed, then the framing settles onto it.
+	rig.follow(Vector3(0.0, 0.0, -14.0))
+	rig.settle("EXPLORATION")
+	assert_almost_eq(rig._focus.z, -14.0, 0.001,
+		"the middle of the room is in shot, so there is nothing to clamp")
+
+	rig.follow(Vector3(0.0, 0.0, -19.0))
+	rig._process(1.0)
+	var north: float = rig._focus.z
+	rig.follow(Vector3(0.0, 0.0, -9.0))
+	rig._process(1.0)
+	assert_lt(north, rig._focus.z, "the follow still moves the camera")
+	assert_lt(north, -14.0, "and it reaches for the party rather than for the entrance")
+
+
+func test_combat_frames_the_room_the_party_is_in() -> void:
+	var scene := _room_at(12, 12, Vector3(0.0, 0.0, -14.0))
+	scene["mode"] = "COMBAT"
+	Table.set_scene(SceneFixtures.scene(scene))
+	var rig := _rig()
+	rig.set_process(false)
+	rig.settle("COMBAT")
+	# The tactical view is the current room squared up in frame. Centred on the entrance it is
+	# a picture of the room they left.
+	assert_almost_eq(rig._focus.x, 0.0, 0.0001)
+	assert_almost_eq(rig._focus.z, -14.0, 0.0001)

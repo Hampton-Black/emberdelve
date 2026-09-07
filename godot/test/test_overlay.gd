@@ -679,3 +679,155 @@ func test_a_click_event_in_window_space_still_moves_the_right_square() -> void:
 	assert_eq(int(Net.outbound[0]["x"]), square.x,
 		"converted window click hits the unprojected square, not a neighbour")
 	assert_eq(int(Net.outbound[0]["y"]), square.y)
+
+
+# ---- Picking once the party has left the entrance
+
+
+## The party has crossed north into the gallery. The crypt stays on the board behind them, DIM,
+## still at the world origin; the gallery — the room they are in — stands at (0, -14).
+func _crossed() -> Dictionary:
+	return {
+		"roomId": "gallery", "mode": "EXPLORATION", "combat": null, "blocked": [],
+		"entities": [{"id": "keeper", "kind": "fighter", "name": "Roderick", "x": 5, "y": 8,
+			"hp": 12, "maxHp": 12, "isPlayerControlled": true}],
+		"rooms": [
+			{"roomId": "crypt", "width": 12, "height": 12, "floorType": "CRACKED_STONE",
+				"wallType": "CARVED", "lighting": "TORCHLIT", "props": [], "visited": true,
+				"originX": 0.0, "originZ": 0.0,
+				"exits": [{"id": "door-north", "x": 6, "y": 11,
+					"direction": "NORTH", "toRoomId": "gallery"}]},
+			{"roomId": "gallery", "width": 10, "height": 16, "floorType": "TILED",
+				"wallType": "CARVED", "lighting": "TORCHLIT", "props": [], "visited": true,
+				"originX": 0.0, "originZ": -14.0,
+				"exits": [{"id": "door-south", "x": 5, "y": 0,
+					"direction": "SOUTH", "toRoomId": "crypt"}]},
+		],
+	}
+
+
+func test_a_floor_click_lands_in_the_room_the_party_is_in() -> void:
+	var world := _world_with_scene(_crossed())
+	await wait_process_frames(2)
+	var cam := world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var square := Vector2i(3, 10)
+	var at: Vector2 = cam.unproject_position(world.grid_to_world("gallery", square.x, square.y))
+	assert_eq(world.pick_at(at).get("square", null), square,
+		"a square in the gallery is a square in the gallery, not one off the board")
+
+	world.handle_pointer(at, true)
+	assert_eq(Net.outbound.size(), 1, "and it is still a move")
+	if Net.outbound.is_empty():
+		return
+	assert_eq(Net.outbound[0]["type"], "moveTo")
+	assert_eq(int(Net.outbound[0]["x"]), square.x)
+	assert_eq(int(Net.outbound[0]["y"]), square.y)
+
+
+func test_a_click_on_a_room_you_are_not_in_does_nothing() -> void:
+	# Visible is not addressable (epic decision 8). The crypt is drawn, so it can be clicked at;
+	# read against the gallery its floor resolves to a perfectly plausible gallery square, and
+	# the party walks somewhere nobody pointed at.
+	var world := _world_with_scene(_crossed())
+	await wait_process_frames(2)
+	var cam := world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var at: Vector2 = cam.unproject_position(world.grid_to_world("crypt", 2, 2))
+	var picked: Dictionary = world.pick_at(at)
+	assert_null(picked.get("square", null), "a room you are not in is scenery")
+
+	var overlay := _overlay(world)
+	if overlay == null:
+		return
+	assert_true(overlay.intent(String(picked.get("entity_id", "")), picked.get("square", null),
+		String(picked.get("target_id", ""))).is_empty(), "no intent")
+
+	world.handle_pointer(at, true)
+	assert_eq(Net.outbound.size(), 0, "and nothing goes out")
+
+
+func test_the_door_back_is_still_clickable_from_the_room_beyond() -> void:
+	# The way home is a segment of the gallery's own south wall, fourteen squares from the world
+	# origin. Picking has to reach it there, or a crossing is a one-way trip.
+	var world := _world_with_scene(_crossed())
+	await wait_process_frames(2)
+	var cam := world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var door: Node3D = null
+	for child in (world.get_node("Room/Walls") as Node3D).get_children():
+		if child.has_meta("exit_id"):
+			door = child as Node3D
+	assert_not_null(door, "the gallery's door back to the crypt")
+	if door == null:
+		return
+	assert_eq(String(door.get_meta("exit_id")), "door-south")
+
+	var leaf := AABB()
+	var first := true
+	for mesh in door.find_children("*", "MeshInstance3D", true, false):
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		leaf = box if first else leaf.merge(box)
+		first = false
+	assert_false(first, "the doorway instanced a mesh")
+	if first:
+		return
+
+	var at: Vector2 = cam.unproject_position(leaf.get_center())
+	assert_eq(String(world.pick_at(at).get("target_id", "")), "door-south")
+
+	world.handle_pointer(at, true)
+	assert_eq(Net.outbound.size(), 1, "and it still crosses")
+	if Net.outbound.is_empty():
+		return
+	assert_eq(Net.outbound[0]["type"], "enterExit")
+	assert_eq(String(Net.outbound[0]["exitId"]), "door-south")
+
+
+func test_no_camera_corner_makes_a_room_you_are_not_in_clickable() -> void:
+	# A doorway wins a pick when the ray leaves the room without touching its floor, and with a
+	# neighbour drawn that ray now lands on something. Swept over all four corners and the whole
+	# of the crypt's floor: never a square, and never a target that is not this room's own way
+	# out. The one thing a click on the room beyond can do is take the door it came through —
+	# which is the door you are looking through, at the floor just past it. Anything else would
+	# be the party acting in a room they are not in.
+	var world := _world_with_scene(_crossed())
+	await wait_process_frames(2)
+	var rig: CameraRig = world.rig
+	assert_not_null(rig, "Camera3D")
+	if rig == null:
+		return
+
+	var squares: Array[String] = []
+	var targets: Array[String] = []
+	var crossings := 0
+	for _corner in 4:
+		for x in range(12):
+			for y in range(12):
+				var at: Vector2 = rig.unproject_position(world.grid_to_world("crypt", x, y))
+				var picked: Dictionary = world.pick_at(at)
+				if picked.get("square", null) != null:
+					squares.append("corner %d, crypt (%d, %d)" % [rig.corner, x, y])
+				var target := String(picked.get("target_id", ""))
+				if target == "door-south":
+					crossings += 1
+				elif not target.is_empty():
+					targets.append("corner %d, crypt (%d, %d): %s" % [rig.corner, x, y, target])
+		rig.rotate_by(1)
+		rig._process(1.0)
+		rig._process(1.0)
+
+	assert_eq(squares, [] as Array[String], "a square in a room the party is not in")
+	assert_eq(targets, [] as Array[String], "something other than the way out was addressable")
+	assert_gt(crossings, 0,
+		"the floor seen through the open door still picks the door, or crossing back by "
+		+ "pointing at the room you came from has quietly stopped working")
