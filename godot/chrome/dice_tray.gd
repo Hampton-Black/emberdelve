@@ -5,13 +5,11 @@ extends Control
 ## The stakes are drawn from the first frame — "ATHLETICS CHECK  DC 20" is legible while the die
 ## is still in the air, and that is most of the tension.
 ##
-## Laid out in Tumble's 232x76 design space and drawn at [member Tumble.DISPLAY_SCALE], as a
-## sibling of the transcript under the overlay. It deliberately does not wear the scene's
-## pixelation: at this size the readout is mostly text, and upscaled 8px monospace is unreadable
-## mush.
+## Laid out in Tumble's 232x76 design space. In the chrome it fills the chin's right half
+## and scales to that Control; isolation tests still pin it to the parent's bottom-right.
 
-# Inset from the overlay's bottom-right. The log already owns the bottom-left, so the
-# browser's centre-line placement would throw on top of the chat.
+# Inset from the parent's bottom-right when the tray is tested in isolation. In chrome
+# the chin's row sizes it; this pad is unused there.
 const BOTTOM_PAD := 22.0
 const READOUT_X := 98.0
 
@@ -61,6 +59,10 @@ func _ready() -> void:
 
 
 func _fit() -> void:
+	# A container child (the chin's right half) is sized by the row. Pinning
+	# bottom-right would fight that layout and throw on top of the log again.
+	if get_parent() is Container:
+		return
 	var max_w := Tumble.TRAY_WIDTH * Tumble.DISPLAY_SCALE
 	var parent_ctrl := get_parent() as Control
 	if parent_ctrl != null and parent_ctrl.size.x > 1.0:
@@ -138,27 +140,32 @@ func _draw() -> void:
 	var text := Tumble.caption(result)
 	var s := Tumble.DISPLAY_SCALE
 	if size.x > 1.0:
-		s = size.x / Tumble.TRAY_WIDTH
-	_paint(visual, text, s)
+		s = minf(s, size.x / Tumble.TRAY_WIDTH)
+	if size.y > 1.0:
+		s = minf(s, size.y / Tumble.TRAY_HEIGHT)
+	var plate := Vector2(Tumble.TRAY_WIDTH * s, Tumble.TRAY_HEIGHT * s)
+	var origin := Vector2((size.x - plate.x) * 0.5, (size.y - plate.y) * 0.5)
+	_paint(visual, text, s, origin)
 
 
-func _paint(visual: Dictionary, text: Dictionary, s: float) -> void:
+func _paint(visual: Dictionary, text: Dictionary, s: float, origin: Vector2) -> void:
 	var opacity: float = visual["opacity"]
 	var reveal: float = visual["reveal"]
 	var emphatic: bool = text["tone"] == "crit" or text["tone"] == "fumble"
 
 	var plate: Color = INK["plate"]
 	plate.a *= opacity
-	draw_rect(Rect2(0.0, 0.0, Tumble.TRAY_WIDTH * s, Tumble.TRAY_HEIGHT * s), plate, true)
+	draw_rect(Rect2(origin, Vector2(Tumble.TRAY_WIDTH * s, Tumble.TRAY_HEIGHT * s)), plate, true)
 
 	var edge: Color = Tumble.TONE_COLOR[text["tone"]] if emphatic and reveal > 0.0 else INK["edge"]
 	edge.a *= opacity
 	draw_rect(
-		Rect2(0.3 * s, 0.3 * s, (Tumble.TRAY_WIDTH - 0.6) * s, (Tumble.TRAY_HEIGHT - 0.6) * s),
+		Rect2(origin + Vector2(0.3 * s, 0.3 * s),
+			Vector2((Tumble.TRAY_WIDTH - 0.6) * s, (Tumble.TRAY_HEIGHT - 0.6) * s)),
 		edge, false, 0.6 * s, true)
 
 	for die in visual["dice"]:
-		_draw_die(die, opacity, s)
+		_draw_die(die, opacity, s, origin)
 
 	var stakes := String(text["label"])
 	if text["target"] != "":
@@ -166,27 +173,27 @@ func _paint(visual: Dictionary, text: Dictionary, s: float) -> void:
 	var fitted := _fitted(stakes, s)
 	var dim: Color = INK["dim"]
 	dim.a *= opacity
-	_draw_text(_font, Vector2(READOUT_X * s, 22.0 * s), fitted[0], int(fitted[1]), dim, false)
+	_draw_text(_font, origin + Vector2(READOUT_X * s, 22.0 * s), fitted[0], int(fitted[1]), dim, false)
 
 	# The arithmetic and the verdict land with the dice, not before. The readout slides up
 	# into place over `reveal` (TS translate Y, not a left-edge wipe) while fading in.
 	var slide := (1.0 - reveal) * 4.0 * s
 	var shown: Color = INK["text"]
 	shown.a *= opacity * reveal
-	_draw_text(_font, Vector2(READOUT_X * s, 41.0 * s + slide), text["arithmetic"],
+	_draw_text(_font, origin + Vector2(READOUT_X * s, 41.0 * s + slide), text["arithmetic"],
 		int(round(11.0 * s)), shown, false)
 
 	var verdict: Color = Tumble.TONE_COLOR[text["tone"]]
 	verdict.a *= opacity * reveal
-	_draw_text(_font_bold, Vector2(READOUT_X * s, 59.0 * s + slide), text["outcome"],
+	_draw_text(_font_bold, origin + Vector2(READOUT_X * s, 59.0 * s + slide), text["outcome"],
 		int(round(13.0 * s)), verdict, false)
 
 
-func _draw_die(die: Dictionary, opacity: float, s: float) -> void:
+func _draw_die(die: Dictionary, opacity: float, s: float, origin: Vector2) -> void:
 	var sides: int = die["sides"]
 	var shape: Dictionary = OUTLINE[sides] if OUTLINE.has(sides) else OUTLINE[20]
-	var origin := Vector2(die["x"], die["y"]) * s
-	draw_set_transform(origin, die["rotation"], Vector2.ONE)
+	var at := origin + Vector2(die["x"], die["y"]) * s
+	draw_set_transform(at, die["rotation"], Vector2.ONE)
 
 	var alpha := opacity * (0.55 if die["discarded"] else 1.0)
 	var body: Color = INK["discard_body"] if die["discarded"] else INK["body"]

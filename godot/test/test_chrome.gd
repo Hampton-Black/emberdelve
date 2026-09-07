@@ -287,7 +287,14 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_eq(input.placeholder_text, "What do you do?")
 	assert_gt(chin.global_position.y + 1.0, view.global_position.y + view.size.y,
 		"the chin sits below the playfield")
-	assert_gt(chin.size.x, win.x * 0.7, "the log takes the chin's width, not a corner veil")
+	assert_gt(chin.size.x, win.x * 0.7, "the chin spans the bezel, not a corner veil")
+	var chat: Control = chrome.get_node("%Chin/Row/Log")
+	var stage: Control = chrome.get_node_or_null("%ChinStage")
+	assert_not_null(stage, "the right half of the chin holds the die and the verbs")
+	if stage != null:
+		assert_almost_eq(chat.size.x, stage.size.x, 80.0,
+			"chat takes the left half; dice and buttons share the right")
+		assert_gt(stage.global_position.x, chat.global_position.x + chat.size.x * 0.5)
 	var chin_panel := (chin as PanelContainer).get_theme_stylebox("panel") as StyleBoxFlat
 	assert_not_null(chin_panel, "Chin wears a StyleBoxFlat")
 	if chin_panel != null:
@@ -300,8 +307,10 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	assert_eq(lintel.text, "THE CRYPT")
 	assert_true(lintel.visible)
 
-	assert_not_null(chrome.get_node_or_null("Overlay/DiceTray"),
-		"the tray is overlay chrome, not a 3D object")
+	assert_not_null(chrome.get_node_or_null("%DiceTray"),
+		"the tray lives in the chin's right half, not over the crypt")
+	assert_eq(chrome.get_node_or_null("Overlay/DiceTray"), null,
+		"the tray left the overlay")
 	assert_eq(world.get_node_or_null("DiceTray"), null,
 		"not inside the World viewport")
 	assert_eq(sub.get_node_or_null("DiceTray"), null)
@@ -330,10 +339,10 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 	var record_size := record.get_theme_font_size("normal_font_size")
 	assert_eq(record_size, 13, "chrome type matches the browser log, not the engine default")
 
-	var tray: Control = chrome.get_node("Overlay/DiceTray")
-	assert_eq(tray.anchor_left, 1.0)
-	assert_eq(tray.anchor_right, 1.0)
-	assert_eq(tray.anchor_bottom, 1.0)
+	var tray: Control = chrome.get_node("%DiceTray")
+	assert_eq(tray.get_parent().name, "ChinStage")
+	assert_true(chin.get_global_rect().has_point(tray.global_position + Vector2(8, 8)),
+		"the tray sits in the chin")
 
 	var gallery := CRYPT.duplicate(true)
 	gallery["roomId"] = "gallery"
@@ -715,6 +724,10 @@ func test_combat_puts_chips_over_the_playfield_and_verbs_in_the_chin() -> void:
 	if verbs.size.x > 0.0:
 		assert_true(chin.get_global_rect().has_point(verbs.global_position + Vector2(8, 8)),
 			"verbs sit in the chin")
+		var stage: Control = chrome.get_node_or_null("%ChinStage")
+		if stage != null:
+			assert_true(stage.get_global_rect().has_point(verbs.global_position + Vector2(8, 8)),
+				"verbs share the right half with the die")
 	assert_not_null(verbs.find_child("Attack", true, false))
 	assert_not_null(verbs.find_child("Move", true, false))
 	assert_not_null(verbs.find_child("EndTurn", true, false))
