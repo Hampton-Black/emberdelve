@@ -746,6 +746,47 @@ func test_a_combat_attack_shows_the_die_beside_the_verbs() -> void:
 	assert_eq(verbs.get_parent(), stage)
 	assert_true(stage.get_global_rect().has_point(tray.global_position + Vector2(8, 8)))
 	assert_true(stage.get_global_rect().has_point(verbs.global_position + Vector2(8, 8)))
+	assert_lt(verbs.global_position.x, tray.global_position.x,
+		"verbs sit left of the die, next to the log")
+	var chat: Control = chrome.get_node("%Chin/Row/Log")
+	assert_lt(verbs.global_position.x - (chat.global_position.x + chat.size.x), 40.0,
+		"verbs sit just to the right of the log, not the far edge")
+
+
+func test_an_enemy_turn_does_not_write_acting_in_the_chin() -> void:
+	# The waiting label wrapped to one glyph per line in a skinny column. The log
+	# already says who is acting; the chin does not need a second copy.
+	Table.set_started()
+	Table.combat_beat = {
+		"view": {
+			"order": [
+				{"entityId": "fighter", "name": "Roderick", "initiative": 18,
+					"isPlayerControlled": true},
+				{"entityId": "goblin", "name": "Vessk", "initiative": 11,
+					"isPlayerControlled": false},
+			],
+			"activeId": "goblin", "round": 1, "movementRemaining": 6, "actionAvailable": true,
+			"legalMoves": [], "legalTargets": [{"x": 2, "y": 2}],
+		},
+		"opened_at": Time.get_ticks_msec() - 1200,
+		"closing_at": null,
+	}
+	Table.combat_changed.emit()
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	var verbs: Control = chrome.get_node_or_null("%CombatVerbs")
+	assert_not_null(verbs, "CombatVerbs")
+	if verbs == null:
+		return
+	assert_false(verbs.visible, "the enemy turn does not occupy the chin")
+	var waiting: Control = chrome.find_child("Waiting", true, false)
+	if waiting != null:
+		assert_false(waiting.visible, "no vertical 'is acting' column")
 
 
 func test_combat_puts_chips_over_the_playfield_and_verbs_in_the_chin() -> void:

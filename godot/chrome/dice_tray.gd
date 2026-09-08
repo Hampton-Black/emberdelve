@@ -82,15 +82,15 @@ func stage_layout(host: Vector2, die_count: int) -> Dictionary:
 	var count := maxi(die_count, 1)
 	var rest_span := float(count - 1) * (Tumble.DIE_RADIUS * 2.0 + Tumble.DIE_GAP)
 	var rest_mid := Vector2(Tumble.FIRST_DIE_X + rest_span * 0.5, Tumble.REST_Y)
-	var stakes_h := 22.0
-	var arith_h := 22.0
-	var outcome_h := 28.0
-	var gap := 10.0
+	var stakes_h := 24.0
+	var arith_h := 28.0
+	var outcome_h := 40.0
+	var gap := 8.0
 	var caption_h := stakes_h + gap + arith_h + gap + outcome_h
 	var die_budget := maxf(host.y - caption_h, Tumble.DIE_RADIUS * 2.0)
 	var s := minf(die_budget / (Tumble.DIE_RADIUS * 2.0),
 		host.x / (rest_span + Tumble.DIE_RADIUS * 4.0))
-	s = minf(s, 6.0)
+	s = minf(s, Tumble.DISPLAY_SCALE)
 	var die_r := Tumble.DIE_RADIUS * s
 	var stack_h := caption_h + die_r * 2.0
 	var stack_top := maxf(0.0, (host.y - stack_h) * 0.5)

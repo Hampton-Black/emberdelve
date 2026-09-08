@@ -34,7 +34,6 @@ var _track: HBoxContainer
 var _attack: Button
 var _move: Button
 var _end: Button
-var _waiting: Label
 var _controls: VBoxContainer
 
 
@@ -124,11 +123,6 @@ func _build() -> void:
 	_end.pressed.connect(_end_turn)
 	_controls.add_child(_end)
 
-	_waiting = _label("Waiting", 10)
-	_waiting.modulate = Color(INK, 0.6)
-	_waiting.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_controls.add_child(_waiting)
-
 
 func _verb(node_name: String, caption: String) -> Button:
 	var btn := Button.new()
@@ -201,8 +195,6 @@ func _redraw() -> void:
 		set_process(false)
 		return
 	visible = true
-	if verbs != self:
-		verbs.visible = true
 	mouse_filter = MOUSE_FILTER_IGNORE
 	_sync(beat)
 	_paint()
@@ -252,7 +244,9 @@ func _sync(beat: Dictionary) -> void:
 	_attack.visible = yours
 	_move.visible = yours
 	_end.visible = yours
-	_waiting.visible = not yours
+	var verbs := _verbs_host()
+	if verbs != self:
+		verbs.visible = yours
 	if yours:
 		var squares := int(combat.get("movementRemaining", 0))
 		_move.modulate.a = 1.0 if squares > 0 else 0.32
@@ -261,9 +255,6 @@ func _sync(beat: Dictionary) -> void:
 		_end.disabled = Table.awaiting_dm
 		_end.text = "…" if Table.awaiting_dm else "END TURN"
 		_end.modulate.a = 0.35 if Table.awaiting_dm else 1.0
-	else:
-		var who := String(active.get("name", "Something")) if not active.is_empty() else "Something"
-		_waiting.text = "the room is still again" if closing else "%s is acting…" % who
 
 
 func _make_chip(combatant: Dictionary) -> Control:

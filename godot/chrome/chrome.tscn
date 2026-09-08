@@ -244,14 +244,6 @@ size_flags_stretch_ratio = 1.0
 size_flags_vertical = 3
 theme_override_constants/separation = 8
 
-[node name="DiceTray" type="Control" parent="Frame/Chin/Row/ChinStage"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-mouse_filter = 2
-script = ExtResource("6_tray")
-
 [node name="CombatVerbs" type="Control" parent="Frame/Chin/Row/ChinStage"]
 unique_name_in_owner = true
 visible = false
@@ -259,6 +251,14 @@ custom_minimum_size = Vector2(132, 0)
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
+
+[node name="DiceTray" type="Control" parent="Frame/Chin/Row/ChinStage"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+script = ExtResource("6_tray")
 
 [node name="CombatChips" type="Control" parent="Frame"]
 unique_name_in_owner = true

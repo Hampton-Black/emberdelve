@@ -75,6 +75,10 @@ func test_the_die_stands_free_with_captions_around_it() -> void:
 	assert_gt(layout["arithmetic"].y, die.y + radius, "arithmetic sits below the die")
 	assert_gt(layout["outcome"].y, layout["arithmetic"].y, "outcome under the arithmetic")
 	assert_almost_eq(layout["stakes"].x, die.x, 8.0, "stakes are centred on the die")
+	assert_lt(float(layout["scale"]), Tumble.DISPLAY_SCALE + 0.51,
+		"the die stays near its original size, not filling the chin")
+	assert_lt(layout["outcome"].y + 22.0, 260.0,
+		"FAILURE / SUCCESS sits inside the chin, not clipped by it")
 
 
 func test_tumble_still_decides_where_the_die_rests() -> void:
