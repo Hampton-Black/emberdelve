@@ -1,14 +1,30 @@
+@tool
 extends Node3D
 
 ## A recess cut into the wall. Local +Z is into the wall; the face it mounts on is
 ## WALL_FACE — half a square in, less half the wall's depth. That figure belongs to
 ## the wall kit, which is why it is computed here rather than baked.
+##
+## @tool so the preview draws it the way the game does; see `_editing_myself`.
 
 const WALL_FACE := 0.5 - Room.WALL_DEPTH / 2.0
 const ALCOVE_HEIGHT := 0.73
 
 
+## True while this node is the scene open in the editor, rather than an instance of it built by
+## editor tooling. `_ready` below writes to transforms that belong to the .tscn, so running it on
+## the scene being edited would bake computed positions into the authored file on the next save.
+## Building an instance somewhere else — which is all the preview does — is safe.
+func _editing_myself() -> bool:
+	if not Engine.is_editor_hint():
+		return false
+	var tree := get_tree()
+	return tree != null and tree.edited_scene_root == self
+
+
 func _ready() -> void:
+	if _editing_myself():
+		return
 	var inner := get_node_or_null("Inner") as Node3D
 	if inner == null:
 		return

@@ -1,3 +1,4 @@
+@tool
 class_name MeshProp
 extends Node3D
 
@@ -7,6 +8,10 @@ extends Node3D
 ##
 ## Which model a given prop gets is hashed from the room and the prop's id — `Room.hash32`,
 ## never `randi()`, so three pillars come back the same way on a reconnect.
+##
+## @tool so editor tooling can call `configure` — a non-tool script is a placeholder in
+## the editor and keeps no methods. Nothing here has a side effect and there is no
+## `_ready`, so it does nothing in the editor unless something asks it to.
 
 const MESH_PROPS := {
 	"PILLAR": [
