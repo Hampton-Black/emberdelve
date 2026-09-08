@@ -691,6 +691,63 @@ func test_exploration_shows_no_chips_or_verbs() -> void:
 	assert_false(verbs.visible)
 
 
+func test_an_exploration_check_shows_the_die_without_combat_verbs() -> void:
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	Table.active_roll = {"result": _skill_check(), "started_at": Time.get_ticks_msec()}
+	Table.roll_thrown.emit(_skill_check())
+	var verbs: Control = chrome.get_node_or_null("%CombatVerbs")
+	var tray: Control = chrome.get_node_or_null("%DiceTray")
+	var chin: Control = chrome.get_node_or_null("%Chin")
+	assert_not_null(verbs, "CombatVerbs")
+	assert_not_null(tray, "DiceTray")
+	assert_not_null(chin, "Chin")
+	if verbs == null or tray == null or chin == null:
+		return
+	assert_false(verbs.visible, "a check is not a fight")
+	assert_true(chin.get_global_rect().has_point(tray.global_position + Vector2(8, 8)),
+		"the die sits in the chin")
+	assert_not_null(Table.active_roll, "the throw is in the air")
+
+
+func test_a_combat_attack_shows_the_die_beside_the_verbs() -> void:
+	Table.set_started()
+	_open_our_turn()
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	var attack := {
+		"request": {"dice": "1d20", "modifier": 5, "advantage": "NORMAL",
+			"purpose": "ATTACK", "actorId": "fighter", "targetId": "goblin",
+			"dc": 15, "skill": null},
+		"faces": [14], "total": 19, "outcome": "HIT",
+	}
+	Table.active_roll = {"result": attack, "started_at": Time.get_ticks_msec()}
+	Table.roll_thrown.emit(attack)
+	var verbs: Control = chrome.get_node_or_null("%CombatVerbs")
+	var tray: Control = chrome.get_node_or_null("%DiceTray")
+	var stage: Control = chrome.get_node_or_null("%ChinStage")
+	assert_not_null(verbs, "CombatVerbs")
+	assert_not_null(tray, "DiceTray")
+	assert_not_null(stage, "ChinStage")
+	if verbs == null or tray == null or stage == null:
+		return
+	assert_true(verbs.visible)
+	assert_eq(tray.get_parent(), stage)
+	assert_eq(verbs.get_parent(), stage)
+	assert_true(stage.get_global_rect().has_point(tray.global_position + Vector2(8, 8)))
+	assert_true(stage.get_global_rect().has_point(verbs.global_position + Vector2(8, 8)))
+
+
 func test_combat_puts_chips_over_the_playfield_and_verbs_in_the_chin() -> void:
 	Table.set_started()
 	_open_our_turn()

@@ -62,6 +62,30 @@ func test_the_tray_pins_to_the_bottom_right() -> void:
 	assert_almost_eq(tray.offset_bottom, -pad, 0.01)
 
 
+func test_the_die_stands_free_with_captions_around_it() -> void:
+	# The overlay tray put the readout in a recessed plate to the right of the die.
+	# The chin wants the die itself, with the stakes above and the arithmetic below.
+	var tray := _tray()
+	await wait_frames(1)
+	var layout: Dictionary = tray.stage_layout(Vector2(720, 260), 1)
+	var radius: float = Tumble.DIE_RADIUS * float(layout["scale"])
+	var die: Vector2 = layout["die"]
+	assert_false(bool(layout["well"]), "no inner tray well")
+	assert_lt(layout["stakes"].y, die.y - radius, "stakes sit above the die")
+	assert_gt(layout["arithmetic"].y, die.y + radius, "arithmetic sits below the die")
+	assert_gt(layout["outcome"].y, layout["arithmetic"].y, "outcome under the arithmetic")
+	assert_almost_eq(layout["stakes"].x, die.x, 8.0, "stakes are centred on the die")
+
+
+func test_tumble_still_decides_where_the_die_rests() -> void:
+	var tray := _tray()
+	await wait_frames(1)
+	var layout: Dictionary = tray.stage_layout(Vector2(720, 260), 1)
+	var rest: Vector2 = layout["origin"] + Vector2(Tumble.FIRST_DIE_X, Tumble.REST_Y) * float(layout["scale"])
+	assert_almost_eq(rest.x, layout["die"].x, 0.51)
+	assert_almost_eq(rest.y, layout["die"].y, 0.51)
+
+
 func test_the_tray_stays_idle_with_no_active_roll() -> void:
 	var tray := _tray()
 	await wait_frames(1)
