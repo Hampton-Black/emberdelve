@@ -18,7 +18,8 @@ the decision, not the component.
 | [0008](0008-model-picks-come-from-played-sessions.md) | Model picks come from played sessions, not benchmarks | Accepted 2026-09-05 |
 | [0009](0009-the-world-frame-is-anchored-at-the-entrance.md) | The world frame is server-owned and anchored at the entrance | Accepted 2026-09-06 |
 | [0010](0010-the-room-nearer-the-entrance-owns-the-shared-wall.md) | The room nearer the entrance owns the shared wall | Accepted 2026-09-06 |
-| [0011](0011-visible-is-not-addressable.md) | Visible is not addressable | Proposed |
+| [0011](0011-visible-is-not-addressable.md) | Visible is not addressable | Accepted 2026-09-07 |
+| [0012](0012-a-consequence-may-only-do-what-a-tool-can-do.md) | A consequence may only do what a tool can already do | Proposed |
 
 0001–0008 were back-filled on 2026-09-06 from decisions already recorded in `AGENTS.md`. Where an ADR
 and `AGENTS.md` disagree, `AGENTS.md` is the operational document and wins; open a new ADR rather

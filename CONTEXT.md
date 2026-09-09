@@ -113,9 +113,20 @@ which only `DELVE` is in scope. It speaks twice: a threshold fires a **sign**, t
 consequence. Diegetic and unlabelled — never a segment counter on screen. Clocks cannot kill.
 _Not: the **narration queue**, which the client's code calls `Clock`. Unrelated._
 
-**Sign** — what a clock says at a threshold, before it fills. Engine-fired, table-driven,
-narrated by the DM. A clock that speaks only at full is a jump scare; one that speaks every tick
-is a counter with extra steps.
+**Consequence** — what a clock's table holds (`ConsequenceId`). A named, pre-validated bundle of
+events that already have an `Event` + `Diff` pair, never an effect language: **a consequence may
+only do what a tool can already do.** Drawn where a table has several entries, fixed where it has
+one — a one-entry table is a fixed consequence and is allowed to be.
+
+**Sign** — a **consequence whose bundle is empty**: what a clock says at a threshold, before it
+fills. Engine-fired, table-driven, narrated by the DM. A clock that speaks only at full is a jump
+scare; one that speaks every tick is a counter with extra steps.
+_Not: a separate kind of thing from a consequence. One enum, one firing path; the bundle is the
+only difference._
+
+**Disposition** — how a creature arrives (`Disposition`). `HOSTILE` starts a fight; `WARY` puts
+the creature on the board and leaves the meeting open. A consequence **brings something in; it
+does not decide how the meeting goes.** The delve-scale ancestor of §9's reaction roll.
 
 **Square** — one grid cell (`Square`). Distance is **Chebyshev everywhere**: a diagonal costs
 one. Two metrics in one combat system is how "why can it hit me from there" starts.
