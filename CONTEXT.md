@@ -47,6 +47,18 @@ narration describes something the world never received.
 place model text enters the prompt. It makes a round trip into the next prompt and reaches no
 roll, no legal move and no renderer.
 
+**Projection** — the engine-authored markdown block of current state that goes into every DM
+prompt (`DmService.worldState`). It **never truncates**, which is its whole point against the
+six-turn transcript window, so anything added to it is in every prompt for the rest of the
+session. Blocks are labelled and obviously not prose, because the model imitates the shape of
+what it is sent.
+_Not: "the context", which is the projection plus the transcript window._
+
+**Band** — a described state where a number would be read aloud: `barely marked` / `bloodied` /
+`badly hurt` / `barely standing` (`BeatRenderer.condition`). One vocabulary, used by both the
+combat beats and the projection. The rule that decides band-or-number: **a count that drives a
+tool decision stays a count; a count that only describes state becomes a band.**
+
 **Diff** — what the server sends the client after a turn (`dm.model.Diff`, sealed:
 `EntityAdded`, `EntityRemoved`, `EntityMoved`, `StatChanged`, `PropRevealed`, `ModeChanged`,
 `CombatChanged`). Scoped to the room the party is standing in — a diff never names a room.
@@ -95,6 +107,16 @@ never what it once said.
 there is exactly one. Every action carries an `actorId`.
 _Not: "the player" as a singleton in code — the word is fine in prose._
 
+**Clock** — a counter that ticks on a defined unit and fires a table when it fills
+(`dm.model.Clock`, design doc §9). One primitive at three scales — `DELVE`, `WATCH`, `FRONT` — of
+which only `DELVE` is in scope. It speaks twice: a threshold fires a **sign**, the fill fires the
+consequence. Diegetic and unlabelled — never a segment counter on screen. Clocks cannot kill.
+_Not: the **narration queue**, which the client's code calls `Clock`. Unrelated._
+
+**Sign** — what a clock says at a threshold, before it fills. Engine-fired, table-driven,
+narrated by the DM. A clock that speaks only at full is a jump scare; one that speaks every tick
+is a counter with extra steps.
+
 **Square** — one grid cell (`Square`). Distance is **Chebyshev everywhere**: a diagonal costs
 one. Two metrics in one combat system is how "why can it hit me from there" starts.
 
@@ -120,8 +142,12 @@ both subscribe to it. Game state never lives in a `Control` or a `Node3D`.
 Chosen by a single policy function, `Room.level_for`. Only a `LIT` room contributes lights, which
 is what keeps `MAX_TORCH_LIGHTS` a per-room budget however far the dungeon runs.
 
-**Clock** — the ordered narration queue (`godot/autoload/clock.gd`). One line at a time, in
-arrival order. `Clock.hold` is what gates the transcript behind a dramatic roll.
+**Narration queue** — the ordered queue that speaks one line at a time, in arrival order
+(`godot/autoload/clock.gd`, so the code calls it `Clock`). `Clock.hold` is what gates the
+transcript behind a dramatic roll.
+
+_Not: "the clock", which is the delve-side counter below. The two are unrelated; the name
+collision is in the code, not in the domain._
 
 **Dramatic roll** — a roll that animates, decided by `isDramatic()` and keyed off *purpose*, not
 off who rolled. Attacks, saves and skill checks throw; damage and initiative go to the log.
