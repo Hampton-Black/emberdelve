@@ -47,6 +47,15 @@ narration describes something the world never received.
 place model text enters the prompt. It makes a round trip into the next prompt and reaches no
 roll, no legal move and no renderer.
 
+**Directive** — a one-clause instruction the engine leaves for the narrator's next prose call: an
+arrival, a sign, a torch relit. Directives wait in the order they were left, and the next narration
+spends all of them — except that one left while a fight is already running is dropped. One left by
+the action that started the fight is not. Each is about **a room** or about **the party**. A
+crossing discards the ones about the room being left, because they have stopped being true, and
+keeps the ones about the party, because a sign that is lost is a clock that went quiet.
+_Not: a **fact**, which the narrator asserts and the projection keeps for good. A directive is the
+engine's, and it is spent once._
+
 **Projection** — the engine-authored markdown block of current state that goes into every DM
 prompt (`DmService.worldState`). It **never truncates**, which is its whole point against the
 six-turn transcript window, so anything added to it is in every prompt for the rest of the
