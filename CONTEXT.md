@@ -70,10 +70,10 @@ is standing in. *Not: the picture of one room* — it stopped being that when vi
 on the board.
 
 **Room view** — one room as far as the client is allowed to draw it (`RoomView`), current or not:
-size, floor and wall type, lighting, exits, visible props, its covered walls, its origin in the
-world frame, and whether it has been visited. One shape for every room, because the shared-wall
-owner is decided by distance from the entrance rather than by where the party stands. Entities
-never appear in one.
+size, floor and wall type, its *current* lighting, exits, visible props, its covered walls, its
+origin in the world frame, and whether it has been visited. One shape for every room, because the
+shared-wall owner is decided by distance from the entrance rather than by where the party stands.
+Entities never appear in one.
 
 **Covered wall** — a perimeter segment a room must not draw, because a room nearer the entrance
 already draws that plane (`Rooms.coveredWalls`, shipped as `RoomView.coveredWalls`). Two rooms
@@ -89,6 +89,14 @@ initiative.
 
 **Exit** — a way out of a room (`Exit`, with a `Direction`). Taken via the `use_exit` tool,
 which is mechanics-only and withheld in combat.
+
+**Lighting preset** — what a room's own fires are doing (`LightingPreset`: `TORCHLIT`, `DIM`,
+`DARK`). A fact about the place, not about where the party is standing. **Folded state, not
+authored content**: `RoomDefinition.lighting` is only the initial value, and an ALERT clock
+filling moves the party's room one step in the direction that room's `fires.to` names. One-way — a
+room has exactly two light states, ever, and a torch relights nothing, because a torch is the
+party's and the fires are the room's.
+_Not: the **render level**, which is a different axis and is about visibility rather than fire._
 
 **Traversal** — leaving a room and coming back to find it as you left it. The M3 gate.
 _Not: "navigation", which was the M1 plan's word for a different, generator-shaped problem._
@@ -164,6 +172,8 @@ both subscribe to it. Game state never lives in a `Control` or a `Node3D`.
 `DIM` for one they have visited and left, `BLACK` for one only ever glimpsed through a doorway.
 Chosen by a single policy function, `Room.level_for`. Only a `LIT` room contributes lights, which
 is what keeps `MAX_TORCH_LIGHTS` a per-room budget however far the dungeon runs.
+_Not: the **lighting preset**, which is what the room's own fires are doing. The name collision on
+`DIM` is real and the axes are independent — a `LIT` room can be `DARK`._
 
 **Narration queue** — the ordered queue that speaks one line at a time, in arrival order
 (`godot/autoload/clock.gd`, so the code calls it `Clock`). `Clock.hold` is what gates the
