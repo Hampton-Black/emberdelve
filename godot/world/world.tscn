@@ -55,6 +55,12 @@ script = ExtResource("5_light")
 [node name="WorldEnvironment" type="WorldEnvironment" parent="Room/Lighting/TORCHLIT"]
 environment = SubResource("EnvTorchlit")
 
+[node name="BRAZIERLIT" type="Node3D" parent="Room/Lighting"]
+visible = false
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Room/Lighting/BRAZIERLIT"]
+environment = SubResource("EnvTorchlit")
+
 [node name="DIM" type="Node3D" parent="Room/Lighting"]
 visible = false
 

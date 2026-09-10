@@ -28,8 +28,11 @@ const TORCH_INSET := WALL_DEPTH * 0.5
 const UNLIT_TINT := Color(0.043, 0.043, 0.055)
 const EMBER := Color(1.0, 0.6039216, 0.2392157)
 const FLAME_CORE := Color(1.0, 0.8313726, 0.5372549)
+## BRAZIERLIT is zero on purpose: the room's fires stand on its floor as props, and a wall full of
+## torches is what made a carried light pointless. See `LightingPreset`.
 const TORCH_SPACING := {
 	"TORCHLIT": 3,
+	"BRAZIERLIT": 0,
 	"DIM": 5,
 	"DARK": 0,
 }

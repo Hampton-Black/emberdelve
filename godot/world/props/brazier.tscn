@@ -11,10 +11,10 @@ roughness = 0.6
 metallic = 0.5
 
 [sub_resource type="StandardMaterial3D" id="Coals"]
-albedo_color = Color(1, 0.831373, 0.537255, 1)
+albedo_color = Color(0.681, 0.923, 0.692, 1)
 roughness = 1.0
 emission_enabled = true
-emission = Color(1, 0.831373, 0.537255, 1)
+emission = Color(0.681, 0.923, 0.692, 1)
 emission_energy_multiplier = 0.85
 
 [sub_resource type="CylinderMesh" id="StemMesh"]
@@ -62,8 +62,8 @@ surface_material_override/0 = SubResource("Coals")
 
 [node name="flame" type="OmniLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
-light_color = Color(1, 0.603922, 0.239216, 1)
-light_energy = 4.5
+light_color = Color(0.42, 0.86, 0.44, 1)
+light_energy = 2.8
 shadow_enabled = false
 omni_range = 9.0
 omni_attenuation = 2.0

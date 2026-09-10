@@ -5,7 +5,7 @@
   "height": 12,
   "floorType": "CRACKED_STONE",
   "wallType": "CARVED",
-  "lighting": "TORCHLIT",
+  "lighting": "BRAZIERLIT",
   "props": [
     {
       "id": "door-north",

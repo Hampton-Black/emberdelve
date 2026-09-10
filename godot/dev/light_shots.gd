@@ -1,13 +1,14 @@
 extends Node3D
 
-## Throwaway harness for emberdelve-27l — renders the crypt at candidate ambient energies so the
-## number can be judged by looking rather than by reading. Delete when the ticket closes.
+## Harness for emberdelve-27l, kept for emberdelve-4h9.16 — renders the crypt with and without its
+## old wall fires and orange braziers, so a light can be judged by looking rather than by reading.
 ##
 ##     /Applications/Godot.app/Contents/MacOS/Godot --path godot res://dev/light_shots.tscn
 ##
 ## It drives the real client: world.tscn, so lighting.gd picks the environment, room.gd builds the
-## wall torches, and CameraRig sits at its own four corners. Nothing here restates a number the
-## game holds — the only value written is EnvTorchlit's ambient_light_energy, one at a time.
+## wall torches, and CameraRig sits at its own four corners. The "green" case is the brazier as
+## `brazier.tscn` authors it, read back rather than restated. The door's exit marker is lit in every
+## shot, because it is the thing that has to read against whatever the floor has become.
 
 const SceneFixtures := preload("res://test/scene_fixtures.gd")
 const PreviewRoom := preload("res://dev/preview_room.gd")
@@ -17,34 +18,27 @@ const PreviewRoom := preload("res://dev/preview_room.gd")
 ## the ambient, because `room.gd` only burns the torches of the room the party is in. The braziers
 ## are props and stay lit either way. So the ladder crosses both.
 const CASES := [
-	{"fires": true, "braziers": "orange", "flame": ORANGE_FLAME, "power": 4.5,
-		"note": "as M3 played it"},
-	{"fires": false, "braziers": "orange", "flame": ORANGE_FLAME, "power": 4.5, "note": ""},
-	{"fires": false, "braziers": "green", "flame": GREEN_FLAME, "power": GREEN_POWER,
-		"note": "as the DM describes it"},
-	{"fires": false, "braziers": "out", "flame": GREEN_FLAME, "power": GREEN_POWER,
+	{"fires": true, "braziers": "orange", "note": "as M3 played it"},
+	{"fires": false, "braziers": "orange", "note": ""},
+	{"fires": false, "braziers": "green", "note": "as the game ships it — emberdelve-4h9.16"},
+	{"fires": false, "braziers": "out",
 		"note": "every fire out — what a lantern would be the only light in"},
 ]
 
-## The ambient this ticket settled. Every sheet is rendered at it; the variable is the fires.
+## The ambient emberdelve-27l settled. Every sheet is rendered at it; the variable is the fires.
 const AMBIENT := 0.7
 
-## The colour both recorded sessions gave the crypt unprompted — "guttering low with green,
-## smokeless flame", "the green braziers still hiss". Chosen against the floor rather than in
-## isolation: `Overlay.EXIT_TINT` is a teal (#3cd2c8), so a green that leans cold puts the door
-## marker back where ADR-0011 found it invisible. This one sits about 56 degrees of hue off it.
-##
-## Energy is well under the orange 4.5 because green is where the eye is most sensitive — the same
-## number reads far hotter, and the prose word is "guttering".
-const GREEN_FLAME := Color(0.42, 0.86, 0.44)
-const GREEN_POWER := 2.8
+## The brazier as it burned before emberdelve-4h9.16, for the comparison. The green is not here —
+## it is whatever `brazier.tscn` says, captured before anything is touched.
 const ORANGE_FLAME := Color(1.0, 0.603922, 0.239216)
+const ORANGE_POWER := 4.5
 const OUT := "user://light_shots"
 const SHOT := Vector2i(1920, 1080)
 const CELL := Vector2i(960, 540)
 
 var _world: Node3D
 var _label: Label
+var _authored: Dictionary = {}
 
 
 func _ready() -> void:
@@ -95,8 +89,12 @@ func _run() -> void:
 	await _settle(30)
 
 	var rig = _world.get_node("Camera3D")
-	var env: Environment = (_world.get_node("Room/Lighting/TORCHLIT/WorldEnvironment")
-		as WorldEnvironment).environment
+	# The group lighting.gd actually switched on. An inactive group's environment is null.
+	var env: Environment = (_world.get_node("Room/Lighting/%s/WorldEnvironment"
+		% String(view.get("lighting", "TORCHLIT"))) as WorldEnvironment).environment
+	# The marker ADR-0011 found invisible once already. It has to be looked at, not assumed.
+	var door: Dictionary = view.get("exits", [])[0]
+	_world.get_node("Overlay").set_hover(Vector2i(int(door["x"]), int(door["y"])), "exit")
 
 	for corner in 4:
 		var sheet := Image.create(CELL.x * 2, CELL.y * 2, false, Image.FORMAT_RGBA8)
@@ -104,7 +102,7 @@ func _run() -> void:
 			var c: Dictionary = CASES[i]
 			env.ambient_light_energy = AMBIENT
 			_set_fires(bool(c["fires"]))
-			_set_braziers(String(c["braziers"]), c["flame"], float(c["power"]))
+			_set_braziers(String(c["braziers"]))
 			_label.text = "wall fires %s   ·   braziers %s   ·   ambient %.2f   ·   corner %d%s" % [
 				"lit" if c["fires"] else "out", c["braziers"], AMBIENT, corner,
 				"" if String(c["note"]).is_empty() else "   ·   " + String(c["note"]),
@@ -122,9 +120,6 @@ func _run() -> void:
 			rig.rotate_by(1)
 			await _settle(50)
 
-	env.ambient_light_energy = AMBIENT
-	_set_fires(true)
-	_set_braziers("orange", ORANGE_FLAME, 4.5)
 	print("light_shots: done — %s" % ProjectSettings.globalize_path(OUT))
 	get_tree().quit()
 
@@ -141,26 +136,34 @@ func _set_fires(on: bool) -> void:
 
 ## The braziers are props, so `burning` never touched them — a room you have left keeps its brazier
 ## light. That is why the crypt seen from the gallery still had two pools of fire in it.
-func _set_braziers(mode: String, flame_colour: Color, power: float) -> void:
+func _set_braziers(mode: String) -> void:
 	# Props hang under `Props/<room id>`, not directly under `Props` — world.gd is explicit that a
 	# prop id is only unique within its room.
 	for prop in _world.get_node("Props/crypt").get_children():
 		if not String(prop.name).begins_with("brazier"):
 			continue
 		var flame := prop.get_node_or_null("flame") as OmniLight3D
-		if flame != null:
-			flame.visible = mode != "out"
-			flame.light_color = flame_colour
-			flame.light_energy = power
 		var coals := prop.get_node_or_null("Meshes/Coals") as MeshInstance3D
+		var mat: StandardMaterial3D = null
 		if coals != null:
-			var mat := coals.get_surface_override_material(0) as StandardMaterial3D
-			if mat != null:
-				var lit := mode != "out"
-				var tint := flame_colour.lightened(0.45)
-				mat.albedo_color = tint if lit else Color(0.24, 0.23, 0.22)
-				mat.emission = tint
-				mat.emission_energy_multiplier = 0.85 if lit else 0.0
+			mat = coals.get_surface_override_material(0) as StandardMaterial3D
+		# Read before the first write. The two braziers share one Coals material, so the second
+		# brazier would otherwise read back whatever the first was just painted.
+		if _authored.is_empty() and flame != null and mat != null:
+			_authored = {"colour": flame.light_color, "power": flame.light_energy,
+				"coals": mat.emission, "glow": mat.emission_energy_multiplier}
+		var lit := mode != "out"
+		var colour: Color = ORANGE_FLAME if mode == "orange" else _authored.get("colour", Color.WHITE)
+		var core: Color = colour.lightened(0.45) if mode == "orange" \
+			else _authored.get("coals", Color.WHITE)
+		if flame != null:
+			flame.visible = lit
+			flame.light_color = colour
+			flame.light_energy = ORANGE_POWER if mode == "orange" else float(_authored.get("power", 1.0))
+		if mat != null:
+			mat.albedo_color = core if lit else Color(0.24, 0.23, 0.22)
+			mat.emission = core
+			mat.emission_energy_multiplier = float(_authored.get("glow", 0.85)) if lit else 0.0
 
 
 func _settle(frames: int) -> void:

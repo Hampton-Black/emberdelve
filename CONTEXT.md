@@ -90,8 +90,10 @@ initiative.
 **Exit** — a way out of a room (`Exit`, with a `Direction`). Taken via the `use_exit` tool,
 which is mechanics-only and withheld in combat.
 
-**Lighting preset** — what a room's own fires are doing (`LightingPreset`: `TORCHLIT`, `DIM`,
-`DARK`). A fact about the place, not about where the party is standing. **Folded state, not
+**Lighting preset** — what a room's own fires are doing (`LightingPreset`: `TORCHLIT`,
+`BRAZIERLIT`, `DIM`, `DARK`). A fact about the place, not about where the party is standing.
+`BRAZIERLIT` is `TORCHLIT`'s air with no wall torches: the room is lit only by fires that stand on
+its floor as props. The crypt is the one room that has it. **Folded state, not
 authored content**: `RoomDefinition.lighting` is only the initial value, and an ALERT clock
 filling moves the party's room one step in the direction that room's `fires.to` names. One-way — a
 room has exactly two light states, ever, and a torch relights nothing, because a torch is the

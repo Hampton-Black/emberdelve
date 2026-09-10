@@ -209,7 +209,13 @@ func test_the_sarcophagus_is_a_tomb_not_a_crate() -> void:
 		assert_ne(cyl.top_radius, cyl.bottom_radius, "the chest tapers toward the top")
 
 
-func test_the_brazier_burns_ember_not_green() -> void:
+## Both recorded sessions describe the crypt's braziers as green, unprompted, and treat it as world
+## fact (emberdelve-4h9.16). This test used to assert ember, "or the room tints" — tinting the room
+## is now the point. The hue was picked against the floor, not in isolation: `Overlay.EXIT_TINT` is
+## a teal, and a green that leans colder puts the door marker back where ADR-0011 found it
+## invisible. The energy is well under the old orange 4.5 because the eye is most sensitive to
+## green, so the same number reads far hotter — and the prose word is "guttering".
+func test_the_brazier_burns_green() -> void:
 	assert_true(ResourceLoader.exists("res://world/props/brazier.tscn"), "brazier.tscn")
 	if not ResourceLoader.exists("res://world/props/brazier.tscn"):
 		return
@@ -220,10 +226,20 @@ func test_the_brazier_burns_ember_not_green() -> void:
 	assert_not_null(light, "brazier OmniLight named flame")
 	if light == null:
 		return
-	# ff9a3d — a hue with no green-dominant complement, or the room tints.
-	assert_almost_eq(light.light_color.r, 1.0, 0.02)
-	assert_almost_eq(light.light_color.g, 0.6039216, 0.02)
-	assert_almost_eq(light.light_color.b, 0.2392157, 0.02)
+	assert_almost_eq(light.light_color.r, 0.42, 0.02)
+	assert_almost_eq(light.light_color.g, 0.86, 0.02)
+	assert_almost_eq(light.light_color.b, 0.44, 0.02)
+	assert_almost_eq(light.light_energy, 2.8, 0.05)
+	# The coals glow the flame's own colour, lightened — not the old warm cream under a green light.
+	var coals := fire.get_node_or_null("Meshes/Coals") as MeshInstance3D
+	assert_not_null(coals, "Meshes/Coals")
+	if coals == null:
+		return
+	var mat := coals.get_active_material(0) as StandardMaterial3D
+	var core := light.light_color.lightened(0.45)
+	assert_almost_eq(mat.emission.r, core.r, 0.02)
+	assert_almost_eq(mat.emission.g, core.g, 0.02)
+	assert_almost_eq(mat.emission.b, core.b, 0.02)
 
 
 func _mesh_count(root: Node) -> int:

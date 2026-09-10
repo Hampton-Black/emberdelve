@@ -114,6 +114,15 @@ func test_lighting_group_visibility_follows_the_preset() -> void:
 	if lighting == null:
 		return
 	assert_true(lighting.get_node("TORCHLIT").visible, "crypt hello is TORCHLIT")
+	assert_false(lighting.get_node("BRAZIERLIT").visible)
+	assert_false(lighting.get_node("DIM").visible)
+	assert_false(lighting.get_node("DARK").visible)
+
+	var braziers := CRYPT.duplicate(true)
+	braziers["lighting"] = "BRAZIERLIT"
+	Table.set_scene(SceneFixtures.scene(braziers))
+	assert_true(lighting.get_node("BRAZIERLIT").visible)
+	assert_false(lighting.get_node("TORCHLIT").visible)
 	assert_false(lighting.get_node("DIM").visible)
 	assert_false(lighting.get_node("DARK").visible)
 
@@ -122,6 +131,7 @@ func test_lighting_group_visibility_follows_the_preset() -> void:
 	Table.set_scene(SceneFixtures.scene(dim))
 	assert_true(lighting.get_node("DIM").visible)
 	assert_false(lighting.get_node("TORCHLIT").visible)
+	assert_false(lighting.get_node("BRAZIERLIT").visible)
 	assert_false(lighting.get_node("DARK").visible)
 
 	var dark := CRYPT.duplicate(true)
@@ -129,6 +139,7 @@ func test_lighting_group_visibility_follows_the_preset() -> void:
 	Table.set_scene(SceneFixtures.scene(dark))
 	assert_true(lighting.get_node("DARK").visible)
 	assert_false(lighting.get_node("TORCHLIT").visible)
+	assert_false(lighting.get_node("BRAZIERLIT").visible)
 	assert_false(lighting.get_node("DIM").visible)
 
 
@@ -193,6 +204,23 @@ func test_dark_rooms_carry_no_wall_torch_lights() -> void:
 	Table.set_scene(SceneFixtures.scene(dark))
 	var room := _room()
 	assert_eq(_omni_count(room), 0, "DARK is unlit walls, not dim torches")
+
+
+## The crypt. Its fires are the braziers, which are props; the walls carry nothing, not even an
+## unlit bracket. The air is TORCHLIT's — the same Environment, so the ambient judged on the
+## crypt's contact sheets is one number and not two copies of it.
+func test_brazierlit_rooms_have_no_wall_torches_and_torchlit_air() -> void:
+	var braziers := CRYPT.duplicate(true)
+	braziers["lighting"] = "BRAZIERLIT"
+	Table.set_scene(SceneFixtures.scene(braziers))
+	var room := _room()
+	assert_eq(_omni_count(room), 0, "the fires stand on the floor, not on the walls")
+	assert_eq(room.get_node("Torches").get_child_count(), 0, "no brackets either")
+	var lighting: Node = room.get_node("Lighting")
+	var own := (lighting.get_node("BRAZIERLIT/WorldEnvironment") as WorldEnvironment).environment
+	var torchlit: Environment = lighting.get_node("TORCHLIT/WorldEnvironment").get_meta("authored")
+	assert_not_null(own, "BRAZIERLIT's environment is the active one")
+	assert_same(own, torchlit)
 
 
 func test_torchlit_rooms_light_the_walls() -> void:
