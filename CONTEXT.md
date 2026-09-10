@@ -98,6 +98,22 @@ room has exactly two light states, ever, and a torch relights nothing, because a
 party's and the fires are the room's.
 _Not: the **render level**, which is a different axis and is about visibility rather than fire._
 
+**Carried torch** — the party's own light, burning in a fighter's hand. The `torch` consumable is
+both the spare and the refuel: spending one resets the LIGHT clock, which is how far the torch
+currently in hand has burned down. One is already lit when a delve starts. It is never a click
+target — it is spent from the exploration bar, because a thing at hand height in front of the
+camera would shadow the things that do have something behind them.
+_Not: a **wall torch**, which is the room's own fixture and belongs to its lighting preset. A torch
+is the party's and the fires are the room's, which is why a torch relights nothing._
+
+**Party light** — how much light the party is casting (`PartyLight`: `FULL`, `LOW`, `GUTTERING`,
+`FAILING`, `OUT`). Folded from the LIGHT clock and never stored beside it, so there is one thing to
+keep correct. The five names are that clock's own **sign** names, so what the DM narrates and what
+the player sees are the same five words. The level is read from the clock's current segment; a sign
+fires only on crossing upward, which is why spending a torch restores the light silently.
+_Not: the **lighting preset** or the **render level**. Those are both about the room; this is the
+only one of the three the party carries with them._
+
 **Traversal** — leaving a room and coming back to find it as you left it. The M3 gate.
 _Not: "navigation", which was the M1 plan's word for a different, generator-shaped problem._
 
