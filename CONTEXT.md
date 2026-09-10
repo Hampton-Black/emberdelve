@@ -128,6 +128,18 @@ only difference._
 the creature on the board and leaves the meeting open. A consequence **brings something in; it
 does not decide how the meeting goes.** The delve-scale ancestor of §9's reaction roll.
 
+**Doubt window** — the run of hit points where surviving the next room is genuinely uncertain
+(40–70%). §9's gate is this window containing 5: *"stand in front of a door at 5 hit points and
+genuinely not know whether to open it."* Its two owners are independent, and conflating them is
+what makes attrition untunable: **the encounter decides where the window sits; max hit points
+decide how much bar there is above it.**
+_Not: a **band**, which is wound vocabulary the player hears. A doubt window is never spoken and
+never rendered — it is a property of the numbers, measured in `docs/evidence/m4-attrition-sim.py`._
+
+**Attrition** — the spending that gives the turn loop something to be about. The engine is the
+only thing that can impose it, because **the model always says yes**. Session-scoped, never
+room-scoped: hit points that reset at a threshold are not a cost.
+
 **Square** — one grid cell (`Square`). Distance is **Chebyshev everywhere**: a diagonal costs
 one. Two metrics in one combat system is how "why can it hit me from there" starts.
 
