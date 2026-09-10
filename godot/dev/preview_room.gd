@@ -191,7 +191,7 @@ static func _torchlit() -> WorldEnvironment:
 	env.background_color = Color(0.0431373, 0.0392157, 0.0627451)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.235294, 0.227451, 0.321569)
-	env.ambient_light_energy = 1.1
+	env.ambient_light_energy = 0.7
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	var node := WorldEnvironment.new()
 	node.name = "Env"
