@@ -122,6 +122,9 @@ is the party's and the fires are the room's, which is why a torch relights nothi
 keep correct. The five names are that clock's own **sign** names, so what the DM narrates and what
 the player sees are the same five words. The level is read from the clock's current segment; a sign
 fires only on crossing upward, which is why spending a torch restores the light silently.
+On the board it is a pool around the party that shrinks and reddens as the level falls. The dark
+past its edge hides but never blocks: stone keeps its outline, a hostile shows only where light
+reaches it, and every square is as reachable as it was.
 _Not: the **lighting preset** or the **render level**. Those are both about the room; this is the
 only one of the three the party carries with them._
 
