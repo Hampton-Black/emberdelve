@@ -178,6 +178,13 @@ never rendered — it is a property of the numbers, measured in `docs/evidence/m
 only thing that can impose it, because **the model always says yes**. Session-scoped, never
 room-scoped: hit points that reset at a threshold are not a cost.
 
+**Ending** — how a delve finished (`Ending`: `EXTRACTED_WITH_OBJECTIVE`, `EXTRACTED_WITHOUT`,
+`PARTY_LOST`). Descriptive, never a verdict: only `PARTY_LOST` is losing, and leaving empty-handed
+is a cautious choice, not a failure. All three read the same way — one plain sentence saying what
+happened, and a count of what was spent: rooms entered, potions and torches used, fights, and where
+the objective ended up. The DM narrates the close; nothing else on screen passes judgement.
+_Not: won / lost. Whether a delve went well is the campaign layer's question, not the delve's._
+
 **Square** — one grid cell (`Square`). Distance is **Chebyshev everywhere**: a diagonal costs
 one. Two metrics in one combat system is how "why can it hit me from there" starts.
 
