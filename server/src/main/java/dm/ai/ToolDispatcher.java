@@ -6,6 +6,7 @@ import dm.engine.CombatSink;
 import dm.engine.GameEngine;
 import dm.model.Anchor;
 import dm.model.Diff;
+import dm.model.Consumable;
 import dm.model.Difficulty;
 import dm.model.Event;
 import dm.model.Mode;
@@ -72,6 +73,7 @@ public final class ToolDispatcher {
                 case ToolSchema.START_COMBAT -> startCombat();
                 case ToolSchema.ASSERT_FACT -> assertFact(args);
                 case ToolSchema.USE_EXIT -> useExit(args);
+                case ToolSchema.USE_ITEM -> useItem(args);
                 case ToolSchema.MOVE_ENTITY -> moveEntity(args);
                 default -> Result.rejected("no such tool: " + call.name());
             };
@@ -215,6 +217,26 @@ public final class ToolDispatcher {
                 List.of(), List.of(), true);
     }
 
+    private Result useItem(JsonNode args) {
+        String actorId = args.path("actor_id").asText("");
+        boolean here = engine.state().entitiesHere().stream()
+                .anyMatch(e -> e.id().equals(actorId) && e.isAlive());
+        if (!here) {
+            return Result.rejected("'" + actorId + "' is not in this room");
+        }
+        String raw = args.path("item").asText("");
+        var item = parseConsumable(raw);
+        if (item.isEmpty()) {
+            return Result.rejected("item must be potion or torch, got '" + raw + "'");
+        }
+        try {
+            List<Diff> diffs = engine.useItem(actorId, item.get());
+            return Result.applied("Spent " + raw + ".", diffs);
+        } catch (IllegalArgumentException e) {
+            return Result.rejected(e.getMessage());
+        }
+    }
+
     private Result moveEntity(JsonNode args) {
         String actorId = args.path("actor_id").asText("");
         boolean here = engine.state().entitiesHere().stream()
@@ -279,6 +301,17 @@ public final class ToolDispatcher {
                 engine.state().roomId(), text, anchor));
 
         return Result.applied("Recorded: " + text, List.of());
+    }
+
+    private static Optional<Consumable> parseConsumable(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Consumable.valueOf(raw.strip().toUpperCase(Locale.ROOT)));
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
     }
 
     private static <E extends Enum<E>> Optional<E> parseEnum(Class<E> type, String raw) {

@@ -832,6 +832,96 @@ func test_combat_puts_chips_over_the_playfield_and_verbs_in_the_chin() -> void:
 	assert_eq(chips.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 
 
+# ---- Exploration bar: potion and torch, locked while the DM has the floor
+
+func _exploration_bar() -> Control:
+	var script: GDScript = load("res://chrome/exploration_bar.gd")
+	assert_not_null(script, "exploration_bar.gd")
+	if script == null:
+		return Control.new()
+	var node: Control = script.new()
+	add_child_autofree(node)
+	return node
+
+
+func _exploration_scene(extra: Dictionary = {}) -> Dictionary:
+	var flat := CRYPT.duplicate(true)
+	flat["potions"] = 2
+	flat["torches"] = 2
+	flat["rope"] = 0
+	flat["canSpendTorch"] = false
+	for key in extra:
+		flat[key] = extra[key]
+	return SceneFixtures.scene(flat)
+
+
+func test_exploration_bar_shows_counts_and_hides_in_combat() -> void:
+	Table.set_scene(_exploration_scene({"canSpendTorch": true}))
+	var bar := _exploration_bar()
+	await wait_frames(1)
+	var potion: Button = bar.find_child("Potion", true, false)
+	var torch: Button = bar.find_child("Torch", true, false)
+	assert_not_null(potion, "Potion")
+	assert_not_null(torch, "Torch")
+	if potion == null or torch == null:
+		return
+	assert_eq(potion.text, "POTION 2")
+	assert_eq(torch.text, "TORCH 2")
+	assert_false(potion.disabled)
+	assert_false(torch.disabled)
+
+	Table.mode = "COMBAT"
+	Table.scene_changed.emit()
+	await wait_frames(1)
+	assert_false(bar.visible)
+
+
+func test_exploration_buttons_grey_when_the_server_says_so() -> void:
+	Table.set_scene(_exploration_scene({
+		"potions": 0, "torches": 1, "canSpendTorch": false,
+	}))
+	var bar := _exploration_bar()
+	await wait_frames(1)
+	var potion: Button = bar.find_child("Potion", true, false)
+	var torch: Button = bar.find_child("Torch", true, false)
+	assert_not_null(potion, "Potion")
+	assert_not_null(torch, "Torch")
+	if potion == null or torch == null:
+		return
+	assert_true(potion.disabled)
+	assert_true(torch.disabled)
+
+
+func test_exploration_buttons_lock_while_the_dm_has_the_floor() -> void:
+	Table.set_scene(_exploration_scene({"canSpendTorch": true}))
+	Table.awaiting_dm = true
+	var bar := _exploration_bar()
+	await wait_frames(1)
+	var potion: Button = bar.find_child("Potion", true, false)
+	assert_not_null(potion, "Potion")
+	if potion == null:
+		return
+	assert_true(potion.disabled)
+	potion.pressed.emit()
+	assert_eq(Net.outbound.size(), 0)
+
+
+func test_a_potion_click_sends_use_item_with_no_model() -> void:
+	Table.set_scene(_exploration_scene())
+	Table.awaiting_dm = false
+	var bar := _exploration_bar()
+	await wait_frames(1)
+	var potion: Button = bar.find_child("Potion", true, false)
+	assert_not_null(potion, "Potion")
+	if potion == null:
+		return
+	potion.pressed.emit()
+	assert_eq(Net.outbound.size(), 1)
+	assert_eq(Net.outbound[0]["type"], "useItem")
+	assert_eq(Net.outbound[0]["actorId"], "fighter")
+	assert_eq(Net.outbound[0]["item"], "potion")
+
+
 # ---- Debug bar: eight buttons, exact wire dictionaries, locked while the DM has the floor
 
 const DEBUG_BUTTONS := [

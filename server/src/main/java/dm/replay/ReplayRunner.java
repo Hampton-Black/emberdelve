@@ -9,6 +9,7 @@ import dm.engine.Rooms;
 import dm.engine.ScriptedClockDraw;
 import dm.model.ClockId;
 import dm.model.Combatant;
+import dm.model.Consumable;
 import dm.model.ConsequenceId;
 import dm.model.Diff;
 import dm.model.Event;
@@ -74,6 +75,7 @@ public final class ReplayRunner {
                 case Event.CheckResolved e ->
                         engine.rollCheck(e.actorId(), e.skill().orElseThrow(),
                                 dm.model.Difficulty.ofDc(e.dc()));
+                case Event.ItemUsed e -> engine.useItem(e.actorId(), e.item());
                 // TurnAdvanced names the incoming combatant. Ending that id would require
                 // the engine to end a turn that has not started. End whoever is active now;
                 // compare checks the event the engine emits.
@@ -212,6 +214,7 @@ public final class ReplayRunner {
                 case Event.ToolCallIssued ignored -> { }
                 case Event.NarrationLogged ignored -> { }
                 case Event.RoomDressed ignored -> { }
+                case Event.ConsumablesGranted ignored -> { }
                 case Event.FactAsserted ignored -> { }
                 default -> kept.add(event);
             }

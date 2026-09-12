@@ -6,6 +6,7 @@ import dm.engine.CombatSink;
 import dm.engine.GameEngine;
 import dm.model.Difficulty;
 import dm.model.Entity;
+import dm.model.Consumable;
 import dm.model.Diff;
 import dm.model.Outcome;
 import dm.model.Skill;
@@ -134,6 +135,10 @@ public final class WsHandler {
 
             case "endTurn" -> act(ctx, sink ->
                     engine.combat().endTurn(message.path("actorId").asText(), sink));
+
+            case "useItem" -> sendDiffs(ctx, engine.useItem(
+                    message.path("actorId").asText("fighter"),
+                    Consumable.valueOf(message.path("item").asText("").toUpperCase())));
 
             // T5 debug hooks. These exist to prove diffs render without a model in the path,
             // and are replaced by real tool dispatch in T7.

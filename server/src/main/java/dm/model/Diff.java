@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = Diff.PropRevealed.class, name = "PropRevealed"),
         @JsonSubTypes.Type(value = Diff.CombatChanged.class, name = "CombatChanged"),
         @JsonSubTypes.Type(value = Diff.RoomLightingChanged.class, name = "RoomLightingChanged"),
+        @JsonSubTypes.Type(value = Diff.ConsumablesChanged.class, name = "ConsumablesChanged"),
 })
 public sealed interface Diff {
 
@@ -50,4 +51,11 @@ public sealed interface Diff {
 
     /** A room's fires moved. Never a segment count. Spec §7c, §10. */
     record RoomLightingChanged(String roomId, LightingPreset lighting) implements Diff {}
+
+    /**
+     * Consumable counts the exploration bar shows. {@code canSpendTorch} is a closed hint, not a
+     * segment count — spec §10.
+     */
+    record ConsumablesChanged(int potions, int torches, int rope, boolean canSpendTorch)
+            implements Diff {}
 }

@@ -34,6 +34,8 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = Event.ClockTicked.class, name = "clock_ticked"),
         @JsonSubTypes.Type(value = Event.ConsequenceFired.class, name = "consequence_fired"),
         @JsonSubTypes.Type(value = Event.RoomLightingChanged.class, name = "room_lighting_changed"),
+        @JsonSubTypes.Type(value = Event.ConsumablesGranted.class, name = "consumables_granted"),
+        @JsonSubTypes.Type(value = Event.ItemUsed.class, name = "item_used"),
 })
 public sealed interface Event {
 
@@ -141,6 +143,16 @@ public sealed interface Event {
     /** A room's fires moved, once. {@code from}/{@code to} so replay never re-reads the room file. */
     record RoomLightingChanged(Instant at, String roomId, LightingPreset from,
                                LightingPreset to) implements Event {}
+
+    /** Starting consumable counts, emitted once from {@code GameEngine.start()}. Spec §5b. */
+    record ConsumablesGranted(Instant at, java.util.Map<Consumable, Integer> counts)
+            implements Event {}
+
+    /**
+     * A consumable spent. {@code remaining} is the count after spending, like
+     * {@link ClockTicked#filled()}.
+     */
+    record ItemUsed(Instant at, String actorId, Consumable item, int remaining) implements Event {}
 
     static NarrationLogged narration(String speakerId, String text) {
         return new NarrationLogged(Instant.now(), speakerId, text);

@@ -4,6 +4,7 @@ import dm.content.ContentLoader;
 import dm.content.Dressings;
 import dm.content.RoomDefinition;
 import dm.model.ClockId;
+import dm.model.Consumable;
 import dm.model.ConsequenceId;
 import dm.model.Diff;
 import dm.model.Directive;
@@ -254,6 +255,8 @@ public final class GameEngine {
         // the opening narration sees the room already dressed.
         recordDressing(entrance.roomId());
         log.append(new Event.PartySpawned(Instant.now(), List.copyOf(members)));
+        log.append(new Event.ConsumablesGranted(Instant.now(),
+                WorldState.STARTING_CONSUMABLES));
         log.append(new Event.ModeEntered(Instant.now(), Mode.EXPLORATION));
     }
 
@@ -359,7 +362,23 @@ public final class GameEngine {
         var roomViews = known.stream().map(this::roomView).toList();
 
         return new SceneState(here.roomId(), roomViews, entities, blocked, state().mode(),
-                combat.view());
+                combat.view(), state().consumableCount(Consumable.POTION),
+                state().consumableCount(Consumable.TORCH),
+                state().consumableCount(Consumable.ROPE), canSpendTorch());
+    }
+
+    private boolean canSpendTorch() {
+        return state().mode() != Mode.COMBAT
+                && state().consumableCount(Consumable.TORCH) > 0
+                && state().clock(ClockId.LIGHT).filled() > 0;
+    }
+
+    private Diff consumablesDiff() {
+        return new Diff.ConsumablesChanged(
+                state().consumableCount(Consumable.POTION),
+                state().consumableCount(Consumable.TORCH),
+                state().consumableCount(Consumable.ROPE),
+                canSpendTorch());
     }
 
     /**
@@ -631,5 +650,47 @@ public final class GameEngine {
     public boolean isInBounds(int x, int y) {
         var room = room();
         return x >= 0 && x < room.width() && y >= 0 && y < room.height();
+    }
+
+    /**
+     * Spend a potion or a torch. Exploration-only; the client may also send {@code useItem}
+     * with no model in the path. Spec §5b.
+     */
+    public List<Diff> useItem(String actorId, Consumable item) {
+        if (combat.isActive()) {
+            throw new IllegalArgumentException("You cannot use that in the middle of a fight.");
+        }
+        if (item == Consumable.ROPE) {
+            throw new IllegalArgumentException("Rope has no use yet.");
+        }
+        int count = state().consumableCount(item);
+        if (count <= 0) {
+            throw new IllegalArgumentException("You have no " + item.name().toLowerCase() + " left.");
+        }
+        if (item == Consumable.TORCH && state().clock(ClockId.LIGHT).filled() == 0) {
+            throw new IllegalArgumentException(
+                    "The torch is already full — spending one would reset nothing.");
+        }
+        var actor = state().find(actorId).orElseThrow(
+                () -> new IllegalArgumentException("No such entity: " + actorId));
+        if (!actor.isAlive()) {
+            throw new IllegalArgumentException(actor.name() + " is dead.");
+        }
+
+        int hpFrom = actor.hp();
+        int remaining = count - 1;
+        log.append(new Event.ItemUsed(Instant.now(), actorId, item, remaining));
+
+        var diffs = new ArrayList<Diff>();
+        if (item == Consumable.POTION) {
+            int hpTo = state().find(actorId).orElseThrow().hp();
+            diffs.add(new Diff.StatChanged(actorId, "hp", hpFrom, hpTo));
+        }
+        if (item == Consumable.TORCH) {
+            resetLight();
+            directives.latch(Directive.aboutParty(ClockTables.TORCH_RELIT));
+        }
+        diffs.add(consumablesDiff());
+        return diffs;
     }
 }

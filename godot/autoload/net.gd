@@ -157,6 +157,9 @@ func attack(actor_id: String, target_id: String) -> void:
 func end_turn(actor_id: String) -> void:
 	send({"type": "endTurn", "actorId": actor_id})
 
+func use_item(actor_id: String, item: String) -> void:
+	send({"type": "useItem", "actorId": actor_id, "item": item})
+
 ## The seven debug messages. They exist so the feel can be tuned with no model, no key and no
 ## latency in the path — see Task 13.
 func debug(message: Dictionary) -> void:

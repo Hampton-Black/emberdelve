@@ -4,6 +4,7 @@ import dm.generate.Dressing;
 import dm.model.Clock;
 import dm.model.ClockId;
 import dm.model.ClockKind;
+import dm.model.Consumable;
 import dm.model.Combatant;
 import dm.model.Entity;
 import dm.model.Event;
@@ -44,7 +45,8 @@ public record WorldState(
         List<Fact> facts,
         int consecutiveFailedChecks,
         Map<ClockId, Clock> clocks,
-        Map<String, LightingPreset> lighting
+        Map<String, LightingPreset> lighting,
+        Map<Consumable, Integer> consumables
 ) {
 
     /** Spec §8: a backstop against a model that asserts something every single turn. */
@@ -54,9 +56,14 @@ public record WorldState(
             ClockId.LIGHT, Clock.empty(ClockId.LIGHT, ClockKind.LIGHT),
             ClockId.ALERT, Clock.empty(ClockId.ALERT, ClockKind.ALERT));
 
+    public static final Map<Consumable, Integer> STARTING_CONSUMABLES = Map.of(
+            Consumable.POTION, 2,
+            Consumable.TORCH, 2,
+            Consumable.ROPE, 0);
+
     public static final WorldState EMPTY = new WorldState(
             "crypt", Map.of(), List.of(), Mode.EXPLORATION, Set.of(), Set.of("crypt"),
-            Map.of(), Optional.empty(), List.of(), 0, STARTING_CLOCKS, Map.of());
+            Map.of(), Optional.empty(), List.of(), 0, STARTING_CLOCKS, Map.of(), Map.of());
 
     public WorldState {
         entities = Map.copyOf(entities);
@@ -67,6 +74,11 @@ public record WorldState(
         facts = List.copyOf(facts);
         clocks = Map.copyOf(clocks);
         lighting = Map.copyOf(lighting);
+        consumables = Map.copyOf(consumables);
+    }
+
+    public int consumableCount(Consumable item) {
+        return consumables.getOrDefault(item, 0);
     }
 
     public static WorldState fold(List<Event> events) {
@@ -125,6 +137,8 @@ public record WorldState(
             case Event.RoomDressed e -> dressed(e);
             case Event.ClockTicked e -> clockTicked(e);
             case Event.RoomLightingChanged e -> lightingChanged(e);
+            case Event.ConsumablesGranted e -> consumablesGranted(e);
+            case Event.ItemUsed e -> itemUsed(e);
             // Inputs, session framing, and the causal record of a table — bundled events
             // sit beside ConsequenceFired, so the fold must not expand it (spec §6g).
             case Event.SessionStarted ignored -> this;
@@ -187,7 +201,7 @@ public record WorldState(
         visited.add(e.toRoomId());
 
         return new WorldState(e.toRoomId(), next, party, mode, revealedProps, visited,
-                dressings, combat, facts, consecutiveFailedChecks, clocks, lighting);
+                dressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables);
     }
 
     private WorldState clockTicked(Event.ClockTicked e) {
@@ -200,14 +214,35 @@ public record WorldState(
         next.put(e.clock(), new Clock(clock.id(), clock.scale(), filled, clock.segments(),
                 clock.kind()));
         return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
-                dressings, combat, facts, consecutiveFailedChecks, next, lighting);
+                dressings, combat, facts, consecutiveFailedChecks, next, lighting, consumables);
+    }
+
+    private WorldState consumablesGranted(Event.ConsumablesGranted e) {
+        return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
+                dressings, combat, facts, consecutiveFailedChecks, clocks, lighting,
+                Map.copyOf(e.counts()));
+    }
+
+    private WorldState itemUsed(Event.ItemUsed e) {
+        var nextConsumables = new LinkedHashMap<>(consumables);
+        nextConsumables.put(e.item(), e.remaining());
+        var nextEntities = new LinkedHashMap<>(entities);
+        if (e.item() == Consumable.POTION) {
+            var actor = entities.get(e.actorId());
+            if (actor != null) {
+                nextEntities.put(e.actorId(), actor.withHp(actor.hp() + 8));
+            }
+        }
+        return new WorldState(roomId, nextEntities, party, mode, revealedProps, visitedRoomIds,
+                dressings, combat, facts, consecutiveFailedChecks, clocks, lighting,
+                Map.copyOf(nextConsumables));
     }
 
     private WorldState lightingChanged(Event.RoomLightingChanged e) {
         var next = new LinkedHashMap<>(lighting);
         next.put(e.roomId(), e.to());
         return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
-                dressings, combat, facts, consecutiveFailedChecks, clocks, next);
+                dressings, combat, facts, consecutiveFailedChecks, clocks, next, consumables);
     }
 
     private WorldState attacked(Event.AttackResolved e) {
@@ -302,12 +337,12 @@ public record WorldState(
                             Optional<CombatRecord> newCombat, List<Fact> newFacts,
                             int newFailedChecks) {
         return new WorldState(roomId, newEntities, newParty, newMode, newRevealed, newVisited,
-                dressings, newCombat, newFacts, newFailedChecks, clocks, lighting);
+                dressings, newCombat, newFacts, newFailedChecks, clocks, lighting, consumables);
     }
 
     private WorldState copyWithDressings(Map<String, Dressing> newDressings) {
         return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
-                newDressings, combat, facts, consecutiveFailedChecks, clocks, lighting);
+                newDressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables);
     }
 
     private WorldState dressed(Event.RoomDressed e) {

@@ -4,9 +4,12 @@ import dm.wire.Json;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dm.engine.GameEngine;
+import dm.model.Consumable;
+import dm.model.ClockId;
 import dm.model.Difficulty;
 import dm.model.Skill;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -32,6 +35,7 @@ public final class ToolSchema {
     public static final String ASSERT_FACT = "assert_fact";
     public static final String USE_EXIT = "use_exit";
     public static final String MOVE_ENTITY = "move_entity";
+    public static final String USE_ITEM = "use_item";
 
     /** Everything {@code spawn_entity} can bring into the room. M0 has one creature. */
     public static final List<String> SPAWNABLE_KINDS = List.of("goblin");
@@ -156,6 +160,17 @@ public final class ToolSchema {
                     "exit_id"));
         }
 
+        var usableItems = usableItems(engine);
+        if (withChecks && !engine.combat().isActive() && !usableItems.isEmpty()) {
+            tools.add(tool(USE_ITEM,
+                    "Spend a potion or a torch from the party's supplies.",
+                    properties -> {
+                        enumProp(properties, "item", usableItems, "Which supply to spend.");
+                        enumProp(properties, "actor_id", actorIds, "Who uses it.");
+                    },
+                    "item", "actor_id"));
+        }
+
         if (!actorIds.isEmpty()) {
             tools.add(tool(MOVE_ENTITY,
                     "Move someone to a square. Use it when the narration says they went "
@@ -190,6 +205,18 @@ public final class ToolSchema {
         }
 
         return tools;
+    }
+
+    private static List<String> usableItems(GameEngine engine) {
+        var items = new ArrayList<String>();
+        if (engine.state().consumableCount(Consumable.POTION) > 0) {
+            items.add("potion");
+        }
+        if (engine.state().consumableCount(Consumable.TORCH) > 0
+                && engine.state().clock(ClockId.LIGHT).filled() > 0) {
+            items.add("torch");
+        }
+        return items;
     }
 
     private static ObjectNode tool(

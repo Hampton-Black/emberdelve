@@ -31,7 +31,16 @@ public record SceneState(
         List<Square> blocked,
         Mode mode,
         /** The fight in progress, or null. Rides along so a reconnect lands mid-combat intact. */
-        CombatView combat
+        CombatView combat,
+        /** Consumable counts for the exploration bar. Zeroes included. Spec §10. */
+        int potions,
+        int torches,
+        int rope,
+        /**
+         * Whether spending a torch would do anything right now — not a segment count on the wire.
+         * Spec §10.
+         */
+        boolean canSpendTorch
 ) {
     /** The room named by {@link #roomId()}, in the same list as everything else. */
     public RoomView currentRoom() {

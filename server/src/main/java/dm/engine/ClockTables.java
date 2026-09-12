@@ -52,6 +52,10 @@ public final class ClockTables {
         return EMPTY_BUNDLES.contains(id);
     }
 
+    /** Party-scoped clause when a torch relights the pool. Spec §8d. */
+    public static final String TORCH_RELIT =
+            "The torch catches; the ring of light spreads again.";
+
     /** Narrator clause for a sign or {@code LIGHT_OUT}. Spec §6c "About". */
     public static String clause(ConsequenceId id) {
         return switch (id) {

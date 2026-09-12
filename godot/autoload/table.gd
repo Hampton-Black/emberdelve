@@ -230,6 +230,12 @@ func _apply_now(list: Array) -> void:
 						break
 				announcements.append(func() -> void: room_lighting_changed.emit(lit_id))
 
+			"ConsumablesChanged":
+				scene["potions"] = int(diff["potions"])
+				scene["torches"] = int(diff["torches"])
+				scene["rope"] = int(diff["rope"])
+				scene["canSpendTorch"] = bool(diff["canSpendTorch"])
+
 	_settle_combat(opened, closed)   # Task 8
 	scene_changed.emit()
 	if opened or closed:
