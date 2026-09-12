@@ -29,6 +29,7 @@ public final class ScriptedClockDraw implements ClockDraw {
             if (options.contains(wanted)) {
                 return wanted;
             }
+            return ConsequenceId.IT_PASSES_BY;
         }
         return options.getFirst();
     }

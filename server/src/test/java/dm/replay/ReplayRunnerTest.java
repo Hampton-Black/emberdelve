@@ -6,7 +6,9 @@ import dm.content.ContentLoader;
 import dm.engine.CombatSink;
 import dm.engine.GameEngine;
 import dm.engine.Rooms;
+import dm.engine.ScriptedClockDraw;
 import dm.engine.ScriptedDiceRoller;
+import dm.model.ConsequenceId;
 import dm.model.Event;
 import dm.state.EventLog;
 import dm.state.SessionWriter;
@@ -169,6 +171,60 @@ class ReplayRunnerTest {
         var thrown = assertThrows(IllegalStateException.class, () -> EventLog.load(session));
         assertTrue(thrown.getMessage().contains("schema"), thrown.getMessage());
         assertTrue(Files.exists(session), "the file stays on disk as historical evidence");
+    }
+
+    @Test
+    @DisplayName("an ALERT fill that spawns a goblin replays without double-spawning")
+    void alertFillSpawnsGoblinReplays(@TempDir Path dir) {
+        var writer = SessionWriter.open(dir);
+        var log = new EventLog(writer);
+        log.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION, 0L,
+                "none", "none"));
+        var content = new ContentLoader();
+        var engine = new GameEngine(content, log, new ScriptedDiceRoller(10),
+                Rooms.authored(content, "crypt", "gallery"),
+                new ScriptedClockDraw(ConsequenceId.SOMETHING_WANDERS_IN));
+        engine.start();
+        for (int i = 0; i < 3; i++) {
+            engine.crossExit("door-north");
+            engine.crossExit("door-south");
+        }
+        writer.close();
+
+        assertTrue(log.events().stream().anyMatch(e ->
+                e instanceof Event.ConsequenceFired f
+                        && f.id() == ConsequenceId.SOMETHING_WANDERS_IN));
+        assertTrue(log.events().stream().anyMatch(Event.EntitySpawned.class::isInstance));
+
+        var result = ReplayRunner.replay(writer.path());
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
+    }
+
+    @Test
+    @DisplayName("an ALERT fill that starts a fight replays without double-starting combat")
+    void alertFillStartsCombatReplays(@TempDir Path dir) {
+        var writer = SessionWriter.open(dir);
+        var log = new EventLog(writer);
+        log.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION, 0L,
+                "none", "none"));
+        var content = new ContentLoader();
+        var engine = new GameEngine(content, log, new ScriptedDiceRoller(10, 10, 10, 10),
+                Rooms.authored(content, "crypt", "gallery"),
+                new ScriptedClockDraw(ConsequenceId.PATROL_ARRIVES));
+        engine.start();
+        for (int i = 0; i < 3; i++) {
+            engine.crossExit("door-north");
+            engine.crossExit("door-south");
+        }
+        writer.close();
+
+        assertTrue(log.events().stream().anyMatch(e ->
+                e instanceof Event.ConsequenceFired f
+                        && f.id() == ConsequenceId.PATROL_ARRIVES));
+        assertTrue(log.events().stream().anyMatch(Event.CombatStarted.class::isInstance));
+
+        var result = ReplayRunner.replay(writer.path());
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
     }
 
     @Test

@@ -9,6 +9,7 @@ import dm.engine.Rooms;
 import dm.engine.ScriptedClockDraw;
 import dm.model.ClockId;
 import dm.model.Combatant;
+import dm.model.ConsequenceId;
 import dm.model.Diff;
 import dm.model.Event;
 import dm.model.RollResult;
@@ -18,7 +19,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Re-executes a recorded session against a fresh engine and compares what came out.
@@ -52,7 +55,14 @@ public final class ReplayRunner {
         var engine = new GameEngine(content, log, dice, roomsIn(content, recorded),
                 drawIn(recorded));
 
+        var skipBundle = new HashSet<Class<? extends Event>>();
         for (var event : recorded) {
+            if (event instanceof Event.ConsequenceFired fired) {
+                skipBundle = new HashSet<>(bundleInputs(fired.id()));
+            }
+            if (!skipBundle.isEmpty() && skipBundle.remove(event.getClass())) {
+                continue;
+            }
             switch (event) {
                 case Event.PartySpawned ignored -> engine.start();
                 case Event.EntitySpawned e -> engine.spawnGoblin(e.entity().x(), e.entity().y());
@@ -92,6 +102,19 @@ public final class ReplayRunner {
      * file. {@code RoomDressed} is emitted on first entry to every room, in entry order, which
      * makes it the one event that names them all in the right order.
      */
+    /** Inputs the trigger already re-emitted when this consequence's fill fired (ADR-0012). */
+    private static Set<Class<? extends Event>> bundleInputs(ConsequenceId id) {
+        if (ClockTables.bundleIsEmpty(id)) {
+            return Set.of();
+        }
+        return switch (id) {
+            case SOMETHING_WANDERS_IN -> Set.of(Event.EntitySpawned.class);
+            case PATROL_ARRIVES -> Set.of(Event.EntitySpawned.class, Event.CombatStarted.class);
+            case DRAWN_BY_THE_NOISE -> Set.of(Event.EntityMoved.class, Event.CombatStarted.class);
+            default -> Set.of();
+        };
+    }
+
     private static Rooms roomsIn(ContentLoader content, List<Event> recorded) {
         var ids = recorded.stream()
                 .filter(Event.RoomDressed.class::isInstance)
