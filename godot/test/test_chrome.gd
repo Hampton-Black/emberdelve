@@ -906,6 +906,27 @@ func test_exploration_buttons_lock_while_the_dm_has_the_floor() -> void:
 	assert_eq(Net.outbound.size(), 0)
 
 
+func test_exploration_buttons_redraw_on_awaiting_dm_transition() -> void:
+	Table.set_scene(_exploration_scene({"canSpendTorch": true}))
+	var bar := _exploration_bar()
+	await wait_frames(1)
+	var potion: Button = bar.find_child("Potion", true, false)
+	assert_not_null(potion, "Potion")
+	if potion == null:
+		return
+	assert_false(potion.disabled, "floor is clear after mount")
+
+	Table.awaiting_dm = true
+	Table.transcript_changed.emit()
+	await wait_frames(1)
+	assert_true(potion.disabled)
+
+	Table.awaiting_dm = false
+	Table.transcript_changed.emit()
+	await wait_frames(1)
+	assert_false(potion.disabled)
+
+
 func test_a_potion_click_sends_use_item_with_no_model() -> void:
 	Table.set_scene(_exploration_scene())
 	Table.awaiting_dm = false

@@ -103,6 +103,7 @@ public final class GameEngine {
         if (id == ClockId.LIGHT && previous >= clock.segments()) {
             return List.of();
         }
+        boolean torchBefore = id == ClockId.LIGHT && canSpendTorch();
         int next = Math.min(previous + 1, clock.segments());
         log.append(new Event.ClockTicked(Instant.now(), id, next));
         var diffs = new ArrayList<Diff>();
@@ -115,6 +116,9 @@ public final class GameEngine {
         }
         if (next >= clock.segments()) {
             diffs.addAll(fireFill(id));
+        }
+        if (id == ClockId.LIGHT && canSpendTorch() != torchBefore) {
+            diffs.add(consumablesDiff());
         }
         return diffs;
     }

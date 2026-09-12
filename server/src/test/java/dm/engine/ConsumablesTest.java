@@ -8,8 +8,10 @@ import dm.model.Diff;
 import dm.model.Directive;
 import dm.model.Event;
 import dm.model.Outcome;
+import dm.model.Difficulty;
 import dm.model.RollRequest;
 import dm.model.RollResult;
+import dm.model.Skill;
 import dm.state.EventLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -197,6 +199,23 @@ class ConsumablesTest {
                 "test", ToolSchema.USE_ITEM, "{\"actor_id\":\"fighter\",\"item\":\"potion\"}"));
         assertFalse(rejected.ok());
         assertTrue(rejected.message().contains("REJECTED"));
+    }
+
+    @Test
+    @DisplayName("a natural 1 that fills LIGHT pushes canSpendTorch to the client")
+    void naturalOneUpdatesCanSpendTorch() {
+        assertFalse(engine.scene().canSpendTorch(), "LIGHT empty at start");
+
+        var nat1 = new GameEngine(new ContentLoader(), new EventLog(), new ScriptedDiceRoller(1));
+        nat1.start();
+        assertFalse(nat1.scene().canSpendTorch());
+
+        nat1.rollCheck("fighter", Skill.ATHLETICS, Difficulty.MEDIUM);
+
+        assertTrue(nat1.scene().canSpendTorch());
+        var diffs = nat1.takePendingDiffs();
+        assertTrue(diffs.stream().anyMatch(d -> d instanceof Diff.ConsumablesChanged cc
+                && cc.canSpendTorch()));
     }
 
     @Test

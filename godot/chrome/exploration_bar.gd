@@ -20,6 +20,7 @@ func _ready() -> void:
 	Table.scene_changed.connect(_redraw)
 	Table.started_changed.connect(_redraw)
 	Table.combat_changed.connect(_redraw)
+	Table.transcript_changed.connect(_redraw)
 	Table.errored.connect(func(_m: String) -> void: _redraw())
 	_redraw()
 
