@@ -1,9 +1,13 @@
 package dm.replay;
 
 import dm.content.ContentLoader;
+import dm.engine.ClockDraw;
+import dm.engine.ClockTables;
 import dm.engine.CombatSink;
 import dm.engine.GameEngine;
 import dm.engine.Rooms;
+import dm.engine.ScriptedClockDraw;
+import dm.model.ClockId;
 import dm.model.Combatant;
 import dm.model.Diff;
 import dm.model.Event;
@@ -45,7 +49,8 @@ public final class ReplayRunner {
 
         var content = new ContentLoader();
         var log = new EventLog();
-        var engine = new GameEngine(content, log, dice, roomsIn(content, recorded));
+        var engine = new GameEngine(content, log, dice, roomsIn(content, recorded),
+                drawIn(recorded));
 
         for (var event : recorded) {
             switch (event) {
@@ -97,6 +102,21 @@ public final class ReplayRunner {
         return ids.isEmpty()
                 ? Rooms.authored(content, "crypt")
                 : Rooms.authored(content, ids.toArray(String[]::new));
+    }
+
+    /**
+     * Reconstruct the ALERT fill draws from recorded {@code ConsequenceFired} ids, so a replay
+     * that fills ALERT does not consume scripted combat faces and does not re-roll the table.
+     */
+    private static ClockDraw drawIn(List<Event> recorded) {
+        var fills = recorded.stream()
+                .filter(Event.ConsequenceFired.class::isInstance)
+                .map(Event.ConsequenceFired.class::cast)
+                .filter(e -> e.clock() == ClockId.ALERT)
+                .map(Event.ConsequenceFired::id)
+                .filter(ClockTables.ALERT_FILL::contains)
+                .toList();
+        return fills.isEmpty() ? ClockDraw.random() : new ScriptedClockDraw(fills);
     }
 
     private static void move(GameEngine engine, Event.EntityMoved e) {

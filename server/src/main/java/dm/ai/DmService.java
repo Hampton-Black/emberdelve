@@ -108,10 +108,10 @@ public final class DmService {
             new java.util.concurrent.atomic.AtomicBoolean();
 
     /**
-     * Arrival directive chosen at a crossing. Consumed on the next free-text prose phase — a click
-     * crossing marks the seam immediately but does not narrate until the player types.
+     * Arrival and clock clauses waiting for the next free-text prose phase. The rail itself
+     * lives on the engine, so a crossing that fires a sign and then {@link #noteCrossing}
+     * cannot silently overwrite it.
      */
-    private String pendingArrival;
 
     /**
      * One narration at a time, across every path that produces any.
@@ -936,7 +936,7 @@ public final class DmService {
     public void reset() {
         history.clear();
         opened.set(false);
-        pendingArrival = null;
+        engine.directives().clear();
     }
 
     /**
@@ -945,13 +945,12 @@ public final class DmService {
      */
     public void noteCrossing(String fromRoomName, String toRoomName, boolean returning) {
         history.add(DmClient.ChatMessage.user(thresholdMarker(fromRoomName, toRoomName)));
-        pendingArrival = returning ? ARRIVAL_RETURN : ARRIVAL_FIRST;
+        engine.directives().crossedInto(engine.room().roomId(),
+                returning ? ARRIVAL_RETURN : ARRIVAL_FIRST);
     }
 
     private String takePendingArrival() {
-        String arrival = pendingArrival;
-        pendingArrival = null;
-        return arrival;
+        return engine.directives().drain();
     }
 
     /**

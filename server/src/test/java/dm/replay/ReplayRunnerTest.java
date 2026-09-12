@@ -162,19 +162,13 @@ class ReplayRunnerTest {
     }
 
     @Test
-    @DisplayName("the played multi-room session replays, and comes back to what it left behind")
-    void theGateSessionReplays() {
+    @DisplayName("the M3 gate session is refused at schema 3, never upgraded")
+    void theM3GateSessionIsRefusedAtSchema3() {
         var session = Path.of("../docs/evidence/session-m3-traversal.jsonl");
 
-        var result = ReplayRunner.replay(session);
-        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
-
-        var state = EventLog.load(session).state();
-        assertTrue(state.visitedRoomIds().containsAll(java.util.Set.of("crypt", "gallery")),
-                "the gate session must have been in both rooms");
-        assertTrue(EventLog.load(session).events().stream()
-                        .filter(Event.PartyMoved.class::isInstance).count() >= 3,
-                "at least one crossing, one return, and one crossing back");
+        var thrown = assertThrows(IllegalStateException.class, () -> EventLog.load(session));
+        assertTrue(thrown.getMessage().contains("schema"), thrown.getMessage());
+        assertTrue(Files.exists(session), "the file stays on disk as historical evidence");
     }
 
     @Test

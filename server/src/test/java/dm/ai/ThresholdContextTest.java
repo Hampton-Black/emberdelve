@@ -5,6 +5,7 @@ import dm.content.ContentLoader;
 import dm.engine.GameEngine;
 import dm.engine.Rooms;
 import dm.engine.ScriptedDiceRoller;
+import dm.model.Directive;
 import dm.state.EventLog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -137,5 +138,78 @@ class ThresholdContextTest {
                 .anyMatch(m -> m.content() != null
                         && m.content().contains(DmService.thresholdMarker(
                                 "The Ashen Crypt", "The Long Gallery"))));
+    }
+
+    @Test
+    @DisplayName("two party signs and an arrival all survive to the next typed turn, in order")
+    void signsAndArrivalDrainInOrder() {
+        var engine = engineForRail();
+        var prose = new ScriptedDmClient("Cold stone underfoot.");
+        var dm = dm(engine, prose);
+
+        engine.directives().latch(Directive.aboutParty("The ring of light has drawn in."));
+        engine.directives().latch(Directive.aboutParty("Far off, something moved and went quiet."));
+        dm.noteCrossing("The Ashen Crypt", "The Long Gallery", false);
+        dm.handleFreeText("fighter", "I look around", silentSink());
+
+        var directive = proseDirective(prose);
+        int light = directive.indexOf("The ring of light has drawn in.");
+        int stirred = directive.indexOf("Far off, something moved and went quiet.");
+        int arrival = directive.indexOf(DmService.ARRIVAL_FIRST);
+        assertTrue(light >= 0 && stirred > light && arrival > stirred, directive);
+    }
+
+    @Test
+    @DisplayName("a second crossing drops the previous arrival and keeps party-scoped signs")
+    void secondCrossingDropsArrivalKeepsSigns() {
+        var engine = engineForRail();
+        var dm = dm(engine, new ScriptedDmClient("x"));
+
+        engine.directives().latch(Directive.aboutParty("The ring of light has drawn in."));
+        engine.crossExit("door-north");
+        dm.noteCrossing("The Ashen Crypt", "The Long Gallery", false);
+
+        engine.crossExit("door-south");
+        dm.noteCrossing("The Long Gallery", "The Ashen Crypt", true);
+
+        var waiting = engine.directives().snapshot().stream()
+                .map(Directive::clause)
+                .toList();
+        assertTrue(waiting.stream().anyMatch(c -> c.contains("ring of light")), waiting.toString());
+        assertTrue(waiting.stream().anyMatch(c -> c.contains(DmService.ARRIVAL_RETURN)),
+                waiting.toString());
+        assertTrue(waiting.stream().noneMatch(c -> c.contains(DmService.ARRIVAL_FIRST)
+                && !c.contains("been here")), waiting.toString());
+    }
+
+    private static GameEngine engineForRail() {
+        var engine = new GameEngine(CONTENT, new EventLog(), new ScriptedDiceRoller(10, 10, 10, 10),
+                Rooms.authored(CONTENT, "crypt", "gallery"));
+        engine.start();
+        return engine;
+    }
+
+    private static DmService dm(GameEngine engine, ScriptedDmClient prose) {
+        return new DmService(new ScriptedDmClient(), prose, engine,
+                CONTENT.prompt("dm-tools"), CONTENT.prompt("dm"), CONTENT.prompt("dm-reconcile"));
+    }
+
+    private static TurnSink silentSink() {
+        return new TurnSink() {
+            @Override public void narration(dm.model.NarrationSegment segment) {}
+            @Override public void diffs(java.util.List<dm.model.Diff> diffs) {}
+            @Override public void roll(dm.model.RollResult roll) {}
+            @Override public void error(Throwable error) {}
+            @Override public void complete() {}
+        };
+    }
+
+    private static String proseDirective(ScriptedDmClient prose) {
+        return prose.conversations().getLast().stream()
+                .filter(m -> "user".equals(m.role()))
+                .map(DmClient.ChatMessage::content)
+                .filter(c -> c != null && c.contains("Three sentences at most."))
+                .findFirst()
+                .orElseThrow();
     }
 }

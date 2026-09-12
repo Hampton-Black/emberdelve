@@ -23,6 +23,7 @@ signal entity_added(entity: Dictionary)
 signal entity_moved(entity_id: String, from: Vector2i, to: Vector2i)
 signal prop_revealed(prop: Dictionary)
 signal entity_died(entity_id: String)
+signal room_lighting_changed(room_id: String)
 
 var connected := false
 var demo_mode := false
@@ -219,6 +220,15 @@ func _apply_now(list: Array) -> void:
 				# Replaced wholesale, never merged. The server sends the entire legal picture
 				# each time precisely so the client has no chance to hold a half-updated one.
 				scene["combat"] = diff["combat"]
+
+			"RoomLightingChanged":
+				var lit_id := String(diff["roomId"])
+				var preset := String(diff["lighting"])
+				for room_view in scene.get("rooms", []):
+					if String(room_view.get("roomId", "")) == lit_id:
+						room_view["lighting"] = preset
+						break
+				announcements.append(func() -> void: room_lighting_changed.emit(lit_id))
 
 	_settle_combat(opened, closed)   # Task 8
 	scene_changed.emit()

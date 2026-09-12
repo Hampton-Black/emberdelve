@@ -230,6 +230,17 @@ func test_torchlit_rooms_light_the_walls() -> void:
 	assert_lte(lights, 10, "MAX_TORCH_LIGHTS")
 
 
+func test_rebuild_fires_snaps_wall_torches_to_the_new_preset() -> void:
+	var room := _room()
+	await wait_frames(2)
+	assert_gt(_omni_count(room), 0, "setup: TORCHLIT has wall fires")
+	var view: Dictionary = Table.room().duplicate(true)
+	view["lighting"] = "DARK"
+	room.rebuild_fires(view, "crypt")
+	assert_eq(_omni_count(room), 0, "DARK carries no wall-torch lights")
+	assert_eq(room.get_node("Torches").get_child_count(), 0, "and no brackets either")
+
+
 func test_carved_walls_differ_from_stone_in_geometry() -> void:
 	# Task 17 left wallType unread because Three.js did. KayKit finally has the
 	# pieces to honour it: cracked, broken, windows — not the same slab. Nothing with a

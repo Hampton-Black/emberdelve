@@ -1,10 +1,14 @@
 package dm.state;
 
 import dm.generate.Dressing;
+import dm.model.Clock;
+import dm.model.ClockId;
+import dm.model.ClockKind;
 import dm.model.Combatant;
 import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Fact;
+import dm.model.LightingPreset;
 import dm.model.Mode;
 import dm.model.Outcome;
 import dm.model.PartyMember;
@@ -38,15 +42,21 @@ public record WorldState(
         Map<String, Dressing> dressings,
         Optional<CombatRecord> combat,
         List<Fact> facts,
-        int consecutiveFailedChecks
+        int consecutiveFailedChecks,
+        Map<ClockId, Clock> clocks,
+        Map<String, LightingPreset> lighting
 ) {
 
     /** Spec §8: a backstop against a model that asserts something every single turn. */
     public static final int MAX_FACTS_PER_ROOM = 30;
 
+    private static final Map<ClockId, Clock> STARTING_CLOCKS = Map.of(
+            ClockId.LIGHT, Clock.empty(ClockId.LIGHT, ClockKind.LIGHT),
+            ClockId.ALERT, Clock.empty(ClockId.ALERT, ClockKind.ALERT));
+
     public static final WorldState EMPTY = new WorldState(
             "crypt", Map.of(), List.of(), Mode.EXPLORATION, Set.of(), Set.of("crypt"),
-            Map.of(), Optional.empty(), List.of(), 0);
+            Map.of(), Optional.empty(), List.of(), 0, STARTING_CLOCKS, Map.of());
 
     public WorldState {
         entities = Map.copyOf(entities);
@@ -55,6 +65,8 @@ public record WorldState(
         visitedRoomIds = Set.copyOf(visitedRoomIds);
         dressings = Map.copyOf(dressings);
         facts = List.copyOf(facts);
+        clocks = Map.copyOf(clocks);
+        lighting = Map.copyOf(lighting);
     }
 
     public static WorldState fold(List<Event> events) {
@@ -111,12 +123,28 @@ public record WorldState(
             case Event.ModeEntered e -> withMode(e.mode());
             case Event.FactAsserted e -> asserted(e);
             case Event.RoomDressed e -> dressed(e);
-            // Inputs and session framing.
+            case Event.ClockTicked e -> clockTicked(e);
+            case Event.RoomLightingChanged e -> lightingChanged(e);
+            // Inputs, session framing, and the causal record of a table — bundled events
+            // sit beside ConsequenceFired, so the fold must not expand it (spec §6g).
             case Event.SessionStarted ignored -> this;
             case Event.PlayerSaid ignored -> this;
             case Event.ToolCallIssued ignored -> this;
             case Event.NarrationLogged ignored -> this;
+            case Event.ConsequenceFired ignored -> this;
         };
+    }
+
+    public Clock clock(ClockId id) {
+        return clocks.get(id);
+    }
+
+    /**
+     * Lighting the fold is holding for this room. Empty until the room's fires have moved —
+     * {@code GameEngine.roomView} then falls back to the authored preset.
+     */
+    public Optional<LightingPreset> lightingIn(String otherRoomId) {
+        return Optional.ofNullable(lighting.get(otherRoomId));
     }
 
     // ---- The cases ----
@@ -141,7 +169,7 @@ public record WorldState(
             return this;
         }
         var next = new LinkedHashMap<>(entities);
-        next.put(e.entityId(), entity.movedTo(e.x(), e.y()));
+        next.put(e.entityId(), entity.movedToRoom(roomId, e.x(), e.y()));
         return copy(next, party, mode, revealedProps, visitedRoomIds,
                 combat.map(c -> c.spendMovement(e.movementSpent())),
                 facts, consecutiveFailedChecks);
@@ -159,7 +187,27 @@ public record WorldState(
         visited.add(e.toRoomId());
 
         return new WorldState(e.toRoomId(), next, party, mode, revealedProps, visited,
-                dressings, combat, facts, consecutiveFailedChecks);
+                dressings, combat, facts, consecutiveFailedChecks, clocks, lighting);
+    }
+
+    private WorldState clockTicked(Event.ClockTicked e) {
+        var clock = clocks.get(e.clock());
+        int filled = e.filled();
+        if (clock.kind() == ClockKind.ALERT && filled >= clock.segments()) {
+            filled = 0;
+        }
+        var next = new LinkedHashMap<>(clocks);
+        next.put(e.clock(), new Clock(clock.id(), clock.scale(), filled, clock.segments(),
+                clock.kind()));
+        return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
+                dressings, combat, facts, consecutiveFailedChecks, next, lighting);
+    }
+
+    private WorldState lightingChanged(Event.RoomLightingChanged e) {
+        var next = new LinkedHashMap<>(lighting);
+        next.put(e.roomId(), e.to());
+        return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
+                dressings, combat, facts, consecutiveFailedChecks, clocks, next);
     }
 
     private WorldState attacked(Event.AttackResolved e) {
@@ -254,12 +302,12 @@ public record WorldState(
                             Optional<CombatRecord> newCombat, List<Fact> newFacts,
                             int newFailedChecks) {
         return new WorldState(roomId, newEntities, newParty, newMode, newRevealed, newVisited,
-                dressings, newCombat, newFacts, newFailedChecks);
+                dressings, newCombat, newFacts, newFailedChecks, clocks, lighting);
     }
 
     private WorldState copyWithDressings(Map<String, Dressing> newDressings) {
         return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
-                newDressings, combat, facts, consecutiveFailedChecks);
+                newDressings, combat, facts, consecutiveFailedChecks, clocks, lighting);
     }
 
     private WorldState dressed(Event.RoomDressed e) {

@@ -31,6 +31,9 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = Event.CombatEnded.class, name = "combat_ended"),
         @JsonSubTypes.Type(value = Event.ModeEntered.class, name = "mode_entered"),
         @JsonSubTypes.Type(value = Event.FactAsserted.class, name = "fact_asserted"),
+        @JsonSubTypes.Type(value = Event.ClockTicked.class, name = "clock_ticked"),
+        @JsonSubTypes.Type(value = Event.ConsequenceFired.class, name = "consequence_fired"),
+        @JsonSubTypes.Type(value = Event.RoomLightingChanged.class, name = "room_lighting_changed"),
 })
 public sealed interface Event {
 
@@ -40,8 +43,10 @@ public sealed interface Event {
      *
      * <p>2 (M3): entities carry a {@code roomId}, so every {@code party_spawned} and
      * {@code entity_spawned} line written at schema 1 describes an entity standing nowhere.
+     *
+     * <p>3 (M4): clocks, consequences and a room's fires becoming folded lighting.
      */
-    int SCHEMA_VERSION = 2;
+    int SCHEMA_VERSION = 3;
 
     Instant at();
 
@@ -120,6 +125,22 @@ public sealed interface Event {
 
     record FactAsserted(Instant at, String id, String roomId, String text,
                         Anchor anchor) implements Event {}
+
+    /**
+     * A clock moved. {@code filled} is the resulting fill, not a delta — the fold does not
+     * count. Spec §6g.
+     */
+    record ClockTicked(Instant at, ClockId clock, int filled) implements Event {}
+
+    /**
+     * A table spoke. Inert in the fold: the bundled events sit beside this one, never inside
+     * it. The drawn id is the causal record. Spec §6g, ADR-0012.
+     */
+    record ConsequenceFired(Instant at, ClockId clock, ConsequenceId id) implements Event {}
+
+    /** A room's fires moved, once. {@code from}/{@code to} so replay never re-reads the room file. */
+    record RoomLightingChanged(Instant at, String roomId, LightingPreset from,
+                               LightingPreset to) implements Event {}
 
     static NarrationLogged narration(String speakerId, String text) {
         return new NarrationLogged(Instant.now(), speakerId, text);

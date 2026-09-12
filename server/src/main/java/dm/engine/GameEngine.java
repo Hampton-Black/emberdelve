@@ -3,7 +3,11 @@ package dm.engine;
 import dm.content.ContentLoader;
 import dm.content.Dressings;
 import dm.content.RoomDefinition;
+import dm.model.ClockId;
+import dm.model.ConsequenceId;
 import dm.model.Diff;
+import dm.model.Directive;
+import dm.model.DirectiveRail;
 import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Exit;
@@ -38,26 +42,187 @@ public final class GameEngine {
     private final DiceRoller dice;
     private final Rooms rooms;
     private final CombatEngine combat;
+    private final ClockDraw draw;
+    private final DirectiveRail directives;
+    private List<Diff> pendingDiffs = List.of();
 
     public GameEngine(ContentLoader content, EventLog log, DiceRoller dice) {
-        this(content, log, dice, Rooms.authored(content, "crypt"));
+        this(content, log, dice, Rooms.authored(content, "crypt"), ClockDraw.random());
     }
 
     public GameEngine(ContentLoader content, EventLog log, DiceRoller dice, RoomDefinition room) {
-        this(content, log, dice, Rooms.of(room));
+        this(content, log, dice, Rooms.of(room), ClockDraw.random());
     }
 
     public GameEngine(ContentLoader content, EventLog log, DiceRoller dice, Rooms rooms) {
+        this(content, log, dice, rooms, ClockDraw.random());
+    }
+
+    public GameEngine(ContentLoader content, EventLog log, DiceRoller dice, Rooms rooms,
+                      ClockDraw draw) {
         this.content = content;
         this.log = log;
         this.dice = dice;
         this.rooms = rooms;
+        this.draw = draw;
         if (!WorldState.EMPTY.roomId().equals(rooms.first().roomId())) {
             throw new IllegalArgumentException(
                     "The entrance must be '" + WorldState.EMPTY.roomId() + "' until the fold's "
                             + "starting room is configurable, got '" + rooms.first().roomId() + "'");
         }
-        this.combat = new CombatEngine(log, dice, this::room);
+        this.combat = new CombatEngine(log, dice, this::room, this::onFightStart);
+        this.directives = new DirectiveRail(() -> this.combat.isActive());
+    }
+
+    public DirectiveRail directives() {
+        return directives;
+    }
+
+    /**
+     * Spend a torch: LIGHT returns to empty. Signs fire on crossing upward only, so this
+     * must not announce a threshold on the way down. Hook for emberdelve-4h9.2 / 4h9.12.
+     */
+    public List<Diff> resetLight() {
+        log.append(new Event.ClockTicked(Instant.now(), ClockId.LIGHT, 0));
+        return List.of();
+    }
+
+    /** Hook for emberdelve-4h9.11: a rest ticks both clocks. */
+    public List<Diff> restTick() {
+        var diffs = new ArrayList<Diff>();
+        diffs.addAll(tickClock(ClockId.LIGHT));
+        diffs.addAll(tickClock(ClockId.ALERT));
+        return diffs;
+    }
+
+    /** Advance one clock one segment. Rest, crossings and a natural 1 all come through here. */
+    public List<Diff> tickClock(ClockId id) {
+        var clock = state().clock(id);
+        int previous = clock.filled();
+        if (id == ClockId.LIGHT && previous >= clock.segments()) {
+            return List.of();
+        }
+        int next = Math.min(previous + 1, clock.segments());
+        log.append(new Event.ClockTicked(Instant.now(), id, next));
+        var diffs = new ArrayList<Diff>();
+        var signs = ClockTables.signs(id);
+        for (int segment = previous + 1; segment <= next && segment < clock.segments(); segment++) {
+            var sign = signs.get(segment);
+            if (sign != null) {
+                fire(id, sign);
+            }
+        }
+        if (next >= clock.segments()) {
+            diffs.addAll(fireFill(id));
+        }
+        return diffs;
+    }
+
+    public List<Diff> takePendingDiffs() {
+        var diffs = pendingDiffs;
+        pendingDiffs = List.of();
+        return diffs;
+    }
+
+    private void onFightStart(CombatSink sink) {
+        sink.diffs(tickClock(ClockId.ALERT));
+    }
+
+    private List<Diff> fireFill(ClockId id) {
+        var diffs = new ArrayList<Diff>();
+        if (id == ClockId.LIGHT) {
+            fire(id, ClockTables.LIGHT_FILL);
+            diffs.addAll(tickClock(ClockId.ALERT));
+            return diffs;
+        }
+        var options = alertFillOptions();
+        var drawn = options.isEmpty()
+                ? ConsequenceId.IT_PASSES_BY
+                : draw.pick(options);
+        log.append(new Event.ConsequenceFired(Instant.now(), id, drawn));
+        diffs.addAll(moveFires());
+        switch (drawn) {
+            case SOMETHING_WANDERS_IN -> {
+                var clause = ClockTables.clause(drawn);
+                if (!clause.isBlank()) {
+                    directives.latch(Directive.aboutRoom(state().roomId(), clause));
+                }
+                diffs.addAll(spawnGoblinHere());
+            }
+            case PATROL_ARRIVES -> {
+                diffs.addAll(spawnGoblinHere());
+                var buffer = new CombatSink.Buffer();
+                combat.start(buffer);
+                diffs.addAll(buffer.collectedDiffs());
+            }
+            case DRAWN_BY_THE_NOISE -> {
+                hostileElsewhere().ifPresent(hostile -> {
+                    var at = defaultGoblinSpawn();
+                    log.append(new Event.EntityMoved(Instant.now(), hostile.id(),
+                            hostile.x(), hostile.y(), at.x(), at.y(), 0));
+                    state().find(hostile.id()).ifPresent(moved ->
+                            diffs.add(new Diff.EntityAdded(moved.toView())));
+                    var buffer = new CombatSink.Buffer();
+                    combat.start(buffer);
+                    diffs.addAll(buffer.collectedDiffs());
+                });
+            }
+            default -> { }
+        }
+        return diffs;
+    }
+
+    private List<ConsequenceId> alertFillOptions() {
+        var options = new ArrayList<>(ClockTables.ALERT_FILL);
+        if (state().find("goblin").isPresent()) {
+            options.remove(ConsequenceId.PATROL_ARRIVES);
+            options.remove(ConsequenceId.SOMETHING_WANDERS_IN);
+        }
+        if (hostileElsewhere().isEmpty()) {
+            options.remove(ConsequenceId.DRAWN_BY_THE_NOISE);
+        }
+        if (options.isEmpty()) {
+            options.add(ConsequenceId.IT_PASSES_BY);
+        }
+        return options;
+    }
+
+    private Optional<Entity> hostileElsewhere() {
+        return state().living().stream()
+                .filter(e -> !e.isPlayerControlled())
+                .filter(e -> !e.roomId().equals(state().roomId()))
+                .findFirst();
+    }
+
+    private List<Diff> spawnGoblinHere() {
+        var at = defaultGoblinSpawn();
+        return spawnGoblin(at.x(), at.y());
+    }
+
+    private List<Diff> moveFires() {
+        var structure = rooms.structure(state().roomId());
+        if (structure.fires() == null) {
+            return List.of();
+        }
+        if (state().lightingIn(structure.roomId()).isPresent()) {
+            return List.of();
+        }
+        var from = structure.lighting();
+        var to = structure.fires().to();
+        log.append(new Event.RoomLightingChanged(Instant.now(), structure.roomId(), from, to));
+        var moved = structure.fires().moved();
+        if (moved != null && !moved.isBlank()) {
+            directives.latch(Directive.aboutRoom(structure.roomId(), moved));
+        }
+        return List.of(new Diff.RoomLightingChanged(structure.roomId(), to));
+    }
+
+    private void fire(ClockId clock, ConsequenceId id) {
+        log.append(new Event.ConsequenceFired(Instant.now(), clock, id));
+        var clause = ClockTables.clause(id);
+        if (!clause.isBlank()) {
+            directives.latch(Directive.aboutParty(clause));
+        }
     }
 
     /** The log. The only way anything in this engine writes. */
@@ -236,7 +401,9 @@ public final class GameEngine {
         var origin = rooms.origins().get(roomId);
 
         return new RoomView(roomId, structure.width(), structure.height(), structure.floorType(),
-                structure.wallType(), structure.lighting(), props, structure.exits(),
+                structure.wallType(),
+                state().lightingIn(roomId).orElse(structure.lighting()),
+                props, structure.exits(),
                 coveredWallsOf(roomId), origin.x(), origin.z(), visited);
     }
 
@@ -327,9 +494,12 @@ public final class GameEngine {
         log.append(new Event.PartyMoved(Instant.now(), movers, here.roomId(),
                 exit.toRoomId(), exitId, arrival.x(), arrival.y()));
 
+        var diffs = new ArrayList<Diff>();
+        diffs.addAll(tickClock(ClockId.LIGHT));
+        diffs.addAll(tickClock(ClockId.ALERT));
         // A room change replaces everything, which is what a fresh Scene is for. The caller
-        // sends one; there is no diff small enough to be worth inventing. Spec §9.
-        return List.of();
+        // sends one; clock diffs still land in the log and on a Scene that roomView() reads.
+        return diffs;
     }
 
     /**
@@ -443,6 +613,7 @@ public final class GameEngine {
                 RollRequest.skillCheck(actorId, skill, actor.skillModifier(skill), difficulty));
         log.append(new Event.CheckResolved(Instant.now(), actorId, Optional.of(skill),
                 difficulty.dc(), result, result.outcome()));
+        pendingDiffs = result.natural() == 1 ? tickClock(ClockId.LIGHT) : List.of();
         return result;
     }
 

@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = Diff.ModeChanged.class, name = "ModeChanged"),
         @JsonSubTypes.Type(value = Diff.PropRevealed.class, name = "PropRevealed"),
         @JsonSubTypes.Type(value = Diff.CombatChanged.class, name = "CombatChanged"),
+        @JsonSubTypes.Type(value = Diff.RoomLightingChanged.class, name = "RoomLightingChanged"),
 })
 public sealed interface Diff {
 
@@ -46,4 +47,7 @@ public sealed interface Diff {
      * <p>A null {@code combat} means the fight is over.
      */
     record CombatChanged(CombatView combat) implements Diff {}
+
+    /** A room's fires moved. Never a segment count. Spec §7c, §10. */
+    record RoomLightingChanged(String roomId, LightingPreset lighting) implements Diff {}
 }

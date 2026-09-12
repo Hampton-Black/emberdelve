@@ -112,7 +112,7 @@ public final class ToolDispatcher {
                 result.total(),
                 result.outcome());
 
-        return new Result(true, message, List.of(), List.of(result), false);
+        return new Result(true, message, engine.takePendingDiffs(), List.of(result), false);
     }
 
     private Result revealProp(JsonNode args) {

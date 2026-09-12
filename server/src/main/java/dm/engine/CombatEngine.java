@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -44,11 +45,18 @@ public final class CombatEngine {
     private final EventLog log;
     private final DiceRoller dice;
     private final Supplier<RoomDefinition> currentRoom;
+    private final Consumer<CombatSink> onFightStart;
 
     public CombatEngine(EventLog log, DiceRoller dice, Supplier<RoomDefinition> currentRoom) {
+        this(log, dice, currentRoom, sink -> { });
+    }
+
+    public CombatEngine(EventLog log, DiceRoller dice, Supplier<RoomDefinition> currentRoom,
+                        Consumer<CombatSink> onFightStart) {
         this.log = log;
         this.dice = dice;
         this.currentRoom = currentRoom;
+        this.onFightStart = onFightStart;
     }
 
     /**
@@ -114,6 +122,8 @@ public final class CombatEngine {
         if (isActive() || isOver()) {
             return;
         }
+
+        onFightStart.accept(sink);
 
         var rolled = new ArrayList<Combatant>();
         var initiativeRolls = new HashMap<String, RollResult>();

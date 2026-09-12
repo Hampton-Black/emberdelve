@@ -72,6 +72,7 @@ public final class Dressings {
                         dressing.sensory(),
                         room.dmNotes().theSarcophagus(),
                         room.dmNotes().theSarcophagusOpened(),
-                        room.dmNotes().theDoor()));
+                        room.dmNotes().theDoor()),
+                room.fires());
     }
 }

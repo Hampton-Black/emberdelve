@@ -165,6 +165,22 @@ func build(view: Dictionary, current_room_id: String) -> void:
 		_darken(self)
 
 
+## Snap wall torches to a lighting preset without tearing down floor and walls.
+##
+## ALERT moving a room's fires must not go through {@code build}: World only rebuilds on a
+## roomId change, so the combat pull-back can play. Two calls, the same ones
+## {@code light_shots.gd} already drives: clear Torches, then _build_wall_torches.
+func rebuild_fires(view: Dictionary, current_room_id: String) -> void:
+	var level := level_for(view, current_room_id)
+	_clear(_ensure_group("Torches"))
+	if level == Level.BLACK:
+		return
+	var size := Vector2i(int(view.get("width", 0)), int(view.get("height", 0)))
+	if size.x <= 0 or size.y <= 0:
+		return
+	_build_wall_torches(size, String(view.get("lighting", "TORCHLIT")), level == Level.LIT)
+
+
 ## Paint every surface in an unvisited room near-black and unshaded.
 ##
 ## Withholding the torches is not enough on its own: the WorldEnvironment's ambient still lifts

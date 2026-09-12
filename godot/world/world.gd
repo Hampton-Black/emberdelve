@@ -33,6 +33,7 @@ func _ready() -> void:
 	Table.entity_moved.connect(_on_entity_moved)
 	Table.entity_died.connect(_on_entity_died)
 	Table.strike.connect(_on_strike)
+	Table.room_lighting_changed.connect(_on_room_lighting_changed)
 	_on_scene_changed()
 	_fit_world_viewport()
 
@@ -136,6 +137,26 @@ func _on_scene_changed() -> void:
 		return
 	_sync_tokens()
 	_follow_party()
+
+
+## ALERT moved this room's fires. Rebuild only its Torches and re-apply lighting — not the
+## roomId-guarded full rebuild, which would kill the combat pull-back (comment above).
+func _on_room_lighting_changed(room_id: String) -> void:
+	var view: Dictionary = Table.room_by_id(room_id)
+	if view.is_empty():
+		return
+	var node := _node_for_room(room_id)
+	if node != null:
+		node.rebuild_fires(view, _room_id)
+	var lighting := get_node_or_null("Room/Lighting")
+	if lighting != null and lighting.has_method("apply"):
+		lighting.apply()
+
+
+func _node_for_room(room_id: String) -> Room:
+	if room_id == _room_id:
+		return get_node_or_null("Room") as Room
+	return get_node_or_null("Neighbours/%s" % room_id) as Room
 
 
 ## Where every room the server has named stands, and how big it is.

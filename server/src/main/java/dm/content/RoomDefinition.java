@@ -27,7 +27,8 @@ public record RoomDefinition(
         List<PropDefinition> props,
         List<Exit> exits,
         StartPositions startPositions,
-        DmNotes dmNotes
+        DmNotes dmNotes,
+        Fires fires
 ) {
 
     /**
@@ -36,6 +37,22 @@ public record RoomDefinition(
      */
     public RoomDefinition {
         exits = exits == null ? List.of() : List.copyOf(exits);
+    }
+
+    public RoomDefinition(
+            String roomId, String name, int width, int height,
+            FloorType floorType, WallType wallType, LightingPreset lighting,
+            List<PropDefinition> props, List<Exit> exits,
+            StartPositions startPositions, DmNotes dmNotes) {
+        this(roomId, name, width, height, floorType, wallType, lighting, props, exits,
+                startPositions, dmNotes, null);
+    }
+
+    /**
+     * A room's own fires, and the one step they ever take. Null when the room never moves.
+     * Spec §7c.
+     */
+    public record Fires(String lit, LightingPreset to, String moved) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

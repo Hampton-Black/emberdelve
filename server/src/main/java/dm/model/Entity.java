@@ -54,7 +54,7 @@ public record Entity(
                 skillModifiers);
     }
 
-    /** Through a door. The only thing that changes which room an entity is in. */
+    /** Through a door, or a hostile drawn into the party's room. */
     public Entity movedToRoom(String newRoomId, int newX, int newY) {
         return new Entity(id, kind, name, ac, hp, maxHp, toHit, damageDice, damageModifier,
                 speedFeet, initiativeModifier, newRoomId, newX, newY, isPlayerControlled,

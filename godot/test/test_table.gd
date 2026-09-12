@@ -154,6 +154,13 @@ func test_an_unknown_entity_id_is_ignored_not_fatal() -> void:
 	assert_eq(Table.scene["entities"].size(), 1)
 
 
+func test_room_lighting_changed_writes_the_preset_onto_the_room() -> void:
+	Table.apply_diffs([{"kind": "RoomLightingChanged", "roomId": "crypt", "lighting": "DARK"}])
+	await wait_frames(2)
+	assert_eq(Table.room()["lighting"], "DARK")
+	assert_eq(Table.room_by_id("crypt")["lighting"], "DARK")
+
+
 # ---- The transcript, paced by the voice
 
 func test_the_players_own_line_lands_immediately() -> void:
