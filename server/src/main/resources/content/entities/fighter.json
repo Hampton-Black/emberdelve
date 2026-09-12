@@ -3,7 +3,7 @@
   "kind": "fighter",
   "name": "Roderick",
   "ac": 16,
-  "maxHp": 12,
+  "maxHp": 20,
   "toHit": 5,
   "damageDice": "1d8",
   "damageModifier": 3,

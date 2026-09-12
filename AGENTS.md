@@ -196,7 +196,7 @@ a multi-tenant provider measure a moment, not a steady state.
 |---|---|
 | Rooms | Two authored: `content/rooms/crypt.json` and `gallery.json`. No generated dungeon. |
 | Party | `List<PartyMember>` containing one member |
-| Fighter | AC 16, HP 12, +5 to hit, 1d8+3 damage, speed 30ft, STR +3 |
+| Fighter | AC 16, HP 20, +5 to hit, 1d8+3 damage, speed 30ft, STR +3 |
 | Goblin | AC 15, HP 7, +4 to hit, 1d6+2 damage, speed 30ft |
 | Attack resolution | `d20 + bonus >= AC`; nat 20 doubles dice. No crit tables, no resistances. |
 | Skill check DCs | A 5-value enum only: 5 / 10 / 15 / 20 / 25 |

@@ -2,9 +2,17 @@ package dm.engine;
 
 import dm.content.ContentLoader;
 import dm.model.Event;
+import dm.model.Outcome;
+import dm.model.RollRequest;
+import dm.model.RollResult;
+import dm.model.Square;
 import dm.state.EventLog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,6 +25,24 @@ class CrossExitTest {
                 Rooms.authored(CONTENT, "crypt", "gallery"));
         engine.start();
         return engine;
+    }
+
+    private static void damage(GameEngine engine, String targetId, int damage) {
+        var attackRoll = new RollResult(
+                RollRequest.attack("goblin", targetId, 4, 16),
+                List.of(18), 22, Outcome.HIT);
+        var damageRoll = new RollResult(
+                RollRequest.damage("goblin", "1d6", 2), List.of(damage), damage + 2, Outcome.HIT);
+        engine.log().append(new Event.AttackResolved(Instant.now(), "goblin", targetId,
+                attackRoll, Optional.of(damageRoll), damage, true, false));
+    }
+
+    private static Square inwardLanding(GameEngine engine, String roomId, String neighbourId) {
+        var room = engine.room(roomId);
+        var arrival = room.exits().stream()
+                .filter(e -> e.toRoomId().equals(neighbourId))
+                .findFirst().orElseThrow();
+        return arrival.inward(room.width(), room.height());
     }
 
     @Test
@@ -126,6 +152,50 @@ class CrossExitTest {
 
         assertEquals(engine.room().exits(), engine.scene().currentRoom().exits());
         assertFalse(engine.scene().currentRoom().exits().isEmpty());
+    }
+
+    @Test
+    @DisplayName("a wound and a secret survive the round trip, and the goblin you left is still there")
+    void partyStateSurvivesCrossing() {
+        var engine = started(new EventLog());
+        int maxHp = CONTENT.entity("fighter").maxHp();
+        int cryptDamage = 3;
+        int galleryDamage = 2;
+
+        damage(engine, "fighter", cryptDamage);
+        engine.revealProp("alcove");
+        engine.spawnGoblin(6, 6);
+        var goblinBefore = engine.state().find("goblin").orElseThrow();
+
+        engine.crossExit("door-north");
+
+        var fighterInGallery = engine.state().find("fighter").orElseThrow();
+        assertEquals(maxHp - cryptDamage, fighterInGallery.hp(),
+                "the wound from the crypt did not heal at the door");
+        assertEquals("gallery", fighterInGallery.roomId());
+
+        damage(engine, "fighter", galleryDamage);
+        engine.revealProp("niche");
+
+        engine.crossExit("door-south");
+
+        var fighter = engine.state().find("fighter").orElseThrow();
+        assertEquals(maxHp - cryptDamage - galleryDamage, fighter.hp(),
+                "neither wound was forgotten on the way back");
+        assertEquals("crypt", fighter.roomId());
+        assertEquals(inwardLanding(engine, "crypt", "gallery"),
+                new Square(fighter.x(), fighter.y()),
+                "the party lands one square inside, not in the doorway");
+        assertTrue(engine.state().revealedHere().contains("alcove"),
+                "the alcove you found is still found");
+
+        var goblinAfter = engine.state().find("goblin").orElseThrow();
+        assertEquals(goblinBefore.id(), goblinAfter.id());
+        assertEquals(goblinBefore.hp(), goblinAfter.hp());
+        assertEquals(goblinBefore.x(), goblinAfter.x());
+        assertEquals(goblinBefore.y(), goblinAfter.y());
+        assertEquals("crypt", goblinAfter.roomId(),
+                "the goblin you left in the crypt is still the same one");
     }
 
     @Test

@@ -33,6 +33,18 @@ class GameEngineEventsTest {
     }
 
     @Test
+    @DisplayName("the fighter starts with enough hit points to spend on the way down")
+    void fighterStartsAtTwenty() {
+        assertEquals(20, engine.content().entity("fighter").maxHp());
+
+        engine.start();
+
+        var fighter = engine.state().find("fighter").orElseThrow();
+        assertEquals(20, fighter.hp());
+        assertEquals(20, fighter.maxHp());
+    }
+
+    @Test
     @DisplayName("starting the game records the party rather than quietly placing it")
     void startRecordsTheParty() {
         engine.start();

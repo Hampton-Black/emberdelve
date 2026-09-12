@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class CombatEngineTest {
 
-    /** Fighter: AC 16, 12 hp, +5 to hit, 1d8+3, DEX +1. Goblin: AC 15, 7 hp, +4, 1d6+2, DEX +2. */
+    /** Fighter: AC 16, 20 hp, +5 to hit, 1d8+3, DEX +1. Goblin: AC 15, 7 hp, +4, 1d6+2, DEX +2. */
     private static Fixture fight(Integer... faces) {
         var log = new EventLog();
         var engine = new GameEngine(new ContentLoader(), log, new ScriptedDiceRoller(faces));
@@ -347,7 +347,7 @@ class CombatEngineTest {
 
         assertTrue(fixture.get("goblin").isAdjacentTo(fixture.get("fighter")),
                 "it should have moved into reach");
-        assertEquals(6, fixture.get("fighter").hp(), "12 hp less 4+2 damage");
+        assertEquals(14, fixture.get("fighter").hp(), "20 hp less 4+2 damage");
         assertEquals("fighter", fixture.engine.combat().activeId(), "and then ended its turn");
     }
 
