@@ -180,10 +180,37 @@ room-scoped: hit points that reset at a threshold are not a cost.
 
 **Ending** — how a delve finished (`Ending`: `EXTRACTED_WITH_OBJECTIVE`, `EXTRACTED_WITHOUT`,
 `PARTY_LOST`). Descriptive, never a verdict: only `PARTY_LOST` is losing, and leaving empty-handed
-is a cautious choice, not a failure. All three read the same way — one plain sentence saying what
+is a cautious choice, not a failure. The delve is lost the moment no living party member remains —
+there is no downed state in between. All three read the same way — one plain sentence saying what
 happened, and a count of what was spent: rooms entered, potions and torches used, fights, and where
 the objective ended up. The DM narrates the close; nothing else on screen passes judgement.
 _Not: won / lost. Whether a delve went well is the campaign layer's question, not the delve's._
+
+**Delve** — one run through a **site**, from the party's first step inside to its **ending**. The
+span attrition is spent over: hit points, consumables and both clocks carry from room to room and
+reset only when a new delve begins.
+_Not: a dungeon, or a session in general. A delve is bounded, and it always ends._
+
+**Site** — the bounded place a delve runs through: a handful of rooms, one **objective**, and a
+**way out**. The entrance is the way out, so a site is walked twice — in, and back. Finite on
+purpose: a site that has been cleared is a fact something can later act on, and a hole that goes
+down forever never produces one.
+_Not: "level" or "floor". Nothing generates downward._
+
+**Way out** — the one exit that leaves the site. Crossing it ends the delve as an extraction, and
+whether the party is carrying the **objective** decides which of the two extracted endings it is.
+_Not: any other **exit**, which can be crossed back through._
+
+**Objective** — the thing a delve came for. An engine-owned **prop**: it has an id, taking it is an
+event, and the way out checks for it. There is exactly one, and the narrator is told not to invent a
+second. Something worth more may sit deeper, and that is the greed decision.
+_Not: a **fact**. An objective the narrator asserted would be a copper key — durable, consistent,
+and with nothing on the board behind it._
+
+**Rest** — the pressure valve: an action that trades clock segments for hit points. Allowed only in
+a room with no living hostile, it ticks every running clock one segment and restores a fixed amount.
+Never a roll — how much you recovered is not a question the DM answers.
+_Not: a free reset. Healing is scarce because the model always says yes._
 
 **Square** — one grid cell (`Square`). Distance is **Chebyshev everywhere**: a diagonal costs
 one. Two metrics in one combat system is how "why can it hit me from there" starts.

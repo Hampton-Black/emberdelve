@@ -121,6 +121,31 @@ right. What it missed is that *mechanics is not narration*. Splitting the tool-c
 fast non-reasoning model and leaving prose on the best writer available made two previously
 disqualified models usable and cut a measured 44-second turn to 8.9 seconds. See §11.
 
+### What settling §9 reversed, before it was built
+
+*M4, 2026-09-10.* Not overturned by play — nothing in §9 has been played yet — but by counting the
+recorded sessions, by a simulator, and by looking at the real client. They are reversals of this
+document all the same, and the M4 gate may add more. (`specs/2026-09-10-m4-delve-design.md` §15.)
+
+**Noisy failures → a natural 1.** §9 ticked the clock on "noisy failures". The two recorded sessions
+failed 14 of 20 checks and 2 of 11, because one DM reached for DC 15–25 and the other for DC 5–10: a
+clock fed by failures burns at a rate set by the narrator's taste in difficulty. The generalisation
+is ADR-0013 — no engine resource is spent as a consequence of a value the model selected, even when
+the value comes from a closed enum.
+
+**No UI beyond a count → a button per action the DM does not adjudicate.** The anti-goal was
+inventory, and a button per entry of a closed enum cannot grow. At `OUT` in a dark room, spending a
+torch is the one action that must not drop, and routing it through the tools model puts the
+load-bearing risk on it. `use_item` stays beside the button.
+
+**One consequence per clock → a sign table and a consequence table.** §9 brought signs down from the
+region without giving the delve clock anywhere to put them. A sign is a consequence whose bundle is
+empty (ADR-0012), and the `WANDERING` clock is ALERT's table rather than a clock of its own.
+
+**The fighter is fragile → the goblin was never a threat.** At HP 12, five hit points survived a
+goblin 72% of the time, and hit points barely informed the decision the gate asks about. The
+encounter decides where the doubt window sits; max hit points decide the run-up above it.
+
 ---
 
 ## 3. Architecture
@@ -546,6 +571,10 @@ coming out. It's a feature.
 this has not, and neither has §10. Written at that lower confidence deliberately — it states a shape
 to aim at and a gate question to aim it with, and it should expect to collect reversals in §2a like
 everything else did.
+
+**Settled, still unbuilt — approved 2026-09-12.** `specs/2026-09-10-m4-delve-design.md` is what this bet
+became before anything was built. Where it and this section disagree, the spec wins, and §2a lists
+what it reversed.
 
 ### The loop
 
@@ -988,8 +1017,8 @@ could turn into a test, and every milestone after it would have paid that cost.
 | **M0** | Does this feel like a DM running a game? | PASS 2026-08-20 | `milestones/m0-evaluation.md` |
 | **M1** | Can the world be made rather than authored? | **Half done** — room generation merged; the dungeon is outstanding | `specs/2026-08-20-m1-procedural-generation-design.md` |
 | **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `milestones/m2-evaluation.md` |
-| **M3** | Is a room a place you can leave and come back to? | Planned 2026-09-05 | `specs/2026-09-05-m3-traversal-design.md` |
-| **M4** | Can you lose a delve, and does losing it sting? | Not started | §9 |
+| **M3** | Is a room a place you can leave and come back to? | PASS 2026-09-06 | `milestones/m3-evaluation.md` |
+| **M4** | Can you lose a delve, and does losing it sting? | Spec approved 2026-09-12 | `specs/2026-09-10-m4-delve-design.md` |
 
 The Godot migration sits between M1 and M2, gated on parity rather than on a question of its own
 (`specs/2026-08-22-chrome-direction-design.md`).

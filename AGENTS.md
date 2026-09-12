@@ -7,7 +7,13 @@ back to. The gate was a 19-turn played session that crossed four times, spent �
 room, found the gallery niche as it was left, and replayed identical:
 `docs/milestones/m3-evaluation.md`.
 
-**Next: the generator plan** — M1's remaining half, *can the world be made rather than authored*.
+**Next: M4 — the delve.** *Can you lose a delve, and does losing it sting?* Decided on the wayfinder
+map `emberdelve-ffi`, built under `emberdelve-4h9`, against
+`docs/superpowers/specs/2026-09-10-m4-delve-design.md`, approved 2026-09-12. The
+rules below still describe the code as it stands; the build tickets update them as each piece lands.
+
+**After it: the generator plan** — M1's remaining half, *can the world be made rather than
+authored*, now with the M4 site as its specification.
 The plan at `docs/superpowers/plans/2026-08-21-m1-dungeon-navigation.md` is **stale in its
 traversal half** (superseded by this milestone) **and in its client/Java foundation** — those
 tasks are React/Three.js, and a `GameRepository` that no longer exists. Its `LayoutGenerator`,
@@ -21,13 +27,17 @@ tasks are React/Three.js, and a `GameRepository` that no longer exists. Its `Lay
 | **M1** | Can the world be made rather than authored? | **Half done.** Single-room generation merged; a generated dungeon is the remaining half | `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` |
 | **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `docs/milestones/m2-evaluation.md` |
 | **M3** | Is a room a place you can leave and come back to? | PASS 2026-09-06 | `docs/milestones/m3-evaluation.md` |
+| **M4** | Can you lose a delve, and does losing it sting? | Spec approved 2026-09-12 | `docs/superpowers/specs/2026-09-10-m4-delve-design.md` |
 
 Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22).
 
 ### Reading order
 
 `docs/milestones/m3-evaluation.md` first — it is the most recent gate and its §8 lists what M3 handed
-forward. `docs/superpowers/specs/2026-09-05-m3-traversal-design.md` is the traversal architecture.
+forward. For M4 work, read `docs/superpowers/specs/2026-09-10-m4-delve-design.md` next: it
+settles design doc §9 before anything is built, and every build ticket under `emberdelve-4h9` is
+executed against it. `docs/superpowers/specs/2026-09-05-m3-traversal-design.md` is the traversal
+architecture.
 `docs/milestones/m2-evaluation.md` and `docs/superpowers/specs/2026-08-23-m2-spine-design.md` are the spine
 everything still sits on. `docs/ai-dm-system-design.md` is the long-range design. **Amended
 2026-09-05** against three gates: its §2a lists the four decisions play reversed and why, and
@@ -243,8 +253,10 @@ These are the things most likely to eat week two.
   content it adjudicates. See `docs/ai-dm-system-design.md` §6.
 - **Do not tune lighting and post-processing for more than one evening.** Timebox it. This is the
   single largest time sink in the project and it will consume as much as you give it.
-- **Do not add a third room, and do not generate a dungeon.** Two authored rooms is the M3
-  shortcut. The generator plan is next.
+- **Do not generate a dungeon.** The M4 site is five *authored* rooms (`emberdelve-4h9.8`), and it
+  is the generator's specification, not a licence to start the generator early. "Do not add a third
+  room" was the M3 shortcut and M4 spent it: two rooms cannot hold a decision about whether to push
+  deeper. The generator plan follows M4.
 - **Do not build save/load.** Sessions are *written* — that is the replay harness — but nothing
   resumes from one, and resume is the expensive half. Restarting the process is still fine.
 - **Do not optimize anything.** Two authored rooms, two entities.
