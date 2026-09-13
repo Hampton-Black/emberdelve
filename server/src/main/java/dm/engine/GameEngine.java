@@ -480,7 +480,7 @@ public final class GameEngine {
         } else {
             log.append(new Event.PropTaken(Instant.now(), state().roomId(), propId));
         }
-        return List.of(new Diff.PropRemoved(propId, state().holdingObjective()));
+        return List.of(new Diff.PropRemoved(propId, state().holdingObjective(), scene().blocked()));
     }
 
     /** Exploration-only; no living hostile in this room. Spec §5b. */

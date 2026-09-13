@@ -217,6 +217,25 @@ func test_prop_removed_of_the_reliquary_keeps_held() -> void:
 	assert_true(bool(Table.scene.get("holdingObjective", false)))
 
 
+func test_prop_removed_uses_the_shipped_blocked_set() -> void:
+	var scene := CRYPT.duplicate(true)
+	scene["props"] = [
+		{"id": "tomb", "type": "SARCOPHAGUS", "x": 6, "y": 6, "rotation": 0, "hidden": false},
+		{"id": "gold-chest", "type": "CONTAINER", "x": 3, "y": 3, "rotation": 0, "hidden": false},
+	]
+	scene["blocked"] = [{"x": 6, "y": 6}, {"x": 3, "y": 3}]
+	Table.set_scene(SceneFixtures.scene(scene))
+	Table.apply_diffs([{
+		"kind": "PropRemoved", "propId": "gold-chest", "holdingObjective": false,
+		"blocked": [{"x": 9, "y": 9}],
+	}])
+	await wait_frames(2)
+	var blocked: Array = Table.scene.get("blocked", [])
+	assert_eq(blocked.size(), 1, "blocked is replaced by the server's list, not derived")
+	assert_eq(int(blocked[0].get("x", -1)), 9)
+	assert_eq(int(blocked[0].get("y", -1)), 9)
+
+
 # ---- The transcript, paced by the voice
 
 func test_the_players_own_line_lands_immediately() -> void:

@@ -64,9 +64,17 @@ class ObjectiveTest {
         var taken = eventsOf(log, Event.ObjectiveTaken.class).getFirst();
         assertEquals("chapel", taken.roomId());
         assertEquals("reliquary", taken.propId());
-        assertTrue(diffs.stream().anyMatch(d -> d instanceof Diff.PropRemoved removed
-                && removed.propId().equals("reliquary")
-                && removed.holdingObjective()));
+        var removed = diffs.stream()
+                .filter(Diff.PropRemoved.class::isInstance)
+                .map(Diff.PropRemoved.class::cast)
+                .findFirst()
+                .orElseThrow();
+        assertEquals("reliquary", removed.propId());
+        assertTrue(removed.holdingObjective());
+        assertEquals(engine.scene().blocked(), removed.blocked(),
+                "the client must not recompute walkability from the taken square");
+        assertTrue(removed.blocked().stream().noneMatch(s -> s.x() == 3 && s.y() == 6),
+                "the vacated reliquary square is not blocked");
     }
 
     @Test

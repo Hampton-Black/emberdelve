@@ -73,8 +73,17 @@ public sealed interface Diff {
      */
     record PartyLightChanged(PartyLight partyLight) implements Diff {}
 
-    /** A takeable prop left the board. {@code holdingObjective} is the fold after the take. */
-    record PropRemoved(String propId, boolean holdingObjective) implements Diff {}
+    /**
+     * A takeable prop left the board. {@code holdingObjective} is the fold after the take.
+     * {@code blocked} is the current room's solid squares after the take — shipped, not
+     * derived (invariant #1).
+     */
+    record PropRemoved(String propId, boolean holdingObjective, java.util.List<Square> blocked)
+            implements Diff {
+        public PropRemoved {
+            blocked = blocked == null ? java.util.List.of() : java.util.List.copyOf(blocked);
+        }
+    }
 
     /** The delve ended. Same report {@link SceneState} ships. Spec §9, §10. */
     record DelveEnded(EndingReport ending) implements Diff {}

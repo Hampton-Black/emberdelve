@@ -261,18 +261,11 @@ func _apply_now(list: Array) -> void:
 
 			"PropRemoved":
 				var gone_id := String(diff["propId"])
-				var gone_prop := prop(gone_id)
 				var gone_at := _index_of_prop(gone_id)
 				if gone_at >= 0:
 					room()["props"].remove_at(gone_at)
-				if not gone_prop.is_empty():
-					var blocked: Array = scene.get("blocked", [])
-					var next_blocked: Array = []
-					for cell in blocked:
-						if int(cell.get("x", -1)) != int(gone_prop.get("x", -2)) \
-								or int(cell.get("y", -1)) != int(gone_prop.get("y", -2)):
-							next_blocked.append(cell)
-					scene["blocked"] = next_blocked
+				if diff.has("blocked"):
+					scene["blocked"] = diff["blocked"]
 				scene["holdingObjective"] = bool(diff.get("holdingObjective",
 						scene.get("holdingObjective", false)))
 				announcements.append(func() -> void: prop_removed.emit(gone_id))

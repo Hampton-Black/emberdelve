@@ -55,14 +55,20 @@ func _ready() -> void:
 ## Actor is `combat.activeId` in a fight, or the first living player-controlled
 ## entity out of one. Never a hardcoded creature id.
 func intent(entity_id: String, square: Variant = null, target_id: String = "") -> Dictionary:
-	if Table.awaiting_dm:
-		return {}
 	var scene := Table.scene
 	if scene.is_empty():
 		return {}
-
 	var combat = scene.get("combat", null)
-	if combat != null and typeof(combat) == TYPE_DICTIONARY:
+	var in_fight := combat != null and typeof(combat) == TYPE_DICTIONARY
+	# Arrival holds the exploration bar; doors stay live (spec §8d). Attacks, moves,
+	# and prop clicks wait. In a fight the board stays locked — a clicked door is
+	# refused server-side anyway, and 4h9.9 closed the attack-during-narration window.
+	if Table.awaiting_dm:
+		if in_fight:
+			return {}
+		return _exit_intent(target_id)
+
+	if in_fight:
 		var actor := Table.entity(String(combat.get("activeId", "")))
 		# The goblin's turn is not the player's to click through.
 		if actor.is_empty() or not bool(actor.get("isPlayerControlled", false)):
@@ -173,7 +179,9 @@ func _marker_intent(target_id: String) -> Dictionary:
 ## Sent, never applied locally. The token does not budge until the server says
 ## it moved (invariant #1). The swing is Table.strike, not this path.
 func commit(action: Dictionary) -> void:
-	if action.is_empty() or Table.awaiting_dm:
+	if action.is_empty():
+		return
+	if Table.awaiting_dm and String(action.get("kind", "")) != "exit":
 		return
 	match String(action.get("kind", "")):
 		"move", "blocked":

@@ -174,6 +174,21 @@ func test_awaiting_dm_does_not_send_attack() -> void:
 	assert_eq(Net.outbound.size(), 0, "the board is locked while the DM has the floor")
 
 
+func test_awaiting_dm_still_sends_an_exit() -> void:
+	Net.outbound.clear()
+	Table.set_scene(SceneFixtures.scene(DOORWAY))
+	Table.awaiting_dm = true
+	var world := _world_tree()
+	var overlay := _overlay(world)
+	assert_not_null(overlay, "Overlay")
+	if overlay == null:
+		return
+	overlay.commit(overlay.intent("", Vector2i(6, 11), "door-north"))
+	assert_eq(Net.outbound.size(), 1, "an arrival holds the bar; doors stay live")
+	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
+	assert_eq(String(Net.outbound[0].get("exitId", "")), "door-north")
+
+
 func test_an_illegal_combat_click_sends_nothing() -> void:
 	Table.set_scene(_fighting("keeper", [{"x": 3, "y": 2}], ["goblin"]))
 	var world := _world_tree()
