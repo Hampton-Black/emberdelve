@@ -173,6 +173,38 @@ func test_party_light_changed_writes_the_level_onto_the_scene() -> void:
 	assert_eq(Table.scene["partyLight"], "LOW")
 
 
+func test_prop_removed_of_a_prize_does_not_claim_the_objective() -> void:
+	var scene := CRYPT.duplicate(true)
+	scene["props"] = [
+		{"id": "tomb", "type": "SARCOPHAGUS", "x": 6, "y": 6, "rotation": 0, "hidden": false},
+		{"id": "gold-chest", "type": "CONTAINER", "x": 3, "y": 3, "rotation": 0, "hidden": false},
+	]
+	scene["holdingObjective"] = false
+	Table.set_scene(SceneFixtures.scene(scene))
+	Table.apply_diffs([{
+		"kind": "PropRemoved", "propId": "gold-chest", "holdingObjective": false,
+	}])
+	await wait_frames(2)
+	assert_false(bool(Table.scene.get("holdingObjective", true)),
+		"taking something that is not the reliquary must not mark it held")
+	assert_eq(Table.room()["props"].size(), 1)
+	assert_eq(String(Table.room()["props"][0]["id"]), "tomb")
+
+
+func test_prop_removed_of_the_reliquary_keeps_held() -> void:
+	var scene := CRYPT.duplicate(true)
+	scene["props"] = [
+		{"id": "reliquary", "type": "CONTAINER", "x": 4, "y": 2, "rotation": 0, "hidden": false},
+	]
+	scene["holdingObjective"] = false
+	Table.set_scene(SceneFixtures.scene(scene))
+	Table.apply_diffs([{
+		"kind": "PropRemoved", "propId": "reliquary", "holdingObjective": true,
+	}])
+	await wait_frames(2)
+	assert_true(bool(Table.scene.get("holdingObjective", false)))
+
+
 # ---- The transcript, paced by the voice
 
 func test_the_players_own_line_lands_immediately() -> void:

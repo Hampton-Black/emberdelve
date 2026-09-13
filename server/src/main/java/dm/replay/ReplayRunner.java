@@ -90,6 +90,7 @@ public final class ReplayRunner {
                 // coin flip that diverges on the landing square.
                 case Event.PartyMoved e -> engine.crossExit(e.throughExitId());
                 case Event.ObjectiveTaken e -> engine.takeProp(e.propId());
+                case Event.PropTaken e -> engine.takeProp(e.propId());
                 case Event.DelveEnded e -> {
                     if (!e.throughExitId().isBlank()) {
                         engine.crossExit(e.throughExitId());

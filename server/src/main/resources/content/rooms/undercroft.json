@@ -1,0 +1,124 @@
+{
+  "roomId": "undercroft",
+  "name": "The Undercroft",
+  "width": 10,
+  "height": 10,
+  "floorType": "CRACKED_STONE",
+  "wallType": "CARVED",
+  "lighting": "DIM",
+  "props": [
+    {
+      "id": "door-south",
+      "type": "DOOR",
+      "x": 5,
+      "y": 0,
+      "rotation": 0,
+      "hidden": false,
+      "description": "The doorway back to the chapel, standing open."
+    },
+    {
+      "id": "door-north",
+      "type": "DOOR",
+      "x": 5,
+      "y": 9,
+      "rotation": 180,
+      "hidden": false,
+      "description": "An open doorway north into colder stone. Nothing bars it."
+    },
+    {
+      "id": "bookcase",
+      "type": "FURNITURE",
+      "appearance": "bookcase",
+      "x": 2,
+      "y": 4,
+      "rotation": 90,
+      "hidden": false,
+      "description": "A bookcase pulled a little from the west wall, its shelves empty except for rot."
+    },
+    {
+      "id": "niche",
+      "type": "ALCOVE",
+      "x": 0,
+      "y": 4,
+      "rotation": 90,
+      "hidden": true,
+      "revealHint": "The bookcase has been pulled a finger's width from the wall; the dust behind it is broken. Searching the bookcase would find it.",
+      "description": "A niche behind the bookcase, packed with grave-lists gone to pulp."
+    },
+    {
+      "id": "coffin",
+      "type": "CONTAINER",
+      "appearance": "coffin",
+      "x": 8,
+      "y": 4,
+      "rotation": 90,
+      "hidden": false,
+      "description": "A plain coffin on the east side, the lid still nailed."
+    },
+    {
+      "id": "barrel",
+      "type": "CONTAINER",
+      "appearance": "barrel",
+      "x": 8,
+      "y": 7,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A warped barrel, its hoops rusted shut."
+    },
+    {
+      "id": "bone",
+      "type": "REMAINS",
+      "appearance": "bone_a",
+      "x": 1,
+      "y": 7,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A yellowed bone on the flags, too long for a dog."
+    },
+    {
+      "id": "rubble",
+      "type": "RUBBLE",
+      "appearance": "rubble_half",
+      "x": 1,
+      "y": 2,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A spill of fallen masonry near the south wall."
+    },
+    {
+      "id": "cobweb",
+      "type": "SCENERY",
+      "appearance": "cobweb2",
+      "x": 0,
+      "y": 7,
+      "rotation": 90,
+      "hidden": false,
+      "description": "A thick cobweb in the west corner."
+    }
+  ],
+  "exits": [
+    {
+      "id": "door-south",
+      "x": 5,
+      "y": 0,
+      "direction": "SOUTH",
+      "toRoomId": "chapel"
+    },
+    {
+      "id": "door-north",
+      "x": 5,
+      "y": 9,
+      "direction": "NORTH",
+      "toRoomId": "vault"
+    }
+  ],
+  "startPositions": {
+    "party": [{ "x": 5, "y": 1 }],
+    "goblinSpawn": { "x": 5, "y": 5 }
+  },
+  "dmNotes": {
+    "overview": "A low undercroft, cracked flags and a bookcase that does not belong. An open door south to the chapel, an open door north toward something colder.",
+    "sensory": "Colder than the chapel. The smell is wet paper and old wood. Footsteps sound closer than they are.",
+    "theDoor": "Both doors stand open. A fight is the only thing that would stop them walking through."
+  }
+}

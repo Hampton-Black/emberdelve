@@ -47,7 +47,7 @@ class ThresholdContextTest {
     @Test
     @DisplayName("no authored door claims to be shut, which nothing can make true")
     void authoredDoorsDoNotClaimToBeShut() {
-        for (var roomId : java.util.List.of("crypt", "gallery")) {
+        for (var roomId : java.util.List.of("crypt", "gallery", "chapel", "undercroft", "vault")) {
             var room = CONTENT.room(roomId);
             for (var exit : room.exits()) {
                 var door = room.props().stream()

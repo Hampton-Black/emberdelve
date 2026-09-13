@@ -72,8 +72,8 @@ public sealed interface Diff {
      */
     record PartyLightChanged(PartyLight partyLight) implements Diff {}
 
-    /** A takeable prop left the board because the party is holding it. */
-    record PropRemoved(String propId) implements Diff {}
+    /** A takeable prop left the board. {@code holdingObjective} is the fold after the take. */
+    record PropRemoved(String propId, boolean holdingObjective) implements Diff {}
 
     /** The delve ended. Same report {@link SceneState} ships. Spec §9, §10. */
     record DelveEnded(EndingReport ending) implements Diff {}

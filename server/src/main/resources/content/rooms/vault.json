@@ -1,0 +1,109 @@
+{
+  "roomId": "vault",
+  "name": "The Vault",
+  "width": 10,
+  "height": 8,
+  "floorType": "STONE",
+  "wallType": "CARVED",
+  "lighting": "DARK",
+  "props": [
+    {
+      "id": "door-south",
+      "type": "DOOR",
+      "x": 5,
+      "y": 0,
+      "rotation": 0,
+      "hidden": false,
+      "description": "The doorway back to the undercroft, standing open."
+    },
+    {
+      "id": "gold-chest",
+      "type": "CONTAINER",
+      "appearance": "chest_gold",
+      "x": 2,
+      "y": 5,
+      "rotation": 0,
+      "hidden": false,
+      "actions": ["take"],
+      "description": "A gold-bound chest, heavier than the reliquary and bright even in this dark. The latch yields."
+    },
+    {
+      "id": "niche",
+      "type": "ALCOVE",
+      "x": 0,
+      "y": 5,
+      "rotation": 90,
+      "hidden": true,
+      "revealHint": "The gold chest sits a hand's width off the west wall; the stone behind it does not match. Searching the chest would find it.",
+      "description": "A niche behind the chest, empty except for a ring of dust where something sat."
+    },
+    {
+      "id": "stag",
+      "type": "STATUE",
+      "appearance": "stag",
+      "x": 8,
+      "y": 5,
+      "rotation": 270,
+      "hidden": false,
+      "description": "A stone stag, smaller than life, watching the door they came through."
+    },
+    {
+      "id": "skull",
+      "type": "REMAINS",
+      "appearance": "skull",
+      "x": 8,
+      "y": 2,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A skull on the flags, the jaw still attached."
+    },
+    {
+      "id": "ribcage",
+      "type": "REMAINS",
+      "appearance": "ribcage",
+      "x": 1,
+      "y": 2,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A ribcage slumped near the south wall."
+    },
+    {
+      "id": "plaque",
+      "type": "SCENERY",
+      "appearance": "plaque",
+      "x": 9,
+      "y": 3,
+      "rotation": 270,
+      "hidden": false,
+      "description": "A plaque on the east wall, the lettering too worn to read."
+    },
+    {
+      "id": "candles",
+      "type": "SCENERY",
+      "appearance": "candles2",
+      "x": 3,
+      "y": 7,
+      "rotation": 180,
+      "hidden": false,
+      "description": "A pair of candles on the north wall, never lit."
+    }
+  ],
+  "exits": [
+    {
+      "id": "door-south",
+      "x": 5,
+      "y": 0,
+      "direction": "SOUTH",
+      "toRoomId": "undercroft"
+    }
+  ],
+  "startPositions": {
+    "party": [{ "x": 5, "y": 1 }],
+    "goblinSpawn": { "x": 7, "y": 4 }
+  },
+  "dmNotes": {
+    "overview": "The last chamber. Dark. A gold chest on the west side, a stag on the east, and the open door they came through south. There is no door further on.",
+    "sensory": "Still air, colder than the undercroft. Metal and dust. Their own breathing is loud.",
+    "theDoor": "The door south stands open. A fight is the only thing that would stop them walking back."
+  }
+}

@@ -52,15 +52,17 @@ class AppearanceTest {
     @Test
     @DisplayName("the reliquary is a takeable CONTAINER that looks like a chest")
     void reliquaryIsContainerChest() {
-        var reliquary = CONTENT.room("crypt").prop("reliquary");
+        var reliquary = CONTENT.room("chapel").prop("reliquary");
         assertEquals(PropType.CONTAINER, reliquary.type());
         assertEquals("chest", reliquary.appearance());
         assertEquals(java.util.List.of("take"), reliquary.actions());
         assertTrue(reliquary.type().blocksMovement());
 
         var engine = new GameEngine(CONTENT, new EventLog(), new ScriptedDiceRoller(10),
-                Rooms.authored(CONTENT, "crypt", "gallery"));
+                Rooms.authored(CONTENT, "crypt", "gallery", "chapel", "undercroft", "vault"));
         engine.start();
+        engine.crossExit("door-north");
+        engine.crossExit("door-north");
         var onBoard = engine.scene().currentRoom().props().stream()
                 .filter(p -> p.id().equals("reliquary"))
                 .findFirst()
@@ -73,8 +75,10 @@ class AppearanceTest {
     @DisplayName("the tool schema never lists appearance names or PropType values")
     void appearanceIsNotInToolSchema() {
         var engine = new GameEngine(CONTENT, new EventLog(), new ScriptedDiceRoller(10),
-                Rooms.authored(CONTENT, "crypt", "gallery"));
+                Rooms.authored(CONTENT, "crypt", "gallery", "chapel", "undercroft", "vault"));
         engine.start();
+        engine.crossExit("door-north");
+        engine.crossExit("door-north");
         var schema = ToolSchema.forTurn(engine).toString()
                 + ToolSchema.forReconcile(engine).toString();
         assertFalse(schema.contains("appearance"), schema);

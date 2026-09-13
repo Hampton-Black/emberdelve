@@ -126,7 +126,11 @@ class CloseNarrationTest {
     private static void typedExtractIsClose(boolean holding, Ending expected) {
         var engine = engine();
         if (holding) {
+            engine.crossExit("door-north");
+            engine.crossExit("door-north");
             engine.takeProp("reliquary");
+            engine.crossExit("door-south");
+            engine.crossExit("door-south");
         }
         var prose = new ScriptedDmClient("They walk out into the air.");
         var dm = new DmService(useExitOnce("stair-south"), prose, engine,
@@ -175,7 +179,7 @@ class CloseNarrationTest {
 
     private static GameEngine engine() {
         var engine = new GameEngine(CONTENT, new EventLog(), new ScriptedDiceRoller(10),
-                Rooms.authored(CONTENT, "crypt", "gallery"));
+                Rooms.authored(CONTENT, "crypt", "gallery", "chapel", "undercroft", "vault"));
         engine.start();
         return engine;
     }

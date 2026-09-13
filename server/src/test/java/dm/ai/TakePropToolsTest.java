@@ -22,9 +22,14 @@ class TakePropToolsTest {
 
     private static GameEngine started() {
         var engine = new GameEngine(CONTENT, new EventLog(), new ScriptedDiceRoller(10),
-                Rooms.authored(CONTENT, "crypt", "gallery"));
+                Rooms.authored(CONTENT, "crypt", "gallery", "chapel", "undercroft", "vault"));
         engine.start();
         return engine;
+    }
+
+    private static void toChapel(GameEngine engine) {
+        engine.crossExit("door-north");
+        engine.crossExit("door-north");
     }
 
     private static List<String> toolNames(com.fasterxml.jackson.databind.node.ArrayNode tools) {
@@ -35,6 +40,7 @@ class TakePropToolsTest {
     @DisplayName("take_prop is offered in mechanics with this room's takeable ids, not in reconcile")
     void takePropIsMechanicsOnly() {
         var engine = started();
+        toChapel(engine);
 
         assertTrue(toolNames(ToolSchema.forTurn(engine)).contains(ToolSchema.TAKE_PROP));
         assertFalse(toolNames(ToolSchema.forReconcile(engine)).contains(ToolSchema.TAKE_PROP));
@@ -52,11 +58,12 @@ class TakePropToolsTest {
     @DisplayName("take_prop is omitted when nothing is left to take")
     void takePropOmittedWhenNothingToTake() {
         var engine = started();
+        toChapel(engine);
         engine.takeProp("reliquary");
 
         assertFalse(toolNames(ToolSchema.forTurn(engine)).contains(ToolSchema.TAKE_PROP));
 
-        engine.crossExit("door-north");
+        engine.crossExit("door-south");
         assertFalse(toolNames(ToolSchema.forTurn(engine)).contains(ToolSchema.TAKE_PROP),
                 "the gallery has nothing takeable");
     }
@@ -66,8 +73,9 @@ class TakePropToolsTest {
     void dispatcherTakesAndRejects() {
         var log = new EventLog();
         var engine = new GameEngine(CONTENT, log, new ScriptedDiceRoller(10),
-                Rooms.authored(CONTENT, "crypt", "gallery"));
+                Rooms.authored(CONTENT, "crypt", "gallery", "chapel", "undercroft", "vault"));
         engine.start();
+        toChapel(engine);
         var dispatcher = new ToolDispatcher(engine);
 
         var taken = dispatcher.dispatch(new DmClient.ToolCall(
@@ -88,6 +96,7 @@ class TakePropToolsTest {
         var engine = started();
         assertTrue(DmService.theParty(engine.state()).contains("- objective: not yet found"));
 
+        toChapel(engine);
         engine.takeProp("reliquary");
 
         var party = DmService.theParty(engine.state());

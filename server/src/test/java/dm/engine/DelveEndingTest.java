@@ -32,6 +32,23 @@ class DelveEndingTest {
         return engine;
     }
 
+    private static GameEngine siteStarted(EventLog log, Integer... faces) {
+        var engine = new GameEngine(CONTENT, log, new ScriptedDiceRoller(faces),
+                Rooms.authored(CONTENT, "crypt", "gallery", "chapel", "undercroft", "vault"));
+        engine.start();
+        return engine;
+    }
+
+    private static void toChapel(GameEngine engine) {
+        engine.crossExit("door-north");
+        engine.crossExit("door-north");
+    }
+
+    private static void backToCrypt(GameEngine engine) {
+        engine.crossExit("door-south");
+        engine.crossExit("door-south");
+    }
+
     private static <T extends Event> List<T> eventsOf(EventLog log, Class<T> type) {
         return log.events().stream().filter(type::isInstance).map(type::cast).toList();
     }
@@ -140,8 +157,10 @@ class DelveEndingTest {
     @DisplayName("extract with the reliquary ships EXTRACTED_WITH_OBJECTIVE, hurt, and CARRIED_OUT")
     void extractWithObjectiveShipsReport() {
         var log = new EventLog();
-        var engine = started(log, 10);
+        var engine = siteStarted(log, 10);
+        toChapel(engine);
         engine.takeProp("reliquary");
+        backToCrypt(engine);
         var diffs = engine.crossExit("stair-south");
 
         EndingReport report = engine.scene().ending();
@@ -206,7 +225,8 @@ class DelveEndingTest {
     @DisplayName("PARTY_LOST while holding the reliquary is FELL_WITH_HIM")
     void lostHoldingFallsWithHim() {
         var log = new EventLog();
-        var engine = started(log, 1, 20, 19, 4);
+        var engine = siteStarted(log, 1, 20, 19, 4);
+        toChapel(engine);
         engine.takeProp("reliquary");
         engine.spawnGoblin(6, 6);
         var fighter = engine.state().find("fighter").orElseThrow();

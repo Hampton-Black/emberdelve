@@ -154,6 +154,7 @@ public record WorldState(
             case Event.NarrationLogged ignored -> this;
             case Event.ConsequenceFired ignored -> this;
             case Event.ObjectiveTaken e -> objectiveTaken(e);
+            case Event.PropTaken e -> propTaken(e);
             case Event.DelveEnded e -> delveEnded(e);
         };
     }
@@ -327,11 +328,19 @@ public record WorldState(
     }
 
     private WorldState objectiveTaken(Event.ObjectiveTaken e) {
+        return taken(e.roomId(), e.propId(), true);
+    }
+
+    private WorldState propTaken(Event.PropTaken e) {
+        return taken(e.roomId(), e.propId(), holdingObjective);
+    }
+
+    private WorldState taken(String roomId, String propId, boolean holding) {
         var next = new LinkedHashSet<>(takenProps);
-        next.add(new PropRef(e.roomId(), e.propId()));
-        return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
+        next.add(new PropRef(roomId, propId));
+        return new WorldState(this.roomId, entities, party, mode, revealedProps, visitedRoomIds,
                 dressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables,
-                true, next, ending);
+                holding, next, ending);
     }
 
     private WorldState delveEnded(Event.DelveEnded e) {

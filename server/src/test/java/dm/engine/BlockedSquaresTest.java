@@ -77,21 +77,26 @@ class BlockedSquaresTest {
     @Test
     @DisplayName("once a blocking prop is taken, its square is walkable")
     void vacatedChestIsWalkable() {
-        var reliquary = new Square(4, 2);
-        assertTrue(engine.scene().blocked().contains(reliquary),
+        engine = new GameEngine(new ContentLoader(), new EventLog(), new RandomDiceRoller(),
+                Rooms.authored(new ContentLoader(), "crypt", "gallery", "chapel", "undercroft", "vault"));
+        engine.start();
+        engine.crossExit("door-north");
+        engine.crossExit("door-north");
+        var box = engine.room().prop("reliquary");
+        var at = new Square(box.x(), box.y());
+        assertTrue(engine.scene().blocked().contains(at),
                 "the reliquary blocks before it is taken");
 
         engine.takeProp("reliquary");
 
-        assertFalse(engine.scene().blocked().contains(reliquary),
+        assertFalse(engine.scene().blocked().contains(at),
                 "the reliquary no longer blocks once it is in hand");
-        assertDoesNotThrow(() -> engine.moveTo("fighter", 4, 2, new CombatSink.Buffer()));
+        assertDoesNotThrow(() -> engine.moveTo("fighter", at.x(), at.y(), new CombatSink.Buffer()));
     }
 
     @Test
     @DisplayName("a square the board does not draw solid is one the engine will not refuse as solid")
     void unblockedIsNotRefusedAsSolid() {
-        engine.takeProp("reliquary");
         var scene = engine.scene();
         var room = scene.currentRoom();
 

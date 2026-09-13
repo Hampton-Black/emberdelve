@@ -11,8 +11,8 @@ import java.util.List;
 /**
  * Bare rooms for the tests that only care about shape and the exit graph.
  *
- * <p>Synthetic on purpose — {@code content/} holds two authored rooms and adding a third is an
- * {@code AGENTS.md} anti-goal. A chain or a cycle here costs nothing and touches no content.
+ * <p>Synthetic on purpose — a chain or a cycle here costs nothing and touches no authored
+ * content. The five-room site lives in {@code content/rooms/}.
  */
 final class SyntheticRooms {
 

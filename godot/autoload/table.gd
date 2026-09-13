@@ -265,7 +265,8 @@ func _apply_now(list: Array) -> void:
 								or int(cell.get("y", -1)) != int(gone_prop.get("y", -2)):
 							next_blocked.append(cell)
 					scene["blocked"] = next_blocked
-				scene["holdingObjective"] = true
+				scene["holdingObjective"] = bool(diff.get("holdingObjective",
+						scene.get("holdingObjective", false)))
 				announcements.append(func() -> void: prop_removed.emit(gone_id))
 
 			"DelveEnded":

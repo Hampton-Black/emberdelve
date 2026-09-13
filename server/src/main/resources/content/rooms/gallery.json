@@ -14,7 +14,16 @@
       "y": 0,
       "rotation": 0,
       "hidden": false,
-      "description": "The slab door back to the crypt, standing open on a dark stair-head. Its iron bands are the same work as the lamp's runes."
+      "description": "The slab door back to the crypt, standing open."
+    },
+    {
+      "id": "door-north",
+      "type": "DOOR",
+      "x": 5,
+      "y": 15,
+      "rotation": 180,
+      "hidden": false,
+      "description": "An open doorway at the head of the gallery. Nothing bars it."
     },
     {
       "id": "pillar-near-west",
@@ -59,7 +68,7 @@
     {
       "id": "brazier-head",
       "type": "BRAZIER",
-      "x": 5,
+      "x": 3,
       "y": 14,
       "rotation": 0,
       "hidden": false,
@@ -93,6 +102,13 @@
       "y": 0,
       "direction": "SOUTH",
       "toRoomId": "crypt"
+    },
+    {
+      "id": "door-north",
+      "x": 5,
+      "y": 15,
+      "direction": "NORTH",
+      "toRoomId": "chapel"
     }
   ],
   "startPositions": {
@@ -100,7 +116,7 @@
     "goblinSpawn": { "x": 5, "y": 8 }
   },
   "dmNotes": {
-    "overview": "A processional gallery, long and narrow, running north from the crypt stair. Four pillars line the aisle. The far end is a dead end with a cold brazier at it — there is no other way on from here.",
+    "overview": "A processional gallery, long and narrow, running north from the crypt stair. Four pillars line the aisle. An open doorway at the far end continues north.",
     "sensory": "Dry where the crypt was damp, and much colder. Dust hangs in the air where the ceiling has come down. Footsteps carry the whole length and come back."
   }
 }

@@ -38,6 +38,7 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = Event.ItemUsed.class, name = "item_used"),
         @JsonSubTypes.Type(value = Event.Rested.class, name = "rested"),
         @JsonSubTypes.Type(value = Event.ObjectiveTaken.class, name = "objective_taken"),
+        @JsonSubTypes.Type(value = Event.PropTaken.class, name = "prop_taken"),
         @JsonSubTypes.Type(value = Event.DelveEnded.class, name = "delve_ended"),
 })
 public sealed interface Event {
@@ -163,6 +164,12 @@ public sealed interface Event {
 
     /** The party took the site's objective. Spec §4c. */
     record ObjectiveTaken(Instant at, String roomId, String propId) implements Event {}
+
+    /**
+     * The party took a takeable that is not the site's objective. Same taken-set as
+     * {@link ObjectiveTaken}; does not set {@code holdingObjective}. Spec §4c.
+     */
+    record PropTaken(Instant at, String roomId, String propId) implements Event {}
 
     /**
      * The delve ended. {@code throughExitId} is the way-out that was crossed, empty on

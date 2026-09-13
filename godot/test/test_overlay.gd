@@ -851,7 +851,10 @@ func _doorway_with_actioned_prop() -> Dictionary:
 
 
 func _prop_mesh_aabb(world: Node, prop_id: String) -> AABB:
-	var prop := world.get_node_or_null("Props/crypt/%s" % prop_id) as Node3D
+	var holder := world.get_node_or_null("Props")
+	var prop: Node3D = null
+	if holder != null:
+		prop = holder.find_child(prop_id, true, false) as Node3D
 	assert_not_null(prop, "prop %s" % prop_id)
 	if prop == null:
 		return AABB()
@@ -1069,28 +1072,32 @@ func test_leaving_from_the_way_out_confirm_sends_enter_exit() -> void:
 # ---- Dense room: scenery must not shadow a handle (emberdelve-4h9.7 / 7m6)
 
 
-func _authored_crypt_scene() -> Dictionary:
+func _authored_room_scene(room_id: String) -> Dictionary:
 	var Preview = load("res://dev/preview_room.gd")
-	var crypt: Dictionary = Preview.view_of("crypt")
-	assert_false(crypt.has("error"), str(crypt.get("error", "")))
-	var props: Array = crypt.get("props", [])
-	assert_gte(props.size(), 20, "the authored crypt must be densely furnished")
-	var kits := {}
-	for prop in props:
-		var appearance := String(prop.get("appearance", ""))
-		if appearance.is_empty():
-			continue
-		# kit is the folder prefix of the mesh path — appearances.gd owns the map.
-		kits[appearance] = true
-	assert_gte(props.size(), 20)
-	crypt["mode"] = "EXPLORATION"
-	crypt["combat"] = null
-	crypt["blocked"] = []
-	crypt["entities"] = [{
+	var room: Dictionary = Preview.view_of(room_id)
+	assert_false(room.has("error"), str(room.get("error", "")))
+	room["mode"] = "EXPLORATION"
+	room["combat"] = null
+	room["blocked"] = []
+	var start := {"x": 5, "y": 1}
+	var starts: Variant = room.get("startPositions", {})
+	if typeof(starts) == TYPE_DICTIONARY:
+		var party: Variant = starts.get("party", [])
+		if typeof(party) == TYPE_ARRAY and party.size() > 0:
+			start = {"x": int(party[0].get("x", 5)), "y": int(party[0].get("y", 1))}
+	room["entities"] = [{
 		"id": "fighter", "kind": "fighter", "name": "Roderick",
-		"x": 6, "y": 1, "hp": 12, "maxHp": 12, "isPlayerControlled": true,
+		"x": start["x"], "y": start["y"], "hp": 12, "maxHp": 12, "isPlayerControlled": true,
 	}]
-	return SceneFixtures.scene(crypt)
+	return SceneFixtures.scene(room)
+
+
+func _authored_crypt_scene() -> Dictionary:
+	var scene := _authored_room_scene("crypt")
+	var crypt: Dictionary = scene["rooms"][0]
+	assert_gte((crypt.get("props", []) as Array).size(), 20,
+		"the authored crypt must be densely furnished")
+	return scene
 
 
 func test_the_authored_crypt_draws_from_at_least_two_kits() -> void:
@@ -1140,7 +1147,7 @@ func test_dense_scenery_does_not_steal_the_north_door() -> void:
 
 
 func test_dense_scenery_does_not_steal_the_reliquary() -> void:
-	var world := _world_with_scene(_authored_crypt_scene())
+	var world := _world_with_scene(_authored_room_scene("chapel"))
 	await wait_process_frames(2)
 	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
 	assert_not_null(cam, "Camera3D")

@@ -87,7 +87,7 @@ public final class App {
         }
 
         var engine = cli.generateSeed() == null
-                ? new GameEngine(content, eventLog, dice, Rooms.authored(content, "crypt", "gallery"))
+                ? new GameEngine(content, eventLog, dice, Rooms.authored(content, "crypt", "gallery", "chapel", "undercroft", "vault"))
                 : new GameEngine(content, eventLog, dice, room);
         eventLog.append(new Event.SessionStarted(Instant.now(), Event.SCHEMA_VERSION,
                 0L, // the dungeon seed lands here when navigation does

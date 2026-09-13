@@ -471,8 +471,13 @@ public final class GameEngine {
         if (state().takenHere().contains(propId)) {
             throw new IllegalArgumentException("'" + propId + "' has already been taken");
         }
-        log.append(new Event.ObjectiveTaken(Instant.now(), state().roomId(), propId));
-        return List.of(new Diff.PropRemoved(propId));
+        boolean objective = EndingReport.OBJECTIVE_NAME.equals(propId);
+        if (objective) {
+            log.append(new Event.ObjectiveTaken(Instant.now(), state().roomId(), propId));
+        } else {
+            log.append(new Event.PropTaken(Instant.now(), state().roomId(), propId));
+        }
+        return List.of(new Diff.PropRemoved(propId, state().holdingObjective()));
     }
 
     /** Exploration-only; no living hostile in this room. Spec §5b. */

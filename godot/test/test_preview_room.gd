@@ -177,8 +177,6 @@ func test_round_trip_moves_one_prop_and_leaves_every_other_field() -> void:
 
 	var tomb := _prop(after, "sarcophagus")
 	assert_eq(tomb.get("contains"), "goblin")
-	var box := _prop(after, "reliquary")
-	assert_eq(box.get("actions"), ["take"])
 
 
 func test_grid_to_world_is_extracted_for_a_self_centred_room() -> void:
@@ -289,9 +287,9 @@ func test_write_appearance_mutates_only_that_field() -> void:
 	var Preview = _script(PREVIEW)
 	if not _has(Preview, "rooms_dir") or not _has(Preview, "write_appearance"):
 		return
-	var crypt := String(Preview.rooms_dir()).path_join("crypt.json")
-	assert_true(FileAccess.file_exists(crypt), crypt)
-	var original := FileAccess.get_file_as_string(crypt)
+	var chapel := String(Preview.rooms_dir()).path_join("chapel.json")
+	assert_true(FileAccess.file_exists(chapel), chapel)
+	var original := FileAccess.get_file_as_string(chapel)
 	var tmp := "user://preview_appearance_roundtrip.json"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	assert_not_null(f, tmp)

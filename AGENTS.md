@@ -194,7 +194,7 @@ a multi-tenant provider measure a moment, not a steady state.
 
 | Shortcut | Value |
 |---|---|
-| Rooms | Two authored: `content/rooms/crypt.json` and `gallery.json`. No generated dungeon. |
+| Rooms | Five authored: `content/rooms/crypt.json`, `gallery.json`, `chapel.json`, `undercroft.json`, and `vault.json`. No generated dungeon. |
 | Party | `List<PartyMember>` containing one member |
 | Fighter | AC 16, HP 20, +5 to hit, 1d8+3 damage, speed 30ft, STR +3 |
 | Goblin | AC 15, HP 7, +4 to hit, 1d6+2 damage, speed 30ft |
@@ -262,7 +262,7 @@ These are the things most likely to eat week two.
   deeper. The generator plan follows M4.
 - **Do not build save/load.** Sessions are *written* — that is the replay harness — but nothing
   resumes from one, and resume is the expensive half. Restarting the process is still fine.
-- **Do not optimize anything.** Two authored rooms, two entities.
+- **Do not optimize anything.** Five authored rooms, two entities.
 - **Do not generalize.** Every abstraction in M0 is written against a sample size of one.
 - **Do not build a character sheet UI.** HP and AC as text is sufficient.
 

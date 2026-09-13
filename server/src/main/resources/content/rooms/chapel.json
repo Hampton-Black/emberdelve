@@ -1,0 +1,160 @@
+{
+  "roomId": "chapel",
+  "name": "The Chapel",
+  "width": 10,
+  "height": 12,
+  "floorType": "TILED",
+  "wallType": "CARVED",
+  "lighting": "DIM",
+  "props": [
+    {
+      "id": "door-south",
+      "type": "DOOR",
+      "x": 5,
+      "y": 0,
+      "rotation": 0,
+      "hidden": false,
+      "description": "The doorway back to the gallery, standing open."
+    },
+    {
+      "id": "door-north",
+      "type": "DOOR",
+      "x": 5,
+      "y": 11,
+      "rotation": 180,
+      "hidden": false,
+      "description": "An open doorway north. Nothing bars it."
+    },
+    {
+      "id": "shrine",
+      "type": "FURNITURE",
+      "appearance": "shrine",
+      "x": 2,
+      "y": 6,
+      "rotation": 90,
+      "hidden": false,
+      "description": "A shrine in the west aisle, its niche empty except for a smear of old wax."
+    },
+    {
+      "id": "reliquary",
+      "type": "CONTAINER",
+      "appearance": "chest",
+      "x": 3,
+      "y": 6,
+      "rotation": 0,
+      "hidden": false,
+      "actions": ["take"],
+      "description": "A small iron-bound reliquary, set before the shrine. The latch yields to a touch."
+    },
+    {
+      "id": "niche",
+      "type": "ALCOVE",
+      "x": 0,
+      "y": 6,
+      "rotation": 90,
+      "hidden": true,
+      "revealHint": "The shrine's empty niche is not quite empty — a seam runs behind the offering-stone. Searching the shrine would find it.",
+      "description": "A shallow niche behind the shrine, holding a folded strip of cloth and a cracked votive."
+    },
+    {
+      "id": "pillar-south-east",
+      "type": "PILLAR",
+      "appearance": "pillar",
+      "x": 7,
+      "y": 3,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A chapel pillar, its capital chewed by damp."
+    },
+    {
+      "id": "pillar-north-east",
+      "type": "PILLAR",
+      "appearance": "pillar_decorated",
+      "x": 7,
+      "y": 9,
+      "rotation": 0,
+      "hidden": false,
+      "description": "Its partner toward the north door, the carving worn to a suggestion of wings."
+    },
+    {
+      "id": "candles-west",
+      "type": "SCENERY",
+      "appearance": "candles",
+      "x": 1,
+      "y": 10,
+      "rotation": 180,
+      "hidden": false,
+      "description": "A huddle of unlit candles on the north-west wall."
+    },
+    {
+      "id": "banner-east",
+      "type": "SCENERY",
+      "appearance": "banner",
+      "x": 9,
+      "y": 6,
+      "rotation": 270,
+      "hidden": false,
+      "description": "A faded chapel banner, the saint's face washed out."
+    },
+    {
+      "id": "chair",
+      "type": "FURNITURE",
+      "appearance": "chair",
+      "x": 8,
+      "y": 6,
+      "rotation": 270,
+      "hidden": false,
+      "description": "A wooden chair facing the shrine, as if someone had been at prayer."
+    },
+    {
+      "id": "lantern",
+      "type": "FURNITURE",
+      "appearance": "lantern_standing",
+      "x": 8,
+      "y": 10,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A standing lantern, unlit, by the north-east corner."
+    },
+    {
+      "id": "cobweb",
+      "type": "SCENERY",
+      "appearance": "cobweb",
+      "x": 0,
+      "y": 3,
+      "rotation": 90,
+      "hidden": false,
+      "description": "A cobweb spanning the west wall, grey with chapel dust."
+    }
+  ],
+  "exits": [
+    {
+      "id": "door-south",
+      "x": 5,
+      "y": 0,
+      "direction": "SOUTH",
+      "toRoomId": "gallery"
+    },
+    {
+      "id": "door-north",
+      "x": 5,
+      "y": 11,
+      "direction": "NORTH",
+      "toRoomId": "undercroft"
+    }
+  ],
+  "startPositions": {
+    "party": [{ "x": 5, "y": 1 }],
+    "goblinSpawn": { "x": 7, "y": 8 }
+  },
+  "dmNotes": {
+    "overview": "A chapel cut into the stone, narrower than the gallery. A shrine stands in the west aisle with a small reliquary before it. Sconces line the walls, cold. An open door north, an open door south.",
+    "sensory": "Wax and old incense. The air is still. When someone moves, the cold sconces seem to listen.",
+    "theDoor": "Both doors stand open. A fight is the only thing that would stop them walking through."
+  },
+  "fires": {
+    "lit": "The wall sconces are cold, wax pooled and dark.",
+    "to": "TORCHLIT",
+    "moved": "The sconces have caught — a line of flame along both walls, as if something ahead has noticed you."
+  }
+}

@@ -24,8 +24,10 @@ class UsePropTakeTest {
     void usePropTakes() throws Exception {
         var engine = new GameEngine(new ContentLoader(), new EventLog(),
                 new ScriptedDiceRoller(10),
-                Rooms.authored(new ContentLoader(), "crypt", "gallery"));
+                Rooms.authored(new ContentLoader(), "crypt", "gallery", "chapel", "undercroft", "vault"));
         engine.start();
+        engine.crossExit("door-north");
+        engine.crossExit("door-north");
         var outbound = new ArrayList<ServerMessage>();
         var handler = WsHandler.forTest(engine, null, outbound::add);
 

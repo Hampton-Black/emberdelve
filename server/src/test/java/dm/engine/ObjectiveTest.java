@@ -22,9 +22,19 @@ class ObjectiveTest {
 
     private static GameEngine started(EventLog log) {
         var engine = new GameEngine(CONTENT, log, new ScriptedDiceRoller(10),
-                Rooms.authored(CONTENT, "crypt", "gallery"));
+                Rooms.authored(CONTENT, "crypt", "gallery", "chapel", "undercroft", "vault"));
         engine.start();
         return engine;
+    }
+
+    private static void toChapel(GameEngine engine) {
+        engine.crossExit("door-north");
+        engine.crossExit("door-north");
+    }
+
+    private static void backToCrypt(GameEngine engine) {
+        engine.crossExit("door-south");
+        engine.crossExit("door-south");
     }
 
     private static <T extends Event> List<T> eventsOf(EventLog log, Class<T> type) {
@@ -36,6 +46,7 @@ class ObjectiveTest {
     void takeHoldsAndRemoves() {
         var log = new EventLog();
         var engine = started(log);
+        toChapel(engine);
 
         assertTrue(engine.scene().currentRoom().props().stream()
                 .anyMatch(p -> p.id().equals("reliquary") && p.actions().contains("take")));
@@ -51,10 +62,11 @@ class ObjectiveTest {
                 "the prop leaves the visible list");
         assertEquals(1, eventsOf(log, Event.ObjectiveTaken.class).size());
         var taken = eventsOf(log, Event.ObjectiveTaken.class).getFirst();
-        assertEquals("crypt", taken.roomId());
+        assertEquals("chapel", taken.roomId());
         assertEquals("reliquary", taken.propId());
         assertTrue(diffs.stream().anyMatch(d -> d instanceof Diff.PropRemoved removed
-                && removed.propId().equals("reliquary")));
+                && removed.propId().equals("reliquary")
+                && removed.holdingObjective()));
     }
 
     @Test
@@ -62,7 +74,9 @@ class ObjectiveTest {
     void leaveHoldingExtractsWithObjective() {
         var log = new EventLog();
         var engine = started(log);
+        toChapel(engine);
         engine.takeProp("reliquary");
+        backToCrypt(engine);
 
         engine.crossExit("stair-south");
 
@@ -73,7 +87,6 @@ class ObjectiveTest {
         assertEquals(Ending.EXTRACTED_WITH_OBJECTIVE, ended.ending());
         assertEquals("stair-south", ended.throughExitId());
         assertEquals("crypt", engine.state().roomId(), "extracting is not a room change");
-        assertTrue(eventsOf(log, Event.PartyMoved.class).isEmpty());
         assertTrue(eventsOf(log, Event.FactAsserted.class).isEmpty());
     }
 
