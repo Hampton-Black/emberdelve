@@ -55,7 +55,8 @@ func _coals_material(coals: MeshInstance3D) -> StandardMaterial3D:
 	var mat := coals.get_surface_override_material(0) as StandardMaterial3D
 	if mat == null:
 		mat = coals.get_active_material(0) as StandardMaterial3D
-	if mat != null and coals.get_surface_override_material(0) == null:
-		mat = mat.duplicate()
-		coals.set_surface_override_material(0, mat)
+	if mat == null:
+		return null
+	mat = mat.duplicate()
+	coals.set_surface_override_material(0, mat)
 	return mat

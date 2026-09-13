@@ -246,6 +246,45 @@ func test_cold_brazier_has_no_light_and_dead_coals() -> void:
 		"dead coals are grey ash, not green")
 
 
+func test_cold_and_lit_braziers_keep_independent_coals() -> void:
+	var packed: PackedScene = load("res://world/props/brazier.tscn")
+	var cold: Node = packed.instantiate()
+	var lit: Node = packed.instantiate()
+	add_child_autofree(cold)
+	add_child_autofree(lit)
+	if not cold.has_method("configure"):
+		return
+	# Cold first, then lit — without per-instance materials the second configure wins.
+	cold.configure({"id": "brazier-head", "type": "BRAZIER", "appearance": "cold"}, "gallery")
+	lit.configure({"id": "fire", "type": "BRAZIER"}, "crypt")
+	var cold_coals := cold.get_node_or_null("Meshes/Coals") as MeshInstance3D
+	var lit_coals := lit.get_node_or_null("Meshes/Coals") as MeshInstance3D
+	assert_not_null(cold_coals, "cold Meshes/Coals")
+	assert_not_null(lit_coals, "lit Meshes/Coals")
+	if cold_coals == null or lit_coals == null:
+		return
+	var cold_mat := cold_coals.get_surface_override_material(0) as StandardMaterial3D
+	if cold_mat == null:
+		cold_mat = cold_coals.get_active_material(0) as StandardMaterial3D
+	var lit_mat := lit_coals.get_surface_override_material(0) as StandardMaterial3D
+	if lit_mat == null:
+		lit_mat = lit_coals.get_active_material(0) as StandardMaterial3D
+	assert_not_null(cold_mat, "cold coals material")
+	assert_not_null(lit_mat, "lit coals material")
+	if cold_mat == null or lit_mat == null:
+		return
+	assert_almost_eq(cold_mat.emission_energy_multiplier, 0.0, 0.01,
+		"cold brazier coals are out")
+	assert_lt(cold_mat.albedo_color.r + cold_mat.albedo_color.g + cold_mat.albedo_color.b, 0.8,
+		"cold brazier coals are grey ash")
+	assert_almost_eq(lit_mat.emission_energy_multiplier, 0.85, 0.01,
+		"lit brazier coals still glow")
+	var core := Color(0.42, 0.86, 0.44, 1).lightened(0.45)
+	assert_almost_eq(lit_mat.emission.r, core.r, 0.02)
+	assert_almost_eq(lit_mat.emission.g, core.g, 0.02)
+	assert_almost_eq(lit_mat.emission.b, core.b, 0.02)
+
+
 func test_cold_is_decided_by_appearance_not_prop_id() -> void:
 	var packed: PackedScene = load("res://world/props/brazier.tscn")
 	var brazier: Node = packed.instantiate()
