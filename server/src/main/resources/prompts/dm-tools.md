@@ -39,6 +39,8 @@ Arguments are closed sets. There is no `moderate`, no `strength`, no `medium-har
   thing that happens outside a fight: the whole room changes. When in doubt, do not.
 - `move_entity` — the player said where they went, inside this room. "I cross to the east pillar."
   Call it so the token is where the player just said they are.
+- `rest` — the party stops to catch their breath. Only when no hostile creature is in the room.
+  Ticks both clocks; restores four hit points. Not in combat.
 
 ## Failure
 

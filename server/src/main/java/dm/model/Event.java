@@ -36,6 +36,7 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = Event.RoomLightingChanged.class, name = "room_lighting_changed"),
         @JsonSubTypes.Type(value = Event.ConsumablesGranted.class, name = "consumables_granted"),
         @JsonSubTypes.Type(value = Event.ItemUsed.class, name = "item_used"),
+        @JsonSubTypes.Type(value = Event.Rested.class, name = "rested"),
 })
 public sealed interface Event {
 
@@ -47,8 +48,10 @@ public sealed interface Event {
      * {@code entity_spawned} line written at schema 1 describes an entity standing nowhere.
      *
      * <p>3 (M4): clocks, consequences and a room's fires becoming folded lighting.
+     *
+     * <p>4 (M4): {@code rested} records a pause that heals and ticks both clocks.
      */
-    int SCHEMA_VERSION = 3;
+    int SCHEMA_VERSION = 4;
 
     Instant at();
 
@@ -153,6 +156,9 @@ public sealed interface Event {
      * {@link ClockTicked#filled()}.
      */
     record ItemUsed(Instant at, String actorId, Consumable item, int remaining) implements Event {}
+
+    /** A rest taken. {@code hpAfter} is the actor's hit points after healing, clamped to max. */
+    record Rested(Instant at, String actorId, int hpAfter) implements Event {}
 
     static NarrationLogged narration(String speakerId, String text) {
         return new NarrationLogged(Instant.now(), speakerId, text);

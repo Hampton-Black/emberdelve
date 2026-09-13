@@ -76,6 +76,7 @@ public final class ReplayRunner {
                         engine.rollCheck(e.actorId(), e.skill().orElseThrow(),
                                 dm.model.Difficulty.ofDc(e.dc()));
                 case Event.ItemUsed e -> engine.useItem(e.actorId(), e.item());
+                case Event.Rested e -> engine.rest(e.actorId());
                 // TurnAdvanced names the incoming combatant. Ending that id would require
                 // the engine to end a turn that has not started. End whoever is active now;
                 // compare checks the event the engine emits.

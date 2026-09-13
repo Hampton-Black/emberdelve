@@ -56,6 +56,11 @@ public final class ClockTables {
     public static final String TORCH_RELIT =
             "The torch catches; the ring of light spreads again.";
 
+    /** Room-scoped clause when the party rests. Spec §8d. */
+    public static final String REST =
+            "The party has stopped to rest and catch their breath. A sentence or two — what "
+                    + "the pause costs in this room, not a description from scratch.";
+
     /** Narrator clause for a sign or {@code LIGHT_OUT}. Spec §6c "About". */
     public static String clause(ConsequenceId id) {
         return switch (id) {

@@ -139,6 +139,7 @@ public record WorldState(
             case Event.RoomLightingChanged e -> lightingChanged(e);
             case Event.ConsumablesGranted e -> consumablesGranted(e);
             case Event.ItemUsed e -> itemUsed(e);
+            case Event.Rested e -> rested(e);
             // Inputs, session framing, and the causal record of a table — bundled events
             // sit beside ConsequenceFired, so the fold must not expand it (spec §6g).
             case Event.SessionStarted ignored -> this;
@@ -236,6 +237,17 @@ public record WorldState(
         return new WorldState(roomId, nextEntities, party, mode, revealedProps, visitedRoomIds,
                 dressings, combat, facts, consecutiveFailedChecks, clocks, lighting,
                 Map.copyOf(nextConsumables));
+    }
+
+    private WorldState rested(Event.Rested e) {
+        var actor = entities.get(e.actorId());
+        if (actor == null) {
+            return this;
+        }
+        var nextEntities = new LinkedHashMap<>(entities);
+        nextEntities.put(e.actorId(), actor.withHp(e.hpAfter()));
+        return new WorldState(roomId, nextEntities, party, mode, revealedProps, visitedRoomIds,
+                dressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables);
     }
 
     private WorldState lightingChanged(Event.RoomLightingChanged e) {

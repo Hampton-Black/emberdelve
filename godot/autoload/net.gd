@@ -160,6 +160,9 @@ func end_turn(actor_id: String) -> void:
 func use_item(actor_id: String, item: String) -> void:
 	send({"type": "useItem", "actorId": actor_id, "item": item})
 
+func rest(actor_id: String) -> void:
+	send({"type": "rest", "actorId": actor_id})
+
 ## The seven debug messages. They exist so the feel can be tuned with no model, no key and no
 ## latency in the path — see Task 13.
 func debug(message: Dictionary) -> void:

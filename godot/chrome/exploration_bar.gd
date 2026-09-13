@@ -1,15 +1,16 @@
 extends Control
 
-## Exploration chrome: potion and torch buttons with counts.
+## Exploration chrome: potion, torch, and rest buttons with counts.
 ##
-## Reads SceneState counts and canSpendTorch. Nothing here decides legality — the server
-## refuses anyway; grey states are hints only.
+## Reads SceneState counts, canSpendTorch, and canRest. Nothing here decides legality — the
+## server refuses anyway; grey states are hints only.
 
 const INK := Color("d8cfc2")
 
 var _font: SystemFont
 var _potion: Button
 var _torch: Button
+var _rest: Button
 
 
 func _ready() -> void:
@@ -40,6 +41,10 @@ func _build() -> void:
 	_torch = _verb("Torch", "TORCH")
 	_torch.pressed.connect(func() -> void: _use("torch"))
 	row.add_child(_torch)
+
+	_rest = _verb("Rest", "REST")
+	_rest.pressed.connect(_rest_pressed)
+	row.add_child(_rest)
 
 
 func _verb(node_name: String, caption: String) -> Button:
@@ -81,10 +86,11 @@ func _redraw() -> void:
 		custom_minimum_size = Vector2.ZERO
 		return
 	visible = true
-	custom_minimum_size = Vector2(132, 0)
+	custom_minimum_size = Vector2(196, 0)
 	var potions := int(Table.scene.get("potions", 0))
 	var torches := int(Table.scene.get("torches", 0))
 	var can_torch := bool(Table.scene.get("canSpendTorch", false))
+	var can_rest := bool(Table.scene.get("canRest", false))
 	var waiting := Table.awaiting_dm
 
 	_potion.text = "POTION %d" % potions
@@ -95,6 +101,9 @@ func _redraw() -> void:
 	_torch.disabled = waiting or not can_torch
 	_torch.modulate.a = 0.35 if _torch.disabled else 1.0
 
+	_rest.disabled = waiting or not can_rest
+	_rest.modulate.a = 0.35 if _rest.disabled else 1.0
+
 
 func _use(item: String) -> void:
 	if Table.awaiting_dm:
@@ -103,6 +112,15 @@ func _use(item: String) -> void:
 	if actor.is_empty():
 		return
 	Net.use_item(actor, item)
+
+
+func _rest_pressed() -> void:
+	if Table.awaiting_dm:
+		return
+	var actor := _actor_id()
+	if actor.is_empty():
+		return
+	Net.rest(actor)
 
 
 func _actor_id() -> String:

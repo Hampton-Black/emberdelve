@@ -140,6 +140,18 @@ public final class WsHandler {
                     message.path("actorId").asText("fighter"),
                     Consumable.valueOf(message.path("item").asText("").toUpperCase())));
 
+            case "rest" -> {
+                String actorId = message.path("actorId").asText("fighter");
+                try {
+                    sendDiffs(ctx, engine.rest(actorId));
+                    if (dm != null) {
+                        turns.submit(() -> dm.narrateRest(turnSink(ctx)));
+                    }
+                } catch (IllegalArgumentException e) {
+                    send(ctx, new ServerMessage.Error(e.getMessage()));
+                }
+            }
+
             // T5 debug hooks. These exist to prove diffs render without a model in the path,
             // and are replaced by real tool dispatch in T7.
             case "debugReveal" -> sendDiffs(ctx, engine.revealProp(message.path("propId").asText()));

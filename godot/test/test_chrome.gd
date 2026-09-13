@@ -850,6 +850,7 @@ func _exploration_scene(extra: Dictionary = {}) -> Dictionary:
 	flat["torches"] = 2
 	flat["rope"] = 0
 	flat["canSpendTorch"] = false
+	flat["canRest"] = true
 	for key in extra:
 		flat[key] = extra[key]
 	return SceneFixtures.scene(flat)
@@ -941,6 +942,46 @@ func test_a_potion_click_sends_use_item_with_no_model() -> void:
 	assert_eq(Net.outbound[0]["type"], "useItem")
 	assert_eq(Net.outbound[0]["actorId"], "fighter")
 	assert_eq(Net.outbound[0]["item"], "potion")
+
+
+func test_rest_button_greys_when_can_rest_is_false() -> void:
+	Table.set_scene(_exploration_scene({"canRest": false}))
+	var bar := _exploration_bar()
+	await wait_frames(1)
+	var rest_btn: Button = bar.find_child("Rest", true, false)
+	assert_not_null(rest_btn, "Rest")
+	if rest_btn == null:
+		return
+	assert_true(rest_btn.disabled)
+
+
+func test_rest_button_locks_while_the_dm_has_the_floor() -> void:
+	Table.set_scene(_exploration_scene())
+	Table.awaiting_dm = true
+	var bar := _exploration_bar()
+	await wait_frames(1)
+	var rest_btn: Button = bar.find_child("Rest", true, false)
+	assert_not_null(rest_btn, "Rest")
+	if rest_btn == null:
+		return
+	assert_true(rest_btn.disabled)
+	rest_btn.pressed.emit()
+	assert_eq(Net.outbound.size(), 0)
+
+
+func test_a_rest_click_sends_rest_with_no_model() -> void:
+	Table.set_scene(_exploration_scene())
+	Table.awaiting_dm = false
+	var bar := _exploration_bar()
+	await wait_frames(1)
+	var rest_btn: Button = bar.find_child("Rest", true, false)
+	assert_not_null(rest_btn, "Rest")
+	if rest_btn == null:
+		return
+	rest_btn.pressed.emit()
+	assert_eq(Net.outbound.size(), 1)
+	assert_eq(Net.outbound[0]["type"], "rest")
+	assert_eq(Net.outbound[0]["actorId"], "fighter")
 
 
 # ---- Debug bar: eight buttons, exact wire dictionaries, locked while the DM has the floor

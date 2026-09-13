@@ -368,7 +368,16 @@ public final class GameEngine {
         return new SceneState(here.roomId(), roomViews, entities, blocked, state().mode(),
                 combat.view(), state().consumableCount(Consumable.POTION),
                 state().consumableCount(Consumable.TORCH),
-                state().consumableCount(Consumable.ROPE), canSpendTorch());
+                state().consumableCount(Consumable.ROPE), canSpendTorch(), canRest());
+    }
+
+    /** Exploration-only; no living hostile in this room. Spec §5b. */
+    public boolean canRest() {
+        if (combat.isActive()) {
+            return false;
+        }
+        return state().entitiesHere().stream()
+                .noneMatch(e -> e.isAlive() && !e.isPlayerControlled());
     }
 
     private boolean canSpendTorch() {
@@ -695,6 +704,39 @@ public final class GameEngine {
             directives.latch(Directive.aboutParty(ClockTables.TORCH_RELIT));
         }
         diffs.add(consumablesDiff());
+        return diffs;
+    }
+
+    /**
+     * Catch breath: four hit points, both clocks tick once. Exploration-only; refused with a
+     * living hostile in the room, including WARY. Spec §5b.
+     */
+    public List<Diff> rest(String actorId) {
+        if (combat.isActive()) {
+            throw new IllegalArgumentException("You cannot rest in the middle of a fight.");
+        }
+        boolean hostileHere = state().entitiesHere().stream()
+                .anyMatch(e -> e.isAlive() && !e.isPlayerControlled());
+        if (hostileHere) {
+            throw new IllegalArgumentException(
+                    "You cannot rest while something hostile is in the room.");
+        }
+        var actor = state().find(actorId).orElseThrow(
+                () -> new IllegalArgumentException("No such entity: " + actorId));
+        if (!actor.isAlive()) {
+            throw new IllegalArgumentException(actor.name() + " is dead.");
+        }
+
+        int hpFrom = actor.hp();
+        int hpTo = Math.min(actor.maxHp(), hpFrom + 4);
+        log.append(new Event.Rested(Instant.now(), actorId, hpTo));
+        directives.latch(Directive.aboutRoom(state().roomId(), ClockTables.REST));
+
+        var diffs = new ArrayList<Diff>();
+        if (hpTo != hpFrom) {
+            diffs.add(new Diff.StatChanged(actorId, "hp", hpFrom, hpTo));
+        }
+        diffs.addAll(restTick());
         return diffs;
     }
 }

@@ -1,6 +1,7 @@
 package dm.ai;
 
 import dm.content.RoomDefinition;
+import dm.engine.ClockTables;
 import dm.engine.GameEngine;
 import dm.model.Combatant;
 import dm.model.Event;
@@ -81,6 +82,9 @@ public final class DmService {
     static final String ARRIVAL_RETURN = "The party has come back into a room they have been "
             + "here before. They know this place. Do not describe it again from scratch — say "
             + "what has changed, or what they came back for, in a sentence or two.";
+
+    /** Room-scoped register for a rest. Spec §8d. */
+    static final String REST_DIRECTIVE = ClockTables.REST;
 
     /** §7: reject, let it retry once, then take the tools away. */
     private static final int REJECTIONS_BEFORE_DEGRADING = 2;
@@ -222,6 +226,30 @@ public final class DmService {
      *
      * @return whether it ran
      */
+    /**
+     * Narrates a rest and any clock signs that fired with it. Takes the lock rather than
+     * giving up — the player asked for the pause. Spec §8d.
+     */
+    public void narrateRest(TurnSink sink) {
+        narrating.lock();
+        try {
+            String directive = takePendingArrival();
+            if (directive == null || directive.isBlank()) {
+                sink.complete();
+                return;
+            }
+            var failed = new boolean[]{false};
+            var prose = runProsePhase("The party rests.", List.of(), sink, failed, false,
+                    directive);
+            if (!failed[0]) {
+                history.add(DmClient.ChatMessage.assistant(prose.text()));
+            }
+            sink.complete();
+        } finally {
+            narrating.unlock();
+        }
+    }
+
     public boolean narrateCombat(List<String> facts, TurnSink sink) {
         if (facts.isEmpty()) {
             return false;

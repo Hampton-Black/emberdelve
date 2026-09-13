@@ -74,6 +74,7 @@ public final class ToolDispatcher {
                 case ToolSchema.ASSERT_FACT -> assertFact(args);
                 case ToolSchema.USE_EXIT -> useExit(args);
                 case ToolSchema.USE_ITEM -> useItem(args);
+                case ToolSchema.REST -> rest(args);
                 case ToolSchema.MOVE_ENTITY -> moveEntity(args);
                 default -> Result.rejected("no such tool: " + call.name());
             };
@@ -215,6 +216,21 @@ public final class ToolDispatcher {
                 "The party left " + from + " and is now in " + engine.state().roomId()
                         + ". Describe what they walk into. Do not describe " + from + " again.",
                 List.of(), List.of(), true);
+    }
+
+    private Result rest(JsonNode args) {
+        String actorId = args.path("actor_id").asText("");
+        boolean here = engine.state().entitiesHere().stream()
+                .anyMatch(e -> e.id().equals(actorId) && e.isAlive());
+        if (!here) {
+            return Result.rejected("'" + actorId + "' is not in this room");
+        }
+        try {
+            List<Diff> diffs = engine.rest(actorId);
+            return Result.applied("The party rested.", diffs);
+        } catch (IllegalArgumentException e) {
+            return Result.rejected(e.getMessage());
+        }
     }
 
     private Result useItem(JsonNode args) {

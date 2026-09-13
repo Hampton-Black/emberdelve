@@ -40,7 +40,9 @@ public record SceneState(
          * Whether spending a torch would do anything right now — not a segment count on the wire.
          * Spec §10.
          */
-        boolean canSpendTorch
+        boolean canSpendTorch,
+        /** Whether resting is legal right now — not combat and no living hostile here. */
+        boolean canRest
 ) {
     /** The room named by {@link #roomId()}, in the same list as everything else. */
     public RoomView currentRoom() {

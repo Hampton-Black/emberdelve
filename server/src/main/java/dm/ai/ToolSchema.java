@@ -36,6 +36,7 @@ public final class ToolSchema {
     public static final String USE_EXIT = "use_exit";
     public static final String MOVE_ENTITY = "move_entity";
     public static final String USE_ITEM = "use_item";
+    public static final String REST = "rest";
 
     /** Everything {@code spawn_entity} can bring into the room. M0 has one creature. */
     public static final List<String> SPAWNABLE_KINDS = List.of("goblin");
@@ -169,6 +170,13 @@ public final class ToolSchema {
                         enumProp(properties, "actor_id", actorIds, "Who uses it.");
                     },
                     "item", "actor_id"));
+        }
+
+        if (withChecks && engine.canRest()) {
+            tools.add(tool(REST,
+                    "The party stops to rest and catch their breath. Ticks both clocks.",
+                    properties -> enumProp(properties, "actor_id", actorIds, "Who rests."),
+                    "actor_id"));
         }
 
         if (!actorIds.isEmpty()) {
