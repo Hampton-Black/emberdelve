@@ -258,3 +258,17 @@ func test_preview_reads_the_environment_off_world_tscn() -> void:
 		"read EnvTorchlit off the scene rather than restating its four numbers")
 	assert_false(src.contains("0.0431373"),
 		"those four numbers were the spike's copy")
+
+
+func test_should_write_prop_only_on_drop_not_mid_drag() -> void:
+	var Preview = _script(PREVIEW)
+	if not _has(Preview, "should_write_prop"):
+		return
+	assert_false(Preview.should_write_prop(true, false, true),
+		"mid-drag square change must not write")
+	assert_false(Preview.should_write_prop(true, true, false),
+		"release without a change must not write")
+	assert_true(Preview.should_write_prop(true, true, true),
+		"release after a drag must write once")
+	assert_false(Preview.should_write_prop(false, false, true),
+		"square change without a release must not write")

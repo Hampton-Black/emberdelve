@@ -183,6 +183,32 @@ static func write_room_prop(room_id: String, prop_id: String, x: int, y: int, ro
 	return write_prop(room_path(room_id), prop_id, x, y, rotation)
 
 
+## True when a viewport drag should persist. Mid-drag grid snaps move the mesh only.
+static func should_write_prop(dragging: bool, just_released: bool,
+		changed_from_committed: bool) -> bool:
+	if dragging and not just_released:
+		return false
+	return just_released and changed_from_committed
+
+
+static func prop_state(node: Node3D, size: Vector2i) -> Dictionary:
+	var square := Grid.to_square(node.position, size)
+	var rot := posmod(roundi(rad_to_deg(node.rotation.y)), 360)
+	return {"x": square.x, "y": square.y, "rotation": rot}
+
+
+static func apply_prop_state(node: Node3D, size: Vector2i, state: Dictionary) -> void:
+	var snap := Grid.to_world(int(state.get("x", 0)), int(state.get("y", 0)), size)
+	node.position = snap
+	node.rotation = Vector3(0.0, deg_to_rad(float(state.get("rotation", 0))), 0.0)
+
+
+static func snap_prop(node: Node3D, size: Vector2i) -> Dictionary:
+	var state := prop_state(node, size)
+	apply_prop_state(node, size, state)
+	return state
+
+
 static func _build_props(holder: Node3D, size: Vector2i, view: Dictionary,
 		skipped: Array[String]) -> int:
 	var room_id := String(view.get("roomId", ""))

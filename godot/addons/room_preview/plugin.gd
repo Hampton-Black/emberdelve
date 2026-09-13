@@ -13,6 +13,8 @@ var _size := Vector2i.ZERO
 var _room_id := ""
 var _seen: Dictionary = {}
 var _loading := false
+var _dragging := false
+var _mouse_was_down := false
 
 
 func _enter_tree() -> void:
@@ -106,9 +108,27 @@ func _capture(root: Node) -> void:
 		var node := child as Node3D
 		if node == null:
 			continue
-		var square := Grid.to_square(node.position, _size)
-		var rot := posmod(roundi(rad_to_deg(node.rotation.y)), 360)
-		_seen[String(node.name)] = {"x": square.x, "y": square.y, "rotation": rot}
+		_seen[String(node.name)] = Preview.prop_state(node, _size)
+
+
+func _prop_changed(prop_id: String, state: Dictionary) -> bool:
+	var was: Dictionary = _seen.get(prop_id, {})
+	if was.is_empty():
+		return false
+	return was.get("x") != state.get("x") or was.get("y") != state.get("y") \
+		or was.get("rotation") != state.get("rotation")
+
+
+func _cancel_drag(props: Node3D) -> void:
+	for child in props.get_children():
+		var node := child as Node3D
+		if node == null:
+			continue
+		var committed: Dictionary = _seen.get(String(node.name), {})
+		if committed.is_empty():
+			continue
+		Preview.apply_prop_state(node, _size, committed)
+	_status.text = "drag cancelled — no write"
 
 
 func _process(_dt: float) -> void:
@@ -120,28 +140,43 @@ func _process(_dt: float) -> void:
 	var props := root.get_node_or_null("RoomPreview/Props") as Node3D
 	if props == null:
 		return
+
+	var mouse_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	var just_released := _mouse_was_down and not mouse_down
+	_mouse_was_down = mouse_down
+
+	if _dragging and Input.is_action_just_pressed("ui_cancel"):
+		_cancel_drag(props)
+		_dragging = false
+		return
+
+	var any_changed := false
+	var live: Dictionary = {}
 	for child in props.get_children():
 		var node := child as Node3D
 		if node == null:
 			continue
-		var square := Grid.to_square(node.position, _size)
-		var rot := posmod(roundi(rad_to_deg(node.rotation.y)), 360)
-		var snap := Grid.to_world(square.x, square.y, _size)
-		if not node.position.is_equal_approx(snap):
-			node.position = snap
-		if absf(node.rotation.x) > 0.0001 or absf(node.rotation.z) > 0.0001 \
-				or not is_equal_approx(node.rotation.y, deg_to_rad(float(rot))):
-			node.rotation = Vector3(0.0, deg_to_rad(float(rot)), 0.0)
-		var was: Dictionary = _seen.get(String(node.name), {})
-		if was.get("x") == square.x and was.get("y") == square.y \
-				and was.get("rotation") == rot:
+		var prop_id := String(node.name)
+		var state := Preview.snap_prop(node, _size)
+		live[prop_id] = state
+		if _prop_changed(prop_id, state):
+			any_changed = true
+
+	if mouse_down and any_changed:
+		_dragging = true
+	elif just_released:
+		_dragging = false
+
+	for prop_id in live:
+		var state: Dictionary = live[prop_id]
+		if not Preview.should_write_prop(_dragging, just_released, _prop_changed(prop_id, state)):
 			continue
-		_seen[String(node.name)] = {"x": square.x, "y": square.y, "rotation": rot}
-		if was.is_empty():
-			continue
-		var err := Preview.write_room_prop(_room_id, String(node.name),
-			square.x, square.y, rot)
+		var err := Preview.write_room_prop(_room_id, prop_id,
+			int(state["x"]), int(state["y"]), int(state["rotation"]))
 		if err.is_empty():
-			_status.text = "wrote %s → (%d, %d) r%d" % [node.name, square.x, square.y, rot]
+			_seen[prop_id] = state
+			_status.text = "wrote %s → (%d, %d) r%d" % [
+				prop_id, state["x"], state["y"], state["rotation"],
+			]
 		else:
 			_status.text = err
