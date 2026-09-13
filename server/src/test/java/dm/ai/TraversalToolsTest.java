@@ -193,6 +193,16 @@ class TraversalToolsTest {
     }
 
     @Test
+    @DisplayName("start_combat is still offered when a hostile is present")
+    void startCombatOfferedWhenHostilePresent() {
+        var engine = started(new EventLog());
+        engine.spawnGoblin(6, 6);
+
+        assertTrue(toolNames(ToolSchema.forTurn(engine)).contains(ToolSchema.START_COMBAT));
+        assertTrue(toolNames(ToolSchema.forReconcile(engine)).contains(ToolSchema.START_COMBAT));
+    }
+
+    @Test
     @DisplayName("start_combat is rejected when the only hostile is in another room")
     void startCombatRejectsHostileElsewhere() {
         var engine = started(new EventLog());

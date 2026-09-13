@@ -647,13 +647,13 @@ exist. Fixed by the prompt telling the truth: `## Ways out` now states the exits
 names the fight as the only exception. A real door state is `emberdelve-ql3` and wants the content
 that justifies it.
 
-**A rule the model reads two ways is a rule that decides nothing.** Both sessions opened on the
-identical move — inspect the sarcophagus, failed check, the first of the session. One spawned the
-goblin and let five turns of parley run. The other spawned it and called `start_combat` in the same
-response, putting the player in initiative before they had done anything hostile.
-`dm-tools.md` says the situation must change on the *second* consecutive failure; both escalated on
-the first. `emberdelve-vy7`. This is M2's "talking to yourself can start a fight" wearing a new
-hat, and it decides what kind of game the session is on turn one.
+**A rule the model reads two ways is a rule that decides nothing (M3 finding, rule gone for M4).**
+Both sessions opened on the identical move — inspect the sarcophagus, failed check, the first of
+the session. One spawned the goblin and let five turns of parley run. The other spawned it and
+called `start_combat` in the same response, putting the player in initiative before they had done
+anything hostile. `dm-tools.md` used to say the situation must change on the *second* consecutive
+failure; both escalated on the first. `emberdelve-vy7`. The two-failure rule is gone:
+`start_combat` is provoked fights only, and ALERT is the only unprovoked fight.
 
 **`roll_check` twice did not recur.** Carried out of M2 and out of the M3 gate; absent from both
 of these sessions. Not called fixed on two sessions, but worth knowing it moved.

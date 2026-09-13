@@ -8,8 +8,10 @@ import dm.engine.ScriptedClockDraw;
 import dm.engine.ScriptedDiceRoller;
 import dm.model.ClockId;
 import dm.model.ConsequenceId;
+import dm.model.Difficulty;
 import dm.model.Event;
 import dm.model.Outcome;
+import dm.model.Skill;
 import dm.state.EventLog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -258,5 +260,20 @@ class ProjectionTest {
         }
         assertTrue(entities.contains("`goblin`"), entities);
         assertFalse(entities.contains("`fighter`"), entities);
+    }
+
+    @Test
+    @DisplayName("two failed checks still count on the fold and never project ## Momentum")
+    void twoFailedChecksDoNotProjectMomentum() {
+        var engine = new GameEngine(CONTENT, new EventLog(), new ScriptedDiceRoller(14, 13),
+                Rooms.authored(CONTENT, "crypt", "gallery"));
+        engine.start();
+        engine.rollCheck("fighter", Skill.ATHLETICS, Difficulty.HARD);
+        engine.rollCheck("fighter", Skill.ATHLETICS, Difficulty.HARD);
+
+        assertEquals(2, engine.consecutiveFailedChecks());
+        var text = projection(engine);
+        assertFalse(headings(text).contains("## Momentum"), headings(text).toString());
+        assertFalse(text.contains("failed in a row"), text);
     }
 }

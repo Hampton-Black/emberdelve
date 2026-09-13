@@ -49,7 +49,7 @@ class StuckCounterTest {
         check(engine);
         assertEquals(1, engine.consecutiveFailedChecks());
         check(engine);
-        assertEquals(2, engine.consecutiveFailedChecks(), "the DM escalates on the second");
+        assertEquals(2, engine.consecutiveFailedChecks(), "the fold still counts past one");
         check(engine);
         assertEquals(3, engine.consecutiveFailedChecks());
     }

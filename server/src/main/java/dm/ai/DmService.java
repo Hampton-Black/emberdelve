@@ -889,14 +889,8 @@ public final class DmService {
         // can simply carry on — observed ending a piece of narration with "Mode: EXPLORATION
         // Position: (6,1)", which the voice then read aloud. Models imitate the shape of what
         // you send them, so the shape has to be obviously not prose.
-        // A fact, not an instruction. What to do about it is in the tool prompt, because it is
-        // the tool model that owns the verbs capable of changing anything.
-        int stuck = engine.consecutiveFailedChecks();
-        if (stuck > 0) {
-            sb.append("\n## Momentum\n\n")
-                    .append(stuck).append(stuck == 1 ? " check has" : " checks have")
-                    .append(" failed in a row, with no success since.\n");
-        }
+        // consecutiveFailedChecks stays on the fold. It does not reach the prompt: a count
+        // nothing reads is ffi.1, and ## Momentum was the two-failure coin flip (emberdelve-vy7).
 
         sb.append(established(engine.state()));
 
