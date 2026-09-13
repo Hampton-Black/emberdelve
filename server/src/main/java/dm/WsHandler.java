@@ -58,13 +58,34 @@ public final class WsHandler {
     private final DmService dm;
     private final boolean demoMode;
     private final boolean voice;
+    private final Consumer<ServerMessage> testOutbound;
     private final SessionGuard guard = new SessionGuard();
 
     public WsHandler(GameEngine engine, DmService dm, boolean demoMode, boolean voice) {
+        this(engine, dm, demoMode, voice, null);
+    }
+
+    WsHandler(GameEngine engine, DmService dm, boolean demoMode, boolean voice,
+            Consumer<ServerMessage> testOutbound) {
         this.engine = engine;
         this.dm = dm;
         this.demoMode = demoMode;
         this.voice = voice;
+        this.testOutbound = testOutbound;
+    }
+
+    /** Test seam: one inbound message, captured outbound frames. */
+    static WsHandler forTest(GameEngine engine, DmService dm, Consumer<ServerMessage> outbound) {
+        return new WsHandler(engine, dm, false, false, outbound);
+    }
+
+    void handleMessage(JsonNode message) {
+        String type = message.path("type").asText();
+        if ("enterExit".equals(type)) {
+            enterExit(message, testOutbound);
+            return;
+        }
+        throw new IllegalArgumentException("test seam only supports enterExit: " + type);
     }
 
     public void register(WsConfig ws) {
@@ -117,17 +138,7 @@ public final class WsHandler {
 
             // A room change replaces everything, so it answers with a whole Scene rather than
             // diffs. The client already rebuilds props and tokens when roomId changes.
-            case "enterExit" -> {
-                String fromName = engine.room().name();
-                var visitedBefore = Set.copyOf(engine.state().visitedRoomIds());
-                engine.crossExit(message.path("exitId").asText(""));
-                send(ctx, new ServerMessage.Scene(engine.scene()));
-                if (dm != null) {
-                    dm.noteCrossing(fromName, engine.room().name(),
-                            visitedBefore.contains(engine.room().roomId()));
-                    turns.submit(() -> dm.narrateArrival(turnSink(ctx)));
-                }
-            }
+            case "enterExit" -> enterExit(ctx, message);
 
             case "attack" -> act(ctx, sink -> engine.combat().attack(
                     message.path("actorId").asText(),
@@ -214,6 +225,31 @@ public final class WsHandler {
                     Difficulty.valueOf(message.path("difficulty").asText("MEDIUM")))));
 
             default -> throw new IllegalArgumentException("Unknown message type: " + type);
+        }
+    }
+
+    private void enterExit(WsContext ctx, JsonNode message) {
+        enterExit(message, msg -> send(ctx, msg), ctx);
+    }
+
+    private void enterExit(JsonNode message, Consumer<ServerMessage> deliver) {
+        enterExit(message, deliver, null);
+    }
+
+    private void enterExit(JsonNode message, Consumer<ServerMessage> deliver, WsContext ctx) {
+        String fromName = engine.room().name();
+        var visitedBefore = Set.copyOf(engine.state().visitedRoomIds());
+        engine.crossExit(message.path("exitId").asText(""));
+        deliver.accept(new ServerMessage.Scene(engine.scene()));
+        if (dm != null) {
+            dm.noteCrossing(fromName, engine.room().name(),
+                    visitedBefore.contains(engine.room().roomId()));
+            turns.submit(() -> dm.narrateArrival(turnSink(ctx)));
+        } else {
+            // The client holds exploration from the moment a door is clicked, on the assumption
+            // that arrival prose is coming. With no key configured one never does, and without
+            // this the hold never lifts — same as the `begin` case.
+            deliver.accept(new ServerMessage.NarrationEnd());
         }
     }
 
@@ -413,6 +449,10 @@ public final class WsHandler {
     }
 
     private void send(WsContext ctx, ServerMessage message) {
+        if (testOutbound != null) {
+            testOutbound.accept(message);
+            return;
+        }
         try {
             ctx.send(Json.MAPPER.writeValueAsString(message));
         } catch (Exception e) {
