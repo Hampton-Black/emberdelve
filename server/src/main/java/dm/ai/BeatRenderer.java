@@ -83,21 +83,33 @@ public final class BeatRenderer {
 
     /**
      * How hurt something looks. Never a number — {@code dm.md} forbids hit points said aloud, and
-     * a fraction in the beat is an invitation to read one out.
+     * a fraction in the beat is an invitation to read one out. Combat beats and {@code ## The party}
+     * share this; a second table is how a creature is bloodied in one block and badly hurt in the
+     * other.
      */
+    public static String condition(Entity entity) {
+        double left = (double) entity.hp() / Math.max(entity.maxHp(), 1);
+        if (left > 0.7) {
+            return "barely marked";
+        }
+        if (left > 0.4) {
+            return "bloodied";
+        }
+        if (left > 0.15) {
+            return "badly hurt";
+        }
+        return "barely standing";
+    }
+
     private static String condition(WorldState state, String entityId, boolean isPlayer) {
         var entity = state.find(entityId).orElse(null);
         if (entity == null) {
             return "";
         }
-        double left = (double) entity.hp() / Math.max(entity.maxHp(), 1);
-        String state0 = left > 0.7 ? "barely marked"
-                : left > 0.4 ? "bloodied"
-                : left > 0.15 ? "badly hurt"
-                : "barely standing";
+        String band = condition(entity);
         return isPlayer
-                ? "You are now " + state0 + "."
-                : capitalise(entity.name()) + " is now " + state0 + ".";
+                ? "You are now " + band + "."
+                : capitalise(entity.name()) + " is now " + band + ".";
     }
 
     private static String capitalise(String text) {

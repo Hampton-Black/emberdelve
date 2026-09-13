@@ -3,9 +3,13 @@ package dm.ai;
 import dm.content.RoomDefinition;
 import dm.engine.ClockTables;
 import dm.engine.GameEngine;
+import dm.model.ClockId;
 import dm.model.Combatant;
+import dm.model.Consumable;
 import dm.model.Event;
 import dm.model.Outcome;
+import dm.model.PartyLight;
+import dm.model.PartyMember;
 import dm.model.Phase;
 import dm.state.EventLog;
 import dm.state.WorldState;
@@ -15,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -742,11 +747,14 @@ public final class DmService {
     // ---- Context ----
 
     /**
+     * The world-state projection the models see. Package-private so a test can lock the headings
+     * without standing Venice up.
+     *
      * @param forProse the two models are told the same facts and given opposite permissions. Only
      *                 the mechanics model can change anything, so only it is invited to act on
      *                 what it reads here.
      */
-    private String worldState(boolean forProse) {
+    String worldState(boolean forProse) {
         RoomDefinition room = engine.room();
         var revealed = engine.state().revealedHere();
         var sb = new StringBuilder();
@@ -758,6 +766,7 @@ public final class DmService {
         }
         sb.append(room.dmNotes().overview()).append("\n\n");
         sb.append(room.dmNotes().sensory()).append("\n\n");
+        appendFire(sb, room, engine.state());
 
         sb.append("## What the player can see\n\n");
         for (var prop : room.props()) {
@@ -833,13 +842,19 @@ public final class DmService {
             appendNote(sb, doorNote);
         }
 
+        sb.append(theParty(engine.state()));
+
         sb.append("## Entities present\n\n");
+        var partyIds = engine.state().party().stream()
+                .map(PartyMember::entityId)
+                .collect(Collectors.toSet());
         for (var entity : engine.state().entitiesHere()) {
+            if (partyIds.contains(entity.id())) {
+                continue;
+            }
             sb.append("- `").append(entity.id()).append("` — ").append(entity.name())
-                    .append(", ").append(entity.hp()).append("/").append(entity.maxHp())
-                    .append(" hp, at (").append(entity.x()).append(",").append(entity.y())
-                    .append(")").append(entity.isPlayerControlled() ? " [the player]" : "")
-                    .append(entity.isAlive() ? "" : " [dead]")
+                    .append(", at (").append(entity.x()).append(",").append(entity.y())
+                    .append(")").append(entity.isAlive() ? "" : " [dead]")
                     // What they look like and what they are holding. Props have carried their
                     // description here from the start and creatures never did, so the narrator
                     // was writing fights between two entities it knew nothing about beyond a
@@ -954,6 +969,72 @@ public final class DmService {
             sb.append("- ").append(fact.text()).append("\n");
         }
         return sb.toString();
+    }
+
+    /**
+     * Session-scoped party state. Always present, never conditional — its absence would read as
+     * "no pressure" on the turn a clock starts running. Spec §8b.
+     */
+    static String theParty(WorldState state) {
+        var sb = new StringBuilder();
+        sb.append("\n## The party\n\n");
+        sb.append("Session state. It followed them in here and it will follow them out.\n\n");
+        for (var member : state.party()) {
+            var entity = state.find(member.entityId()).orElse(null);
+            if (entity == null) {
+                continue;
+            }
+            sb.append("- `").append(entity.id()).append("` — ").append(entity.name())
+                    .append(", ").append(BeatRenderer.condition(entity))
+                    .append(", at (").append(entity.x()).append(",").append(entity.y())
+                    .append(")\n");
+        }
+        sb.append("- objective: not yet found\n");
+        sb.append("- torch: ")
+                .append(PartyLight.of(state.clock(ClockId.LIGHT).filled())
+                        .name().toLowerCase(Locale.ROOT))
+                .append("\n");
+        sb.append("- the site: ").append(alertBand(state.clock(ClockId.ALERT).filled()))
+                .append("\n");
+        sb.append("- potions: ").append(state.consumableCount(Consumable.POTION))
+                .append(" · torches: ").append(state.consumableCount(Consumable.TORCH))
+                .append(" · rope: ").append(state.consumableCount(Consumable.ROPE))
+                .append("\n\n");
+        sb.append("There is nothing else here worth carrying out. Do not invent a second.\n\n");
+        sb.append("The torch and anything moving toward the party are the engine's to change, "
+                + "not yours.\n");
+        sb.append("Narrate what you are told has happened. Do not decide that the light goes out.\n\n");
+        return sb.toString();
+    }
+
+    /** ALERT as fiction: quiet 0–1, stirring 2–3, hunting 4–5, on you at 6. Spec §8b. */
+    private static String alertBand(int filled) {
+        if (filled >= 6) {
+            return "on you";
+        }
+        if (filled >= 4) {
+            return "hunting";
+        }
+        if (filled >= 2) {
+            return "stirring";
+        }
+        return "quiet";
+    }
+
+    /**
+     * The room's current fire sentence, after sensory. Exactly one of {@code lit} / {@code moved},
+     * and none when the room has no fires. Spec §7c.
+     */
+    private static void appendFire(StringBuilder sb, RoomDefinition room, WorldState state) {
+        if (room.fires() == null) {
+            return;
+        }
+        String line = state.lightingIn(room.roomId()).isPresent()
+                ? room.fires().moved()
+                : room.fires().lit();
+        if (line != null && !line.isBlank()) {
+            sb.append(line).append("\n\n");
+        }
     }
 
     /**
