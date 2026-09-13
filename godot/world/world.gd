@@ -13,6 +13,7 @@ extends Node3D
 
 const CameraRigScript := preload("res://world/camera_rig.gd")
 const TOKEN_SCENE := preload("res://world/tokens/token.tscn")
+const MarkerGlyph := preload("res://world/marker.gd")
 
 ## Player-controlled tokens sit on this layer so the party's OmniLight can light them
 ## without they themselves shadowing it. Membership is isPlayerControlled, never "fighter".
@@ -39,6 +40,7 @@ func _ready() -> void:
 	Table.scene_changed.connect(_on_scene_changed)
 	Table.prop_revealed.connect(_on_prop_revealed)
 	Table.prop_removed.connect(_on_prop_removed)
+	Table.marker_placed.connect(_on_marker_placed)
 	Table.mode_changed.connect(_on_mode_changed)
 	Table.entity_added.connect(_on_entity_added)
 	Table.entity_moved.connect(_on_entity_moved)
@@ -132,6 +134,7 @@ func _on_scene_changed() -> void:
 		_room_id = room_id
 		_rebuild_rooms()
 		_rebuild_props()
+		_rebuild_markers()
 		_rebuild_tokens()
 		_follow_party()
 		if rig:
@@ -231,6 +234,49 @@ func _on_prop_removed(prop_id: String) -> void:
 	if node != null:
 		holder.remove_child(node)
 		node.free()
+
+
+func _on_marker_placed(marker: Dictionary) -> void:
+	_instance_marker(marker)
+
+
+func _rebuild_markers() -> void:
+	var holder := get_node_or_null("Markers") as Node3D
+	if holder == null:
+		return
+	for child in holder.get_children():
+		holder.remove_child(child)
+		child.free()
+	if Table.scene.is_empty():
+		return
+	for marker in Table.scene.get("markers", []):
+		_instance_marker(marker)
+
+
+func _instance_marker(marker: Dictionary) -> void:
+	var holder := _markers_of(_room_id)
+	if holder == null:
+		return
+	var id := String(marker.get("id", ""))
+	if id.is_empty() or holder.get_node_or_null(NodePath(id)) != null:
+		return
+	var glyph := MarkerGlyph.new()
+	glyph.name = id
+	glyph.position = grid_to_world(_room_id, int(marker.get("x", 0)), int(marker.get("y", 0)))
+	holder.add_child(glyph)
+	glyph.configure(marker)
+
+
+func _markers_of(room_id: String) -> Node3D:
+	var holder := get_node_or_null("Markers") as Node3D
+	if holder == null or room_id.is_empty():
+		return null
+	var room := holder.get_node_or_null(NodePath(room_id)) as Node3D
+	if room == null:
+		room = Node3D.new()
+		room.name = room_id
+		holder.add_child(room)
+	return room
 
 
 ## Everything standing on every floor the player can see, room by room.
@@ -629,6 +675,19 @@ func _target_under(origin: Vector3, dir: Vector3, floor_t: float) -> String:
 			var prop := Table.prop(String(child.name))
 			var actions: Variant = prop.get("actions", [])
 			if actions.is_empty():
+				continue
+			var box := _visual_aabb(child as Node3D)
+			if box.size == Vector3.ZERO:
+				continue
+			var t := _ray_aabb_t(origin, dir, box)
+			if t < best_t:
+				best_t = t
+				best_id = String(child.name)
+
+	var markers := get_node_or_null("Markers/%s" % _room_id) as Node3D
+	if markers != null:
+		for child in markers.get_children():
+			if not (child is Node3D):
 				continue
 			var box := _visual_aabb(child as Node3D)
 			if box.size == Vector3.ZERO:

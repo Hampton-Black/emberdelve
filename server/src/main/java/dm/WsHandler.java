@@ -9,7 +9,9 @@ import dm.model.Entity;
 import dm.model.Consumable;
 import dm.model.Diff;
 import dm.model.Ending;
+import dm.model.Marker;
 import dm.model.Outcome;
+import dm.model.PartyMember;
 import dm.model.Skill;
 import dm.model.Mode;
 import dm.wire.Json;
@@ -164,15 +166,19 @@ public final class WsHandler {
                 }
             }
 
-            // A takeable prop. Click and take_prop share GameEngine.takeProp.
+            // A takeable prop, or a marker the player pointed at. Click and the tools share
+            // GameEngine.takeProp / inspectMarker.
             case "useProp" -> {
-                if (!"take".equals(message.path("action").asText(""))) {
-                    break;
-                }
-                try {
-                    sendDiffs(ctx, engine.takeProp(message.path("propId").asText("")));
-                } catch (IllegalArgumentException e) {
-                    send(ctx, new ServerMessage.Error(e.getMessage()));
+                String action = message.path("action").asText("");
+                String id = message.path("propId").asText("");
+                if ("inspect".equals(action)) {
+                    inspectMarker(ctx, id);
+                } else if ("take".equals(action)) {
+                    try {
+                        sendDiffs(ctx, engine.takeProp(id));
+                    } catch (IllegalArgumentException e) {
+                        send(ctx, new ServerMessage.Error(e.getMessage()));
+                    }
                 }
             }
 
@@ -416,6 +422,27 @@ public final class WsHandler {
         public void beat(String fact) {
             facts.add(fact);
         }
+    }
+
+    private void inspectMarker(WsContext ctx, String markerId) {
+        Marker marker;
+        try {
+            marker = engine.inspectMarker(markerId);
+        } catch (IllegalArgumentException e) {
+            send(ctx, new ServerMessage.Error(e.getMessage()));
+            return;
+        }
+        if (dm == null) {
+            return;
+        }
+        String actorId = engine.state().party().stream()
+                .map(PartyMember::entityId)
+                .findFirst()
+                .orElse("fighter");
+        // Tag + text, never a grid coordinate — pa8: a visible marker that prints (9,6)
+        // will be read aloud.
+        String line = "I look at the " + marker.tag().name() + ": " + marker.text();
+        turns.submit(() -> dm.handleFreeText(actorId, line, turnSink(ctx)));
     }
 
     private void pause() {

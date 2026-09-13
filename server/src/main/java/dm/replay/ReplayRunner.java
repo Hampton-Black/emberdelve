@@ -224,6 +224,8 @@ public final class ReplayRunner {
                 case Event.RoomDressed ignored -> { }
                 case Event.ConsumablesGranted ignored -> { }
                 case Event.FactAsserted ignored -> { }
+                case Event.MarkerPlaced ignored -> { }
+                case Event.MarkerInspected ignored -> { }
                 default -> kept.add(event);
             }
         }

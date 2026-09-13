@@ -61,8 +61,12 @@ Some of what the narrator says is true and has no mechanism behind it — a smel
 scratch on a wall, a ring on a dead hand. Those are not failures. Call `assert_fact` with what
 was asserted, so it is still true next turn.
 
-Anchor it to a square or to something already in the room when it is a thing in a place. Leave it
-`ambient` when it is not — a temperature, a smell, a sound has no square.
+When that thing is a place the player should be able to point at — a scorched patch, a scratched
+sigil, fresh tracks — also call `place_marker` with the closed tag, the square, and the same
+short text. The engine drops a glyph there. A false positive is a glyph nobody clicks.
+
+Anchor an `assert_fact` to a square or to something already in the room when it is a thing in a
+place. Leave it `ambient` when it is not — a temperature, a smell, a sound has no square.
 
 Do not assert what a tool already did. A goblin you spawned is on the board; it does not also
 need asserting.

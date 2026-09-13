@@ -219,7 +219,7 @@ log written at an older `Event.SCHEMA_VERSION` is **refused, never upgraded** �
 log is free and an upgrader is a tax paid forever. No party splits (the whole party moves). No
 fleeing (exits are illegal in combat).
 
-## LLM tools — exactly these ten
+## LLM tools — exactly these eleven
 
 On the **mechanics** pass: `roll_check` (skill + difficulty enums), `reveal_prop` (per-room closed
 enum of hidden prop ids), `spawn_entity` (kind: `goblin` only), `start_combat`, `use_exit`
@@ -229,21 +229,22 @@ when count is zero; torch withheld when LIGHT is empty), `rest` (withheld in com
 living hostile is in the room), `take_prop` (closed enum of takeable ids in this room; withheld
 when none remain).
 
-On the **reconcile** pass only: `reveal_prop`, `spawn_entity`, `start_combat`, `assert_fact`, and
-`move_entity`. No dice in that phase — the outcome has already been narrated. **`use_exit` and
-`take_prop` are mechanics-only; `move_entity` is both phases.** A tool belongs in reconcile when a
-false positive is cheap to live with and the narrator is the one holding the information — walking
-to a pillar is; leaving the room, or taking the objective, is not.
+On the **reconcile** pass only: `reveal_prop`, `spawn_entity`, `start_combat`, `assert_fact`,
+`place_marker`, and `move_entity`. No dice in that phase — the outcome has already been narrated.
+**`use_exit` and `take_prop` are mechanics-only; `move_entity` is both phases.** A tool belongs
+in reconcile when a false positive is cheap to live with and the narrator is the one holding the
+information — walking to a pillar is; leaving the room, or taking the objective, is not.
 
 Every enum is closed and validated server-side. Invalid calls are rejected with a structured
 error; the model retries once, then the turn degrades to narration-only.
 
-**`assert_fact` is the one tool that carries free-form model text**, and it is not a hole in
-invariant #7. The rule, stated so it does not erode: *free-form model text may enter the prompt;
-anything reaching the engine or the renderer goes through a closed enum.* A fact's `text` makes
-one round trip back into the next prompt — it drives no roll, gates no legal move, and reaches no
-renderer. Its `anchor` (`ambient` / `at_square` / `on`) is closed and validated like everything
-else.
+**`assert_fact` and `place_marker` are the tools that carry free-form model text**, and that is
+not a hole in invariant #7. The rule, stated so it does not erode: *free-form model text may
+enter the prompt; anything reaching the engine or the renderer goes through a closed enum.* A
+fact's `text` (and a marker's) makes one round trip back into the next prompt — it drives no
+roll, gates no legal move, and reaches no renderer. `assert_fact`'s `anchor` (`ambient` /
+`at_square` / `on`) and `place_marker`'s `tag` (`SCORCH` / `SIGIL` / `TRACKS`) are closed and
+validated like everything else.
 
 ---
 

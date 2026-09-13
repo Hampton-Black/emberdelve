@@ -1168,3 +1168,99 @@ func test_dense_scenery_does_not_steal_the_reliquary() -> void:
 	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
 	assert_eq(String(picked.get("target_id", "")), "reliquary",
 		"scenery must not shadow an actioned handle")
+
+
+# ---- DM-placed markers (emberdelve-4h9.6)
+
+
+func _doorway_with_marker() -> Dictionary:
+	var scene := DOORWAY.duplicate(true)
+	scene["markers"] = [{
+		"id": "marker-scorch", "tag": "SCORCH", "x": 4, "y": 5,
+	}]
+	return SceneFixtures.scene(scene)
+
+
+func _marker_mesh_aabb(world: Node, marker_id: String) -> AABB:
+	var holder := world.get_node_or_null("Markers")
+	var marker: Node3D = null
+	if holder != null:
+		marker = holder.find_child(marker_id, true, false) as Node3D
+	assert_not_null(marker, "marker %s" % marker_id)
+	if marker == null:
+		return AABB()
+	var leaf := AABB()
+	var first := true
+	for mesh in marker.find_children("*", "MeshInstance3D", true, false):
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		leaf = box if first else leaf.merge(box)
+		first = false
+	assert_false(first, "marker %s has a mesh" % marker_id)
+	return leaf
+
+
+func test_a_marker_is_returned_by_pick_at() -> void:
+	var world := _world_with_scene(_doorway_with_marker())
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var leaf := _marker_mesh_aabb(world, "marker-scorch")
+	if leaf.size == Vector3.ZERO:
+		return
+	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
+	assert_eq(String(picked.get("target_id", "")), "marker-scorch")
+
+
+func test_committing_a_marker_intent_sends_inspect() -> void:
+	Net.outbound.clear()
+	var world := _world_with_scene(_doorway_with_marker())
+	var overlay := _overlay(world)
+	assert_not_null(overlay, "Overlay")
+	if overlay == null:
+		return
+
+	var action: Dictionary = overlay.intent("", Vector2i(4, 5), "marker-scorch")
+	assert_eq(String(action.get("kind", "")), "marker")
+	assert_eq(String(action.get("marker_id", "")), "marker-scorch")
+	assert_eq(String(action.get("action", "")), "inspect")
+
+	overlay.commit(action)
+
+	assert_eq(Net.outbound.size(), 1)
+	assert_eq(String(Net.outbound[0].get("type", "")), "useProp")
+	assert_eq(String(Net.outbound[0].get("propId", "")), "marker-scorch")
+	assert_eq(String(Net.outbound[0].get("action", "")), "inspect")
+
+
+func test_a_marker_does_not_steal_the_north_door() -> void:
+	# 7m6: only things with actions are pick targets. A marker has an action. It still must
+	# not shadow the doorway when the ray is aimed at the door — same as brazier-east.
+	var world := _world_with_scene(_doorway_with_marker())
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var door: Node3D = null
+	for child in (world.get_node("Room/Walls") as Node3D).get_children():
+		if child.has_meta("exit_id"):
+			door = child as Node3D
+	assert_not_null(door, "the tagged doorway")
+	if door == null:
+		return
+	var leaf := AABB()
+	var first := true
+	for mesh in door.find_children("*", "MeshInstance3D", true, false):
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		leaf = box if first else leaf.merge(box)
+		first = false
+	if first:
+		return
+
+	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
+	assert_eq(String(picked.get("target_id", "")), "door-north",
+		"a floor glyph must not steal the doorway")

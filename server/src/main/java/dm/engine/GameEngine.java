@@ -15,6 +15,7 @@ import dm.model.EndingReport;
 import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Exit;
+import dm.model.MarkerTag;
 import dm.model.Mode;
 import dm.model.ObjectiveFate;
 import dm.model.PartyLight;
@@ -37,6 +38,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Authoritative state. Applies actions and emits diffs; the client renders what it is told
@@ -398,7 +400,8 @@ public final class GameEngine {
                 state().consumableCount(Consumable.TORCH),
                 state().consumableCount(Consumable.ROPE), canSpendTorch(), canRest(),
                 partyLight(), state().holdingObjective(),
-                state().ending().isPresent() ? endingReport() : null);
+                state().ending().isPresent() ? endingReport() : null,
+                state().markersHere().stream().map(dm.model.Marker::toView).toList());
     }
 
     /**
@@ -743,6 +746,35 @@ public final class GameEngine {
             diffs.addAll(spawnContained(definition));
         }
         return diffs;
+    }
+
+    /**
+     * A reconcile-placed glyph. Invalid tag and out-of-bounds are the dispatcher's to refuse;
+     * this still bounds-checks so a click path cannot invent a square.
+     */
+    public List<Diff> placeMarker(MarkerTag tag, int x, int y, String text) {
+        requireOpen();
+        if (!isInBounds(x, y)) {
+            throw new IllegalArgumentException("(" + x + "," + y + ") is off the grid");
+        }
+        String id = "marker-" + UUID.randomUUID().toString().substring(0, 8);
+        log.append(new Event.MarkerPlaced(Instant.now(), id, state().roomId(), tag, x, y, text));
+        return List.of(new Diff.MarkerPlaced(new dm.model.MarkerView(id, tag, x, y)));
+    }
+
+    /**
+     * The player pointed at a marker. Records which one; the next prompt carries tag + text,
+     * never a grid coordinate.
+     */
+    public dm.model.Marker inspectMarker(String markerId) {
+        requireOpen();
+        var marker = state().markersHere().stream()
+                .filter(m -> m.id().equals(markerId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "there is no marker '" + markerId + "' here"));
+        log.append(new Event.MarkerInspected(Instant.now(), markerId));
+        return marker;
     }
 
     /**

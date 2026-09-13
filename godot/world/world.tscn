@@ -81,6 +81,8 @@ environment = SubResource("EnvDark")
 
 [node name="Props" type="Node3D" parent="."]
 
+[node name="Markers" type="Node3D" parent="."]
+
 [node name="Tokens" type="Node3D" parent="."]
 
 [node name="Overlay" type="Node3D" parent="."]

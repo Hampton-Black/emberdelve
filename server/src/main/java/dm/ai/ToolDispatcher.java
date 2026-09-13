@@ -77,6 +77,7 @@ public final class ToolDispatcher {
                 case ToolSchema.REST -> rest(args);
                 case ToolSchema.MOVE_ENTITY -> moveEntity(args);
                 case ToolSchema.TAKE_PROP -> takeProp(args);
+                case ToolSchema.PLACE_MARKER -> placeMarker(args);
                 default -> Result.rejected("no such tool: " + call.name());
             };
         } catch (Exception e) {
@@ -325,6 +326,29 @@ public final class ToolDispatcher {
                 engine.state().roomId(), text, anchor));
 
         return Result.applied("Recorded: " + text, List.of());
+    }
+
+    private Result placeMarker(JsonNode arguments) {
+        String text = arguments.path("text").asText("").strip();
+        if (text.isBlank()) {
+            return Result.rejected("A marker with no text marks nothing.");
+        }
+        var tag = parseEnum(dm.model.MarkerTag.class, arguments.path("tag").asText(""));
+        if (tag.isEmpty()) {
+            return Result.rejected("tag must be one of SCORCH, SIGIL, TRACKS, got '"
+                    + arguments.path("tag").asText("") + "'");
+        }
+        int x = arguments.path("x").asInt(-1);
+        int y = arguments.path("y").asInt(-1);
+        if (!engine.isInBounds(x, y)) {
+            return Result.rejected("(" + x + "," + y + ") is off the grid.");
+        }
+        try {
+            List<Diff> diffs = engine.placeMarker(tag.get(), x, y, text);
+            return Result.applied("Marked " + tag.get().name() + " at that square.", diffs);
+        } catch (IllegalArgumentException e) {
+            return Result.rejected(e.getMessage());
+        }
     }
 
     private static Optional<Consumable> parseConsumable(String raw) {

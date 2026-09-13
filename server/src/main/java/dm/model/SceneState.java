@@ -51,8 +51,17 @@ public record SceneState(
         /** Whether the party is carrying the site's objective. Spec §4c, §10. */
         boolean holdingObjective,
         /** How the delve ended — sentence parts and ledger — or null while it is still running. Spec §4, §9, §10. */
-        EndingReport ending
+        EndingReport ending,
+        /**
+         * Glyphs in the room the party is standing in. Id, tag, square — never the free-form
+         * text. Spec §8f.
+         */
+        List<MarkerView> markers
 ) {
+    public SceneState {
+        markers = markers == null ? List.of() : List.copyOf(markers);
+    }
+
     /** The room named by {@link #roomId()}, in the same list as everything else. */
     public RoomView currentRoom() {
         return rooms.stream()

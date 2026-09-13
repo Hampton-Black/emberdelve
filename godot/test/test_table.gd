@@ -173,6 +173,18 @@ func test_party_light_changed_writes_the_level_onto_the_scene() -> void:
 	assert_eq(Table.scene["partyLight"], "LOW")
 
 
+func test_a_placed_marker_joins_the_scene() -> void:
+	Table.apply_diffs([{
+		"kind": "MarkerPlaced",
+		"marker": {"id": "marker-scorch", "tag": "SCORCH", "x": 9, "y": 6},
+	}])
+	await wait_frames(2)
+	assert_eq(Table.scene["markers"].size(), 1)
+	assert_eq(Table.marker("marker-scorch")["tag"], "SCORCH")
+	assert_false(Table.marker("marker-scorch").has("text"),
+		"free-form text never reaches the renderer")
+
+
 func test_prop_removed_of_a_prize_does_not_claim_the_objective() -> void:
 	var scene := CRYPT.duplicate(true)
 	scene["props"] = [

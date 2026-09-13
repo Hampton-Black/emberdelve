@@ -40,6 +40,8 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = Event.ObjectiveTaken.class, name = "objective_taken"),
         @JsonSubTypes.Type(value = Event.PropTaken.class, name = "prop_taken"),
         @JsonSubTypes.Type(value = Event.DelveEnded.class, name = "delve_ended"),
+        @JsonSubTypes.Type(value = Event.MarkerPlaced.class, name = "marker_placed"),
+        @JsonSubTypes.Type(value = Event.MarkerInspected.class, name = "marker_inspected"),
 })
 public sealed interface Event {
 
@@ -176,6 +178,19 @@ public sealed interface Event {
      * {@link Ending#PARTY_LOST}. Replay walks the same door. Spec §4.
      */
     record DelveEnded(Instant at, Ending ending, String throughExitId) implements Event {}
+
+    /**
+     * A glyph the narrator put on a square. {@code text} is prompt-only, like
+     * {@link FactAsserted#text()}; the client is handed {@link MarkerView}.
+     */
+    record MarkerPlaced(Instant at, String id, String roomId, MarkerTag tag, int x, int y,
+                        String text) implements Event {}
+
+    /**
+     * The player pointed at a marker. Inert in the fold: the fact is already in
+     * {@link MarkerPlaced}; this is the click, so the next prompt knows which one.
+     */
+    record MarkerInspected(Instant at, String markerId) implements Event {}
 
     static NarrationLogged narration(String speakerId, String text) {
         return new NarrationLogged(Instant.now(), speakerId, text);

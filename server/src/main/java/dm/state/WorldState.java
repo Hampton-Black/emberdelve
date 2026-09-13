@@ -10,6 +10,7 @@ import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Fact;
 import dm.model.LightingPreset;
+import dm.model.Marker;
 import dm.model.Mode;
 import dm.model.Outcome;
 import dm.model.Ending;
@@ -50,7 +51,8 @@ public record WorldState(
         Map<Consumable, Integer> consumables,
         boolean holdingObjective,
         Set<PropRef> takenProps,
-        Optional<Ending> ending
+        Optional<Ending> ending,
+        List<Marker> markers
 ) {
 
     /** Spec §8: a backstop against a model that asserts something every single turn. */
@@ -68,7 +70,7 @@ public record WorldState(
     public static final WorldState EMPTY = new WorldState(
             "crypt", Map.of(), List.of(), Mode.EXPLORATION, Set.of(), Set.of("crypt"),
             Map.of(), Optional.empty(), List.of(), 0, STARTING_CLOCKS, Map.of(), Map.of(),
-            false, Set.of(), Optional.empty());
+            false, Set.of(), Optional.empty(), List.of());
 
     public WorldState {
         entities = Map.copyOf(entities);
@@ -81,6 +83,7 @@ public record WorldState(
         lighting = Map.copyOf(lighting);
         consumables = Map.copyOf(consumables);
         takenProps = Set.copyOf(takenProps);
+        markers = List.copyOf(markers);
     }
 
     public int consumableCount(Consumable item) {
@@ -106,6 +109,11 @@ public record WorldState(
     /** Facts asserted in the room the party is standing in. Spec §8: room-scoped. */
     public List<Fact> factsHere() {
         return facts.stream().filter(f -> f.roomId().equals(roomId)).toList();
+    }
+
+    /** Glyphs placed in the room the party is standing in. Spec §8f. */
+    public List<Marker> markersHere() {
+        return markers.stream().filter(m -> m.roomId().equals(roomId)).toList();
     }
 
     /** Rooms the party has stood in. Feeds the arrival directive — spec §7b. */
@@ -156,6 +164,8 @@ public record WorldState(
             case Event.ObjectiveTaken e -> objectiveTaken(e);
             case Event.PropTaken e -> propTaken(e);
             case Event.DelveEnded e -> delveEnded(e);
+            case Event.MarkerPlaced e -> markerPlaced(e);
+            case Event.MarkerInspected ignored -> this;
         };
     }
 
@@ -212,7 +222,7 @@ public record WorldState(
 
         return new WorldState(e.toRoomId(), next, party, mode, revealedProps, visited,
                 dressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables,
-                holdingObjective, takenProps, ending);
+                holdingObjective, takenProps, ending, markers);
     }
 
     private WorldState clockTicked(Event.ClockTicked e) {
@@ -226,13 +236,13 @@ public record WorldState(
                 clock.kind()));
         return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
                 dressings, combat, facts, consecutiveFailedChecks, next, lighting, consumables,
-                holdingObjective, takenProps, ending);
+                holdingObjective, takenProps, ending, markers);
     }
 
     private WorldState consumablesGranted(Event.ConsumablesGranted e) {
         return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
                 dressings, combat, facts, consecutiveFailedChecks, clocks, lighting,
-                Map.copyOf(e.counts()), holdingObjective, takenProps, ending);
+                Map.copyOf(e.counts()), holdingObjective, takenProps, ending, markers);
     }
 
     private WorldState itemUsed(Event.ItemUsed e) {
@@ -247,7 +257,7 @@ public record WorldState(
         }
         return new WorldState(roomId, nextEntities, party, mode, revealedProps, visitedRoomIds,
                 dressings, combat, facts, consecutiveFailedChecks, clocks, lighting,
-                Map.copyOf(nextConsumables), holdingObjective, takenProps, ending);
+                Map.copyOf(nextConsumables), holdingObjective, takenProps, ending, markers);
     }
 
     private WorldState rested(Event.Rested e) {
@@ -259,7 +269,7 @@ public record WorldState(
         nextEntities.put(e.actorId(), actor.withHp(e.hpAfter()));
         return new WorldState(roomId, nextEntities, party, mode, revealedProps, visitedRoomIds,
                 dressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables,
-                holdingObjective, takenProps, ending);
+                holdingObjective, takenProps, ending, markers);
     }
 
     private WorldState lightingChanged(Event.RoomLightingChanged e) {
@@ -267,7 +277,7 @@ public record WorldState(
         next.put(e.roomId(), e.to());
         return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
                 dressings, combat, facts, consecutiveFailedChecks, clocks, next, consumables,
-                holdingObjective, takenProps, ending);
+                holdingObjective, takenProps, ending, markers);
     }
 
     private WorldState attacked(Event.AttackResolved e) {
@@ -340,13 +350,13 @@ public record WorldState(
         next.add(new PropRef(roomId, propId));
         return new WorldState(this.roomId, entities, party, mode, revealedProps, visitedRoomIds,
                 dressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables,
-                holding, next, ending);
+                holding, next, ending, markers);
     }
 
     private WorldState delveEnded(Event.DelveEnded e) {
         return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
                 dressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables,
-                holdingObjective, takenProps, Optional.of(e.ending()));
+                holdingObjective, takenProps, Optional.of(e.ending()), markers);
     }
 
     private WorldState combatStarted(List<Combatant> order) {
@@ -387,6 +397,14 @@ public record WorldState(
                 consecutiveFailedChecks);
     }
 
+    private WorldState markerPlaced(Event.MarkerPlaced e) {
+        var next = new ArrayList<Marker>(markers);
+        next.add(new Marker(e.id(), e.roomId(), e.tag(), e.x(), e.y(), e.text()));
+        return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
+                dressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables,
+                holdingObjective, takenProps, ending, next);
+    }
+
     private int speedOf(String entityId) {
         return find(entityId).map(Entity::speedSquares).orElse(0);
     }
@@ -397,13 +415,13 @@ public record WorldState(
                             int newFailedChecks) {
         return new WorldState(roomId, newEntities, newParty, newMode, newRevealed, newVisited,
                 dressings, newCombat, newFacts, newFailedChecks, clocks, lighting, consumables,
-                holdingObjective, takenProps, ending);
+                holdingObjective, takenProps, ending, markers);
     }
 
     private WorldState copyWithDressings(Map<String, Dressing> newDressings) {
         return new WorldState(roomId, entities, party, mode, revealedProps, visitedRoomIds,
                 newDressings, combat, facts, consecutiveFailedChecks, clocks, lighting, consumables,
-                holdingObjective, takenProps, ending);
+                holdingObjective, takenProps, ending, markers);
     }
 
     private WorldState dressed(Event.RoomDressed e) {

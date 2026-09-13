@@ -28,6 +28,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = Diff.PartyLightChanged.class, name = "PartyLightChanged"),
         @JsonSubTypes.Type(value = Diff.PropRemoved.class, name = "PropRemoved"),
         @JsonSubTypes.Type(value = Diff.DelveEnded.class, name = "DelveEnded"),
+        @JsonSubTypes.Type(value = Diff.MarkerPlaced.class, name = "MarkerPlaced"),
 })
 public sealed interface Diff {
 
@@ -77,4 +78,7 @@ public sealed interface Diff {
 
     /** The delve ended. Same report {@link SceneState} ships. Spec §9, §10. */
     record DelveEnded(EndingReport ending) implements Diff {}
+
+    /** A DM-placed glyph appeared in the current room. No free-form text. */
+    record MarkerPlaced(MarkerView marker) implements Diff {}
 }

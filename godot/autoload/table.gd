@@ -23,6 +23,7 @@ signal entity_added(entity: Dictionary)
 signal entity_moved(entity_id: String, from: Vector2i, to: Vector2i)
 signal prop_revealed(prop: Dictionary)
 signal prop_removed(prop_id: String)
+signal marker_placed(marker: Dictionary)
 signal entity_died(entity_id: String)
 signal room_lighting_changed(room_id: String)
 signal leave_confirm_changed()
@@ -119,6 +120,13 @@ func prop(id: String) -> Dictionary:
 	for p in room().get("props", []):
 		if p["id"] == id:
 			return p
+	return {}
+
+
+func marker(id: String) -> Dictionary:
+	for m in scene.get("markers", []):
+		if String(m.get("id", "")) == id:
+			return m
 	return {}
 
 
@@ -273,6 +281,17 @@ func _apply_now(list: Array) -> void:
 				scene["ending"] = diff["ending"]
 				_dismiss_leave_confirm()
 
+			"MarkerPlaced":
+				var placed: Dictionary = diff["marker"]
+				var markers: Array = scene.get("markers", []).duplicate()
+				var at_marker := _index_of_marker(String(placed.get("id", "")))
+				if at_marker >= 0:
+					markers[at_marker] = placed
+				else:
+					markers.append(placed)
+				scene["markers"] = markers
+				announcements.append(func() -> void: marker_placed.emit(placed))
+
 	_settle_combat(opened, closed)   # Task 8
 	scene_changed.emit()
 	if opened or closed:
@@ -293,6 +312,14 @@ func _index_of_prop(id: String) -> int:
 	var props: Array = room().get("props", [])
 	for i in props.size():
 		if props[i]["id"] == id:
+			return i
+	return -1
+
+
+func _index_of_marker(id: String) -> int:
+	var markers: Array = scene.get("markers", [])
+	for i in markers.size():
+		if String(markers[i].get("id", "")) == id:
 			return i
 	return -1
 
@@ -440,6 +467,15 @@ func _send_cross(exit_id: String) -> void:
 	awaiting_dm = true
 	transcript_changed.emit()
 	Net.enter_exit(exit_id)
+
+
+## A click on a glyph. Same family as useProp; starts a turn so the DM hears which
+## fact the player pointed at.
+func inspect_marker(marker_id: String) -> void:
+	Clock.silence()
+	awaiting_dm = true
+	transcript_changed.emit()
+	Net.use_prop(marker_id, "inspect")
 
 
 ## Every roll reaches the log; only dramatic ones get thrown.

@@ -993,7 +993,8 @@ public final class DmService {
      */
     static String established(WorldState state) {
         var facts = state.factsHere();
-        if (facts.isEmpty()) {
+        var markers = state.markersHere();
+        if (facts.isEmpty() && markers.isEmpty()) {
             return "";
         }
         var sb = new StringBuilder();
@@ -1002,6 +1003,10 @@ public final class DmService {
                 + "true. Do not contradict them and do not re-introduce them as new.\n\n");
         for (var fact : facts) {
             sb.append("- ").append(fact.text()).append("\n");
+        }
+        for (var marker : markers) {
+            sb.append("- ").append(marker.tag().name()).append(": ").append(marker.text())
+                    .append("\n");
         }
         return sb.toString();
     }

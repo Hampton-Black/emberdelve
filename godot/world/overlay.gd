@@ -94,6 +94,10 @@ func intent(entity_id: String, square: Variant = null, target_id: String = "") -
 	if not prop.is_empty():
 		return prop
 
+	var marker := _marker_intent(target_id)
+	if not marker.is_empty():
+		return marker
+
 	# Out of combat there is no turn and nothing to spend, so anywhere on the
 	# floor will do. The server still refuses squares with something solid on them.
 	var player := _first_player(scene)
@@ -151,6 +155,21 @@ func _prop_intent(target_id: String) -> Dictionary:
 	}
 
 
+## A DM-placed glyph. It has an action (inspect), so it is a pick target. 7m6.
+func _marker_intent(target_id: String) -> Dictionary:
+	if target_id.is_empty():
+		return {}
+	var marker := Table.marker(target_id)
+	if marker.is_empty():
+		return {}
+	return {
+		"kind": "marker",
+		"marker_id": target_id,
+		"action": "inspect",
+		"square": Vector2i(int(marker.get("x", 0)), int(marker.get("y", 0))),
+	}
+
+
 ## Sent, never applied locally. The token does not budge until the server says
 ## it moved (invariant #1). The swing is Table.strike, not this path.
 func commit(action: Dictionary) -> void:
@@ -166,6 +185,8 @@ func commit(action: Dictionary) -> void:
 			Table.cross_exit(String(action["exit_id"]))
 		"prop":
 			Net.use_prop(String(action["prop_id"]), String(action["action"]))
+		"marker":
+			Table.inspect_marker(String(action["marker_id"]))
 
 
 ## `kind` is the intent the hover is previewing, so a door does not look like a floor tile you
@@ -188,6 +209,8 @@ func set_hover(square: Variant = null, kind: String = "") -> void:
 		"exit":
 			hover.material_override = _exit_mat
 		"prop":
+			hover.material_override = _prop_mat
+		"marker":
 			hover.material_override = _prop_mat
 		"blocked":
 			hover.material_override = _blocked_mat

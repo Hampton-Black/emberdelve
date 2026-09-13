@@ -38,6 +38,7 @@ public final class ToolSchema {
     public static final String USE_ITEM = "use_item";
     public static final String REST = "rest";
     public static final String TAKE_PROP = "take_prop";
+    public static final String PLACE_MARKER = "place_marker";
 
     /** Everything {@code spawn_entity} can bring into the room. M0 has one creature. */
     public static final List<String> SPAWNABLE_KINDS = List.of("goblin");
@@ -52,7 +53,8 @@ public final class ToolSchema {
      * change is louder than a fight.
      */
     private static final java.util.Set<String> RECONCILE_TOOLS =
-            java.util.Set.of(REVEAL_PROP, SPAWN_ENTITY, START_COMBAT, ASSERT_FACT, MOVE_ENTITY);
+            java.util.Set.of(REVEAL_PROP, SPAWN_ENTITY, START_COMBAT, ASSERT_FACT, MOVE_ENTITY,
+                    PLACE_MARKER);
 
     private ToolSchema() {
     }
@@ -221,6 +223,22 @@ public final class ToolSchema {
                     "text", "anchor", "x", "y", "target_id");
             ((ObjectNode) assertFact.get("function")).put("strict", true);
             tools.add(assertFact);
+
+            ObjectNode placeMarker = tool(PLACE_MARKER,
+                    "Drop a generic interaction glyph on a square the narrator just named — a "
+                            + "scorched patch, a scratched sigil, fresh tracks. The player can "
+                            + "click it. The text is a fact; it never reaches the board.",
+                    properties -> {
+                        enumProp(properties, "tag", List.of("SCORCH", "SIGIL", "TRACKS"),
+                                "What the glyph shows. Closed.");
+                        intProp(properties, "x", 0, engine.room().width() - 1);
+                        intProp(properties, "y", 0, engine.room().height() - 1);
+                        stringProp(properties, "text",
+                                "What is now true there. Short. One fact. Prompt-only.");
+                    },
+                    "tag", "x", "y", "text");
+            ((ObjectNode) placeMarker.get("function")).put("strict", true);
+            tools.add(placeMarker);
         }
 
         return tools;
