@@ -650,6 +650,38 @@ func test_ending_hides_input_and_bars_and_dismisses_leave_confirm() -> void:
 	assert_true(Table.leave_confirm.is_empty())
 
 
+func test_ending_page_is_sized_to_its_content() -> void:
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	Table.set_started()
+	var title: Control = chrome.get_node_or_null("Overlay/Title")
+	if title != null:
+		title.visible = false
+	var next := Table.scene.duplicate(true)
+	next["ending"] = _ending_report("EXTRACTED_WITHOUT", {"hurt": "barely marked"})
+	Table.set_scene(next)
+	await wait_frames(2)
+	var ending: Control = chrome.get_node_or_null("Overlay/Ending")
+	assert_not_null(ending, "Ending")
+	if ending == null:
+		return
+	assert_true(ending.visible)
+	var content_h: float = ending.get_combined_minimum_size().y
+	assert_gt(content_h, 40.0, "the page has a sentence, a ledger and a button")
+	assert_lt(ending.size.y, 280.0, "not a ~312px empty plate")
+	assert_almost_eq(ending.size.y, content_h, 8.0,
+		"the control's height is its content, not a tall empty hit-target")
+	var chin: Control = chrome.get_node_or_null("%Chin")
+	if chin != null:
+		assert_lt(ending.global_position.y + ending.size.y, chin.global_position.y + 1.0,
+			"the page never reaches the chin")
+
+
 # ---- Combat bar: ceremony math, end-turn lock, allegiance HP
 
 func _combat_bar() -> Control:

@@ -365,6 +365,12 @@ public final class DmService {
                     visitedBefore.contains(engine.room().roomId()));
         }
         String arrival = takePendingArrival();
+        // Spec §8e: a typed extract's prose is the close, not a crossing arrival and not
+        // ordinary turn prose. Swap the directive here — do not call narrateClose while
+        // this turn already holds narrating.
+        if (engine.state().ending().isPresent()) {
+            arrival = CLOSE;
+        }
 
         long proseStart = System.nanoTime();
         // A creature does not get the benefit of the doubt on an unmarked quotation when the

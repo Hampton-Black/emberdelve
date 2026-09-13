@@ -1,4 +1,4 @@
-extends Control
+extends PanelContainer
 
 ## The delve's last page: one sentence, a ledger, DESCEND AGAIN. Spec §9.
 ##
@@ -27,7 +27,9 @@ func delay_for(report: Dictionary) -> float:
 
 func _ready() -> void:
 	visible = false
-	mouse_filter = MOUSE_FILTER_IGNORE
+	mouse_filter = MOUSE_FILTER_STOP
+	size_flags_horizontal = 0
+	size_flags_vertical = 0
 	_font = SystemFont.new()
 	_font.font_names = PackedStringArray(["Menlo", "Monaco", "Courier New", "monospace"])
 	_build()
@@ -37,9 +39,7 @@ func _ready() -> void:
 
 
 func _build() -> void:
-	var plate := PanelContainer.new()
-	plate.name = "Plate"
-	plate.mouse_filter = MOUSE_FILTER_STOP
+	mouse_filter = MOUSE_FILTER_STOP
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.07, 0.065, 0.06, 0.94)
 	style.border_color = Color(0.28, 0.24, 0.2, 1)
@@ -49,18 +49,17 @@ func _build() -> void:
 	style.content_margin_right = 16.0
 	style.content_margin_top = 14.0
 	style.content_margin_bottom = 14.0
-	plate.add_theme_stylebox_override("panel", style)
-	plate.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	add_child(plate)
+	add_theme_stylebox_override("panel", style)
 
 	var col := VBoxContainer.new()
 	col.name = "Col"
 	col.add_theme_constant_override("separation", 12)
-	plate.add_child(col)
+	add_child(col)
 
 	_sentence = Label.new()
 	_sentence.name = "Sentence"
 	_sentence.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_sentence.custom_minimum_size.x = 288.0
 	_sentence.add_theme_font_override("font", _font)
 	_sentence.add_theme_font_size_override("font_size", 16)
 	col.add_child(_sentence)
@@ -154,6 +153,23 @@ func _fill(report: Dictionary) -> void:
 			_sentence.text = "%s came out." % names
 			_sentence.add_theme_color_override("font_color", DAYLIGHT)
 	_ledger.text = _ledger_text(report)
+	custom_minimum_size = Vector2(320.0, 0.0)
+	_shrink_to_content()
+	call_deferred("_shrink_to_content")
+
+
+func _shrink_to_content() -> void:
+	# Labels need a frame of width before min-size is honest; without this the
+	# Overlay's layout leaves a tall empty plate (offset_bottom 600 on a 1920² root).
+	custom_minimum_size = Vector2(320.0, 0.0)
+	var height := get_combined_minimum_size().y
+	if absf(size.y - height) <= 1.0 and absf(offset_bottom - (48.0 + height)) <= 1.0:
+		return
+	reset_size()
+	offset_top = 48.0
+	offset_bottom = 48.0 + height
+	offset_right = -20.0
+	offset_left = -340.0
 
 
 func _join_names(raw: Variant) -> String:
