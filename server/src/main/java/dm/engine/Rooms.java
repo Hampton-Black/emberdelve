@@ -61,6 +61,11 @@ public final class Rooms {
         return byId.containsKey(roomId);
     }
 
+    /** Rooms in this session. The site's total on the ending ledger. Spec §9. */
+    public int size() {
+        return byId.size();
+    }
+
     public RoomDefinition structure(String roomId) {
         var room = byId.get(roomId);
         if (room == null) {

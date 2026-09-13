@@ -10,6 +10,7 @@ func _ready() -> void:
 	text_submitted.connect(_send)
 	Table.transcript_changed.connect(_relock)
 	Table.started_changed.connect(_relock)
+	Table.scene_changed.connect(_relock)
 	Net.connected.connect(_relock)
 	Net.disconnected.connect(func(_reason: String) -> void: _relock())
 	_relock()
@@ -26,5 +27,7 @@ func _send(typed: String) -> void:
 
 
 func _relock() -> void:
-	editable = Table.connected and Table.started and not Table.awaiting_dm
+	var over := Table.scene.get("ending") is Dictionary
+	visible = not over
+	editable = Table.connected and Table.started and not Table.awaiting_dm and not over
 	placeholder_text = "The DM is speaking." if Table.awaiting_dm else "What do you do?"

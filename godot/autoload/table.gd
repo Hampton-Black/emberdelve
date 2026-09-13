@@ -86,6 +86,7 @@ func set_scene(state: Dictionary) -> void:
 		reset()
 	scene = state
 	mode = String(state.get("mode", "EXPLORATION"))
+	_dismiss_leave_confirm()
 	_adopt_combat_from_scene()   # Task 8
 	scene_changed.emit()
 	mode_changed.emit(mode)
@@ -268,7 +269,8 @@ func _apply_now(list: Array) -> void:
 				announcements.append(func() -> void: prop_removed.emit(gone_id))
 
 			"DelveEnded":
-				scene["ending"] = String(diff["ending"])
+				scene["ending"] = diff["ending"]
+				_dismiss_leave_confirm()
 
 	_settle_combat(opened, closed)   # Task 8
 	scene_changed.emit()
@@ -419,6 +421,15 @@ func confirm_leave() -> void:
 
 
 func stay() -> void:
+	leave_confirm = {}
+	leave_confirm_changed.emit()
+
+
+func _dismiss_leave_confirm() -> void:
+	if not (scene.get("ending") is Dictionary):
+		return
+	if leave_confirm.is_empty():
+		return
 	leave_confirm = {}
 	leave_confirm_changed.emit()
 

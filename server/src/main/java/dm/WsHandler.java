@@ -8,6 +8,7 @@ import dm.model.Difficulty;
 import dm.model.Entity;
 import dm.model.Consumable;
 import dm.model.Diff;
+import dm.model.Ending;
 import dm.model.Outcome;
 import dm.model.Skill;
 import dm.model.Mode;
@@ -80,26 +81,7 @@ public final class WsHandler {
     }
 
     void handleMessage(JsonNode message) {
-        String type = message.path("type").asText();
-        if ("enterExit".equals(type)) {
-            enterExit(message, testOutbound);
-            return;
-        }
-        if ("useProp".equals(type)) {
-            if (!"take".equals(message.path("action").asText(""))) {
-                return;
-            }
-            try {
-                var diffs = engine.takeProp(message.path("propId").asText(""));
-                if (!diffs.isEmpty()) {
-                    testOutbound.accept(new ServerMessage.Diffs(diffs));
-                }
-            } catch (IllegalArgumentException e) {
-                testOutbound.accept(new ServerMessage.Error(e.getMessage()));
-            }
-            return;
-        }
-        throw new IllegalArgumentException("test seam only supports enterExit/useProp: " + type);
+        handle(null, message);
     }
 
     public void register(WsConfig ws) {
@@ -272,9 +254,10 @@ public final class WsHandler {
         engine.crossExit(message.path("exitId").asText(""));
         deliver.accept(new ServerMessage.Scene(engine.scene()));
         if (engine.state().ending().isPresent()) {
-            // Extraction has no arrival: the close is 4h9.5. Lift the client's hold.
             if (dm == null) {
                 deliver.accept(new ServerMessage.NarrationEnd());
+            } else {
+                turns.submit(() -> dm.narrateClose(closeFacts(List.of()), turnSink(ctx)));
             }
             return;
         }
@@ -338,7 +321,7 @@ public final class WsHandler {
         turns.submit(() -> {
             var theirs = new Beats(ctx);
             try {
-                engine.combat().runAutomaticTurns(theirs, WsHandler::beat);
+                engine.combat().runAutomaticTurns(theirs, this::pause);
             } catch (Exception e) {
                 log.error("enemy turn failed", e);
                 send(ctx, new ServerMessage.Error("The goblin froze: " + e.getMessage()));
@@ -363,10 +346,30 @@ public final class WsHandler {
     }
 
     private void narrate(WsContext ctx, List<String> facts) {
-        if (dm == null || facts.isEmpty()) {
+        if (dm == null) {
+            return;
+        }
+        if (engine.state().ending().isPresent()) {
+            turns.submit(() -> dm.narrateClose(closeFacts(facts), turnSink(ctx)));
+            return;
+        }
+        if (facts.isEmpty()) {
             return;
         }
         turns.submit(() -> dm.narrateCombat(facts, turnSink(ctx)));
+    }
+
+    private List<String> closeFacts(List<String> facts) {
+        var out = new java.util.ArrayList<>(facts);
+        var report = engine.scene().ending();
+        if (report != null) {
+            out.add(switch (report.ending()) {
+                case PARTY_LOST -> "The party has fallen.";
+                case EXTRACTED_WITH_OBJECTIVE -> "The party left the site with the reliquary.";
+                case EXTRACTED_WITHOUT -> "The party left the site.";
+            });
+        }
+        return out;
     }
 
     /**
@@ -412,7 +415,10 @@ public final class WsHandler {
         }
     }
 
-    private static void beat() {
+    private void pause() {
+        if (testOutbound != null) {
+            return;
+        }
         try {
             Thread.sleep(BEAT_MS);
         } catch (InterruptedException e) {

@@ -323,9 +323,17 @@ func test_the_project_boots_into_chrome_with_an_empty_stretching_world() -> void
 		"initiative lives over the playfield")
 	assert_not_null(chrome.get_node_or_null("%CombatVerbs"),
 		"verbs live in the chin")
-	assert_not_null(chrome.get_node("Overlay/Defeat"))
-	assert_not_null(chrome.get_node("Overlay/Defeat/Restart"),
-		"the script references $Restart")
+	assert_false(FileAccess.file_exists("res://chrome/defeat.gd"),
+		"defeat.gd is gone; the ending page replaced it")
+	assert_false(FileAccess.file_exists("res://chrome/defeat.gd.uid"))
+	assert_eq(chrome.get_node_or_null("Overlay/Defeat"), null,
+		"Overlay/Defeat is gone; the ending page replaced it")
+	assert_not_null(chrome.get_node_or_null("Overlay/Ending"))
+	var ending_restart: Node = null
+	var ending_node: Node = chrome.get_node_or_null("Overlay/Ending")
+	if ending_node != null:
+		ending_restart = ending_node.find_child("Restart", true, false)
+	assert_not_null(ending_restart, "DESCEND AGAIN is the way on")
 	var debug_bar := chrome.get_node_or_null("Overlay/DebugBar")
 	assert_not_null(debug_bar, "the debug bar is overlay chrome")
 	if debug_bar == null:
@@ -455,52 +463,120 @@ func test_the_window_opens_larger_than_the_plan_s_720p_default() -> void:
 	assert_eq(ProjectSettings.get_setting("display/window/size/viewport_height"), 1080)
 
 
-# ---- Defeat: a dead fighter is a death, not a crash
+# ---- Ending page: derived from the report, never from hit points
 
-func _defeat() -> Control:
-	var script: GDScript = load("res://chrome/defeat.gd")
-	assert_not_null(script, "defeat.gd")
+func _ending_page() -> Control:
+	var script: GDScript = load("res://chrome/ending.gd")
+	assert_not_null(script, "ending.gd")
 	if script == null:
 		return Control.new()
 	var node: Control = script.new()
-	var btn := Button.new()
-	btn.name = "Restart"
-	node.add_child(btn)
 	add_child_autofree(node)
 	return node
 
 
-func test_defeat_stays_hidden_while_the_fighter_lives() -> void:
-	Table.set_started()
-	var defeat := _defeat()
-	assert_false(defeat.visible)
+func _ending_report(kind: String, extra: Dictionary = {}) -> Dictionary:
+	var report := {
+		"ending": kind,
+		"partyNames": ["Roderick"],
+		"roomName": "The Ashen Crypt",
+		"objectiveName": "reliquary",
+		"roomsEntered": 1,
+		"roomsInSite": 2,
+		"potionsUsed": 0,
+		"potionsBrought": 2,
+		"torchesUsed": 0,
+		"torchesBrought": 2,
+		"fights": 0,
+		"objective": "LEFT_WHERE_IT_LAY",
+	}
+	for key in extra:
+		report[key] = extra[key]
+	return report
 
 
-func test_defeat_appears_when_the_fighter_falls_during_a_session() -> void:
+func test_zero_hp_without_an_ending_report_shows_no_page() -> void:
 	Table.set_started()
-	var defeat := _defeat()
+	var page := _ending_page()
 	Table.scene["entities"][0]["hp"] = 0
+	Table.scene.erase("ending")
 	Table.scene_changed.emit()
-	assert_true(defeat.visible)
+	await wait_frames(1)
+	assert_false(page.visible, "the page is not derived from hit points")
 
 
-func test_defeat_stays_hidden_if_the_session_has_not_started() -> void:
-	Table.scene["entities"][0]["hp"] = 0
-	var defeat := _defeat()
-	Table.scene_changed.emit()
-	assert_false(defeat.visible)
-
-
-func test_restart_flags_the_table_before_it_hits_the_wire() -> void:
-	var defeat := _defeat()
+func test_party_lost_sentence_is_ash() -> void:
 	Table.set_started()
+	var page := _ending_page()
+	Table.scene["ending"] = _ending_report("PARTY_LOST")
+	Table.scene_changed.emit()
+	await wait_seconds(page.IMPACT_SECONDS + page.DEATH_A_SECONDS + 0.05)
+	assert_true(page.visible)
+	var sentence: Label = page.find_child("Sentence", true, false)
+	assert_not_null(sentence, "Sentence")
+	if sentence == null:
+		return
+	assert_eq(sentence.text, "Roderick fell in the Ashen Crypt.")
+	assert_eq(sentence.get_theme_color("font_color"), page.ASH)
+
+
+func test_extracted_with_objective_is_daylight() -> void:
+	Table.set_started()
+	var page := _ending_page()
+	Table.scene["ending"] = _ending_report("EXTRACTED_WITH_OBJECTIVE", {
+		"objective": "CARRIED_OUT",
+		"hurt": "barely marked",
+	})
+	Table.scene_changed.emit()
+	await wait_frames(1)
+	assert_true(page.visible)
+	var sentence: Label = page.find_child("Sentence", true, false)
+	assert_not_null(sentence, "Sentence")
+	if sentence == null:
+		return
+	assert_eq(sentence.text, "Roderick came out with the reliquary.")
+	assert_eq(sentence.get_theme_color("font_color"), page.DAYLIGHT)
+
+
+func test_extracted_without_is_daylight_and_immediate() -> void:
+	Table.set_started()
+	var page := _ending_page()
+	Table.scene["ending"] = _ending_report("EXTRACTED_WITHOUT", {"hurt": "bloodied"})
+	Table.scene_changed.emit()
+	await wait_frames(1)
+	assert_true(page.visible, "extraction shows the page at once")
+	var sentence: Label = page.find_child("Sentence", true, false)
+	assert_not_null(sentence, "Sentence")
+	if sentence == null:
+		return
+	assert_eq(sentence.text, "Roderick came out.")
+	assert_eq(sentence.get_theme_color("font_color"), page.DAYLIGHT)
+
+
+func test_party_lost_waits_for_the_fall() -> void:
+	Table.set_started()
+	var page := _ending_page()
+	Table.scene["ending"] = _ending_report("PARTY_LOST")
+	Table.scene_changed.emit()
+	await wait_frames(1)
+	assert_false(page.visible, "the page waits for IMPACT_SECONDS + Death_A")
+	await wait_seconds(page.IMPACT_SECONDS + page.DEATH_A_SECONDS + 0.05)
+	assert_true(page.visible)
+
+
+func test_descend_again_is_live_while_the_dm_speaks() -> void:
+	var page := _ending_page()
+	Table.set_started()
+	Table.awaiting_dm = true
+	Table.scene["ending"] = _ending_report("EXTRACTED_WITHOUT", {"hurt": "barely marked"})
+	Table.scene_changed.emit()
+	await wait_frames(1)
 	Table.say_as_player("last words")
-	var restart: Button = defeat.get_node_or_null("Restart")
+	var restart: Button = page.find_child("Restart", true, false)
 	assert_not_null(restart, "Restart")
 	if restart == null:
 		return
-	# Flag first, then the wire: a scene that landed on this call stack would otherwise
-	# be treated as the middle of a session.
+	assert_false(restart.disabled)
 	restart.pressed.emit()
 	assert_true(Table._restarting, "expect_restart before Net.restart")
 	assert_eq(Net.outbound.size(), 1)
@@ -508,6 +584,70 @@ func test_restart_flags_the_table_before_it_hits_the_wire() -> void:
 	Table.set_scene(SceneFixtures.scene(CRYPT))
 	assert_false(Table.started)
 	assert_eq(Table.transcript, [])
+
+
+func test_ending_page_delay_matches_the_token_impact() -> void:
+	var page := _ending_page()
+	var token_script: GDScript = load("res://world/tokens/token.gd")
+	assert_not_null(token_script, "token.gd")
+	if token_script == null:
+		return
+	assert_eq(page.IMPACT_SECONDS, token_script.IMPACT_SECONDS)
+	assert_eq(page.DEATH_A_SECONDS, 0.8)
+	assert_eq(page.delay_for(_ending_report("PARTY_LOST")),
+		page.IMPACT_SECONDS + page.DEATH_A_SECONDS)
+	assert_eq(page.delay_for(_ending_report("EXTRACTED_WITHOUT")), 0.0)
+
+
+func test_ending_hides_input_and_bars_and_dismisses_leave_confirm() -> void:
+	var packed: PackedScene = load("res://chrome/chrome.tscn")
+	assert_not_null(packed, "chrome.tscn")
+	if packed == null:
+		return
+	var chrome: Node = packed.instantiate()
+	add_child_autofree(chrome)
+	await wait_process_frames(4)
+	Table.set_started()
+	Table.awaiting_dm = false
+	var title: Control = chrome.get_node_or_null("Overlay/Title")
+	if title != null:
+		title.visible = false
+	Table.leave_confirm = {"exit_id": "stair-south", "holding": false}
+	Table.leave_confirm_changed.emit()
+	var next := Table.scene.duplicate(true)
+	next["ending"] = _ending_report("EXTRACTED_WITHOUT", {"hurt": "barely marked"})
+	Table.set_scene(next)
+	await wait_frames(2)
+	var input: LineEdit = chrome.get_node_or_null("%Chin/Row/Log/VBox/InputBox")
+	assert_not_null(input, "InputBox")
+	if input != null:
+		assert_false(input.visible)
+	var explore: Control = chrome.get_node_or_null("%ExplorationBar")
+	if explore != null:
+		assert_false(explore.visible)
+	var debug_bar: Control = chrome.get_node_or_null("Overlay/DebugBar")
+	if debug_bar != null:
+		assert_false(debug_bar.visible)
+	var confirm: Control = chrome.get_node_or_null("%LeaveConfirm")
+	if confirm != null:
+		assert_false(confirm.visible)
+	var transcript: Control = chrome.get_node_or_null("%Chin/Row/Log/VBox/Transcript")
+	assert_not_null(transcript, "transcript stays")
+	if transcript != null:
+		assert_true(transcript.visible)
+	var ending: Control = chrome.get_node_or_null("Overlay/Ending")
+	assert_not_null(ending, "Ending")
+	if ending != null:
+		assert_true(ending.visible)
+		var chin: Control = chrome.get_node_or_null("%Chin")
+		var view: Control = chrome.get_node_or_null("%WorldView")
+		if chin != null:
+			assert_lt(ending.global_position.y + ending.size.y, chin.global_position.y + 1.0,
+				"the page never reaches the chin")
+		if view != null and view.size.x > 0.0:
+			assert_gt(ending.global_position.x, view.global_position.x + view.size.x * 0.4,
+				"the page sits at the top right")
+	assert_true(Table.leave_confirm.is_empty())
 
 
 # ---- Combat bar: ceremony math, end-turn lock, allegiance HP

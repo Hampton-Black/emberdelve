@@ -29,6 +29,7 @@ func _ready() -> void:
 		add_child(button)
 	Table.transcript_changed.connect(_relock)
 	Table.started_changed.connect(_relock)
+	Table.scene_changed.connect(_relock)
 	_relock()
 
 
@@ -37,6 +38,7 @@ func _send(message: Dictionary) -> void:
 
 
 func _relock() -> void:
+	visible = not (Table.scene.get("ending") is Dictionary)
 	for button in get_children():
 		(button as Button).disabled = Table.awaiting_dm
 

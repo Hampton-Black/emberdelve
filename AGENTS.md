@@ -476,9 +476,10 @@ the player's own sentence says they spoke.
 
 **A dead player character used to be only a dropped token.** Combat ended, the mode pill flipped
 back to EXPLORATION, and nothing said what had happened — with the input box refusing text and the
-board refusing clicks, that reads as a crash rather than a death. `ui/Defeat.tsx` marks the moment
-and offers the way on. It throws the session away and lays the room out again, which is what
-restarting the process did, without the terminal.
+board refusing clicks, that reads as a crash rather than a death. `ui/Defeat.tsx` was that mark
+for a death. The ending page is that mark now, for all three endings — extracted with the
+objective, extracted empty-handed, and lost. DESCEND AGAIN throws the session away and lays the
+site out again, which is what restarting the process did, without the terminal.
 
 **The opening used to be silent on a cold load.** Browsers gate audio behind a user gesture and
 the narration arrived before the player had made one, so the DM described the room to a page that

@@ -67,7 +67,7 @@ class ObjectiveTest {
         engine.crossExit("stair-south");
 
         assertEquals(Optional.of(Ending.EXTRACTED_WITH_OBJECTIVE), engine.state().ending());
-        assertEquals(Ending.EXTRACTED_WITH_OBJECTIVE, engine.scene().ending());
+        assertEquals(Ending.EXTRACTED_WITH_OBJECTIVE, engine.scene().ending().ending());
         assertEquals(1, eventsOf(log, Event.DelveEnded.class).size());
         var ended = eventsOf(log, Event.DelveEnded.class).getFirst();
         assertEquals(Ending.EXTRACTED_WITH_OBJECTIVE, ended.ending());
@@ -86,7 +86,7 @@ class ObjectiveTest {
         engine.crossExit("stair-south");
 
         assertEquals(Optional.of(Ending.EXTRACTED_WITHOUT), engine.state().ending());
-        assertEquals(Ending.EXTRACTED_WITHOUT, engine.scene().ending());
+        assertEquals(Ending.EXTRACTED_WITHOUT, engine.scene().ending().ending());
         var ended = eventsOf(log, Event.DelveEnded.class).getFirst();
         assertEquals(Ending.EXTRACTED_WITHOUT, ended.ending());
         assertFalse(engine.state().holdingObjective());

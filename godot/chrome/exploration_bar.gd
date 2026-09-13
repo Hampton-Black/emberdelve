@@ -83,7 +83,8 @@ func _btn_style(bg: Color, border: Color) -> StyleBoxFlat:
 func _redraw() -> void:
 	var fighting := Table.combat_beat != null
 	if Table.scene.is_empty() or Table.mode != "EXPLORATION" or fighting \
-			or not Table.leave_confirm.is_empty():
+			or not Table.leave_confirm.is_empty() \
+			or Table.scene.get("ending") is Dictionary:
 		visible = false
 		custom_minimum_size = Vector2.ZERO
 		return

@@ -187,7 +187,7 @@ func _chip_style(active: bool) -> StyleBoxFlat:
 func _redraw() -> void:
 	var beat = Table.combat_beat
 	var verbs := _verbs_host()
-	if beat == null:
+	if beat == null or Table.scene.get("ending") is Dictionary:
 		visible = false
 		if verbs != self:
 			verbs.visible = false

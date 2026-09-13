@@ -1,5 +1,6 @@
 package dm.engine;
 
+import dm.ai.BeatRenderer;
 import dm.content.ContentLoader;
 import dm.content.Dressings;
 import dm.content.RoomDefinition;
@@ -9,10 +10,13 @@ import dm.model.ConsequenceId;
 import dm.model.Diff;
 import dm.model.Directive;
 import dm.model.DirectiveRail;
+import dm.model.Ending;
+import dm.model.EndingReport;
 import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Exit;
 import dm.model.Mode;
+import dm.model.ObjectiveFate;
 import dm.model.PartyLight;
 import dm.model.Prop;
 import dm.model.RollRequest;
@@ -73,7 +77,7 @@ public final class GameEngine {
                             + "starting room is configurable, got '" + rooms.first().roomId() + "'");
         }
         this.combat = new CombatEngine(log, dice, this::room, this::onFightStart,
-                this::canRest, this::withCanRestIfChanged);
+                this::canRest, this::withCanRestIfChanged, this::endingReport);
         this.directives = new DirectiveRail(() -> this.combat.isActive());
     }
 
@@ -392,7 +396,58 @@ public final class GameEngine {
                 combat.view(), state().consumableCount(Consumable.POTION),
                 state().consumableCount(Consumable.TORCH),
                 state().consumableCount(Consumable.ROPE), canSpendTorch(), canRest(),
-                partyLight(), state().holdingObjective(), state().ending().orElse(null));
+                partyLight(), state().holdingObjective(),
+                state().ending().isPresent() ? endingReport() : null);
+    }
+
+    /**
+     * Sentence parts and ledger for the current ending. Folded from the log; never a second
+     * write path. Spec §9, §10.
+     */
+    EndingReport endingReport() {
+        var ending = state().ending().orElseThrow();
+        var names = state().party().stream()
+                .map(member -> state().find(member.entityId()))
+                .flatMap(Optional::stream)
+                .map(Entity::name)
+                .toList();
+        int potionsBrought = 0;
+        int torchesBrought = 0;
+        int potionsUsed = 0;
+        int torchesUsed = 0;
+        int fights = 0;
+        for (var event : log.events()) {
+            switch (event) {
+                case Event.ConsumablesGranted granted -> {
+                    potionsBrought += granted.counts().getOrDefault(Consumable.POTION, 0);
+                    torchesBrought += granted.counts().getOrDefault(Consumable.TORCH, 0);
+                }
+                case Event.ItemUsed used when used.item() == Consumable.POTION -> potionsUsed++;
+                case Event.ItemUsed used when used.item() == Consumable.TORCH -> torchesUsed++;
+                case Event.CombatStarted ignored -> fights++;
+                default -> { }
+            }
+        }
+        String hurt = null;
+        if (ending != Ending.PARTY_LOST) {
+            hurt = state().party().stream()
+                    .map(member -> state().find(member.entityId()))
+                    .flatMap(Optional::stream)
+                    .filter(Entity::isAlive)
+                    .findFirst()
+                    .map(BeatRenderer::condition)
+                    .orElse(null);
+        }
+        var fate = switch (ending) {
+            case EXTRACTED_WITH_OBJECTIVE -> ObjectiveFate.CARRIED_OUT;
+            case EXTRACTED_WITHOUT -> ObjectiveFate.LEFT_WHERE_IT_LAY;
+            case PARTY_LOST -> state().holdingObjective()
+                    ? ObjectiveFate.FELL_WITH_HIM
+                    : ObjectiveFate.LEFT_WHERE_IT_LAY;
+        };
+        return new EndingReport(ending, names, room().name(), EndingReport.OBJECTIVE_NAME,
+                state().visitedRoomIds().size(), rooms.size(),
+                potionsUsed, potionsBrought, torchesUsed, torchesBrought, fights, fate, hurt);
     }
 
     /**
@@ -578,7 +633,7 @@ public final class GameEngine {
                     : dm.model.Ending.EXTRACTED_WITHOUT;
             log.append(new Event.DelveEnded(Instant.now(), ending, exitId));
             directives.clear();
-            return List.of(new Diff.DelveEnded(ending));
+            return List.of(new Diff.DelveEnded(endingReport()));
         }
 
         if (!rooms.has(exit.toRoomId())) {

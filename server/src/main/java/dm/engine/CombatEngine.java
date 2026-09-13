@@ -5,6 +5,7 @@ import dm.content.RoomDefinition;
 import dm.model.Combatant;
 import dm.model.CombatView;
 import dm.model.Diff;
+import dm.model.Ending;
 import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Mode;
@@ -49,6 +50,7 @@ public final class CombatEngine {
     private final Consumer<CombatSink> onFightStart;
     private final Supplier<Boolean> canRestSnapshot;
     private final BiFunction<List<Diff>, Boolean, List<Diff>> withCanRestHint;
+    private final Supplier<dm.model.EndingReport> endingReport;
 
     public CombatEngine(EventLog log, DiceRoller dice, Supplier<RoomDefinition> currentRoom) {
         this(log, dice, currentRoom, sink -> { });
@@ -62,12 +64,20 @@ public final class CombatEngine {
     CombatEngine(EventLog log, DiceRoller dice, Supplier<RoomDefinition> currentRoom,
                  Consumer<CombatSink> onFightStart, Supplier<Boolean> canRestSnapshot,
                  BiFunction<List<Diff>, Boolean, List<Diff>> withCanRestHint) {
+        this(log, dice, currentRoom, onFightStart, canRestSnapshot, withCanRestHint, () -> null);
+    }
+
+    CombatEngine(EventLog log, DiceRoller dice, Supplier<RoomDefinition> currentRoom,
+                 Consumer<CombatSink> onFightStart, Supplier<Boolean> canRestSnapshot,
+                 BiFunction<List<Diff>, Boolean, List<Diff>> withCanRestHint,
+                 Supplier<dm.model.EndingReport> endingReport) {
         this.log = log;
         this.dice = dice;
         this.currentRoom = currentRoom;
         this.onFightStart = onFightStart;
         this.canRestSnapshot = canRestSnapshot;
         this.withCanRestHint = withCanRestHint;
+        this.endingReport = endingReport;
     }
 
     /**
@@ -223,6 +233,15 @@ public final class CombatEngine {
         resolveAttack(actor, target, sink);
 
         if (isOver()) {
+            // Only an empty party is a lost delve. Killing the last goblin just ends the fight.
+            boolean players = livingEntities().stream().anyMatch(Entity::isPlayerControlled);
+            if (!players) {
+                log.append(new Event.DelveEnded(Instant.now(), Ending.PARTY_LOST, ""));
+                var report = endingReport.get();
+                if (report != null) {
+                    sink.diffs(List.of(new Diff.DelveEnded(report)));
+                }
+            }
             end(sink);
         } else {
             sink.diffs(List.of(new Diff.CombatChanged(view())));

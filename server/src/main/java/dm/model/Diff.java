@@ -75,6 +75,6 @@ public sealed interface Diff {
     /** A takeable prop left the board because the party is holding it. */
     record PropRemoved(String propId) implements Diff {}
 
-    /** The delve ended. Spec §10. */
-    record DelveEnded(Ending ending) implements Diff {}
+    /** The delve ended. Same report {@link SceneState} ships. Spec §9, §10. */
+    record DelveEnded(EndingReport ending) implements Diff {}
 }

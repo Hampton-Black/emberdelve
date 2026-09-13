@@ -50,8 +50,8 @@ public record SceneState(
         PartyLight partyLight,
         /** Whether the party is carrying the site's objective. Spec §4c, §10. */
         boolean holdingObjective,
-        /** How the delve ended, or null while it is still running. Spec §4, §10. */
-        Ending ending
+        /** How the delve ended — sentence parts and ledger — or null while it is still running. Spec §4, §9, §10. */
+        EndingReport ending
 ) {
     /** The room named by {@link #roomId()}, in the same list as everything else. */
     public RoomView currentRoom() {

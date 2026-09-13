@@ -88,6 +88,13 @@ public final class DmService {
             + "here before. They know this place. Do not describe it again from scratch — say "
             + "what has changed, or what they came back for, in a sentence or two.";
 
+    /**
+     * The last narration of a delve. Two or three sentences, no numbers, no verdict.
+     * Spec §8e.
+     */
+    static final String CLOSE = "The delve has ended. Two or three sentences. "
+            + "Do not use the words won, lost, or failed. Do not say numbers.";
+
     /** Room-scoped register for a rest. Spec §8d. */
     static final String REST_DIRECTIVE = ClockTables.REST;
 
@@ -299,6 +306,24 @@ public final class DmService {
         } finally {
             narrating.unlock();
         }
+    }
+
+    /**
+     * The last narration of a delve. Takes the lock rather than giving up — it replaces
+     * whatever would otherwise have been last. Spec §8e.
+     */
+    public void narrateClose(List<String> facts, TurnSink sink) {
+        narrating.lock();
+        try {
+            var failed = new boolean[]{false};
+            var prose = runProsePhase(CLOSE, facts, sink, failed, false);
+            if (!failed[0]) {
+                history.add(DmClient.ChatMessage.assistant(prose.text()));
+            }
+        } finally {
+            narrating.unlock();
+        }
+        sink.complete();
     }
 
     /**
