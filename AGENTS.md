@@ -2,18 +2,12 @@
 
 AI Dungeon Master. Java backend, Godot desktop client.
 
-**Current milestone: M3 — gate PASSED 2026-09-06.** A room is a place you can leave and come
-back to. The gate was a 19-turn played session that crossed four times, spent ≥7 turns in each
-room, found the gallery niche as it was left, and replayed identical:
-`docs/milestones/m3-evaluation.md`.
+**Current milestone: M4 — gate PASSED 2026-09-13.** You can lose a delve, and losing it stung.
+The gate was a 41-turn Godot session that took the reliquary, chose the north door, fell in the
+vault holding it, and replayed identical: `docs/milestones/m4-evaluation.md`.
 
-**Next: M4 — the delve.** *Can you lose a delve, and does losing it sting?* Decided on the wayfinder
-map `emberdelve-ffi`, built under `emberdelve-4h9`, against
-`docs/superpowers/specs/2026-09-10-m4-delve-design.md`, approved 2026-09-12. The
-rules below still describe the code as it stands; the build tickets update them as each piece lands.
-
-**After it: the generator plan** — M1's remaining half, *can the world be made rather than
-authored*, now with the M4 site as its specification.
+**Next: the generator plan** — M1's remaining half, *can the world be made rather than authored*,
+now with the M4 site as its specification.
 The plan at `docs/superpowers/plans/2026-08-21-m1-dungeon-navigation.md` is **stale in its
 traversal half** (superseded by this milestone) **and in its client/Java foundation** — those
 tasks are React/Three.js, and a `GameRepository` that no longer exists. Its `LayoutGenerator`,
@@ -27,16 +21,15 @@ tasks are React/Three.js, and a `GameRepository` that no longer exists. Its `Lay
 | **M1** | Can the world be made rather than authored? | **Half done.** Single-room generation merged; a generated dungeon is the remaining half | `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` |
 | **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `docs/milestones/m2-evaluation.md` |
 | **M3** | Is a room a place you can leave and come back to? | PASS 2026-09-06 | `docs/milestones/m3-evaluation.md` |
-| **M4** | Can you lose a delve, and does losing it sting? | Spec approved 2026-09-12 | `docs/superpowers/specs/2026-09-10-m4-delve-design.md` |
+| **M4** | Can you lose a delve, and does losing it sting? | PASS 2026-09-13 | `docs/milestones/m4-evaluation.md` |
 
 Godot replaced the Vite/Three.js table on 2026-08-23 (parity gate, Task 22).
 
 ### Reading order
 
-`docs/milestones/m3-evaluation.md` first — it is the most recent gate and its §8 lists what M3 handed
-forward. For M4 work, read `docs/superpowers/specs/2026-09-10-m4-delve-design.md` next: it
-settles design doc §9 before anything is built, and every build ticket under `emberdelve-4h9` is
-executed against it. `docs/superpowers/specs/2026-09-05-m3-traversal-design.md` is the traversal
+`docs/milestones/m4-evaluation.md` first — it is the most recent gate and its §8 lists what M4 handed
+forward. `docs/superpowers/specs/2026-09-10-m4-delve-design.md` is the spec that gate was built
+against. `docs/superpowers/specs/2026-09-05-m3-traversal-design.md` is the traversal
 architecture.
 `docs/milestones/m2-evaluation.md` and `docs/superpowers/specs/2026-08-23-m2-spine-design.md` are the spine
 everything still sits on. `docs/ai-dm-system-design.md` is the long-range design. **Amended
@@ -46,7 +39,8 @@ and this file disagree, this file wins — it is the operational one.
 
 `docs/milestones/m0-build-plan.md` and `docs/milestones/m0-evaluation.md` are history. They are still worth reading for
 *why* things are the way they are, and their shortcuts table no longer describes this codebase.
-Where M0 and M2 disagree, **M2 wins**. Where M2 and M3 disagree, **M3 wins**.
+Where M0 and M2 disagree, **M2 wins**. Where M2 and M3 disagree, **M3 wins**. Where M3 and M4
+disagree, **M4 wins**.
 
 ---
 
@@ -535,6 +529,22 @@ The full list is `docs/milestones/m3-evaluation.md` §8.
   `reveal_prop` is never offered. A generated room has no alcove and no niche. The wrong fix is
   free-form dress-pass secrets with no mechanism; the right fix is hidden props the generator
   already knows how to place.
+
+### Carried out of M4 — findings, not tasks
+
+The full list is `docs/milestones/m4-evaluation.md` §8. Playtest leftovers are standalone beads,
+not children of the epic.
+
+- **The doubt window sat in the vault, not at 5 HP in a doorway.** Two goblins still do not spend
+  enough hit points; a brute does. Encounter places the window.
+- **Failed talk still starts a fight.** Look-around no longer does.
+- **LIGHT fill and room fires are different objects.** A dead party torch in a room whose bowls
+  still burn is correct by the fold and wrong by "pitch darkness".
+- **ALERT's band and ALERT's fill cannot both be true as written.** `on you` is dead while a fill
+  zeros the clock.
+- **Every goblin is Vessk.** `emberdelve-5yj`.
+- **Generated rooms still have nothing to find, and now they also have no occupants.** The
+  authored site is the specification.
 
 ### Fixed after the M3 gate — playtest 2026-09-06
 

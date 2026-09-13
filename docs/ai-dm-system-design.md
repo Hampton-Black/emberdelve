@@ -7,6 +7,8 @@ reversed decision is more useful with its original reasoning attached than witho
 **Amended again 2026-09-06** to add §9 — the delve, the region, and the clocks that run them. That
 section is the missing tier between a turn and a campaign, and its absence was the largest structural
 gap in this document rather than a gap in the code.
+**Amended 2026-09-13** after the M4 gate (`milestones/m4-evaluation.md`): §9 has been played. The
+verdict is PASS. What play added sits in that evaluation's §8, not as further reversals here.
 
 **How to read this.** This is the long-range design: the shape of the thing and why it is that
 shape. `../AGENTS.md` is the operational file — what an agent must actually do today — and it wins on
@@ -123,9 +125,12 @@ disqualified models usable and cut a measured 44-second turn to 8.9 seconds. See
 
 ### What settling §9 reversed, before it was built
 
-*M4, 2026-09-10.* Not overturned by play — nothing in §9 has been played yet — but by counting the
-recorded sessions, by a simulator, and by looking at the real client. They are reversals of this
-document all the same, and the M4 gate may add more. (`specs/2026-09-10-m4-delve-design.md` §15.)
+*M4, 2026-09-10.* Overturned before play by counting the recorded sessions, by a simulator, and by
+looking at the real client — reversals of this document all the same
+(`specs/2026-09-10-m4-delve-design.md` §15). Played 2026-09-13. The gate passed
+(`milestones/m4-evaluation.md`). Play did not reverse these four; it confirmed that encounter, not
+max HP, is what places the doubt window, and it named a spec-versus-spec hole: ALERT's band `on you`
+cannot fire while a fill zeros the clock.
 
 **Noisy failures → a natural 1.** §9 ticked the clock on "noisy failures". The two recorded sessions
 failed 14 of 20 checks and 2 of 11, because one DM reached for DC 15–25 and the other for DC 5–10: a
@@ -1018,7 +1023,7 @@ could turn into a test, and every milestone after it would have paid that cost.
 | **M1** | Can the world be made rather than authored? | **Half done** — room generation merged; the dungeon is outstanding | `specs/2026-08-20-m1-procedural-generation-design.md` |
 | **M2** | Can a fault found in play be turned into a test? | PASS 2026-09-05 | `milestones/m2-evaluation.md` |
 | **M3** | Is a room a place you can leave and come back to? | PASS 2026-09-06 | `milestones/m3-evaluation.md` |
-| **M4** | Can you lose a delve, and does losing it sting? | Spec approved 2026-09-12 | `specs/2026-09-10-m4-delve-design.md` |
+| **M4** | Can you lose a delve, and does losing it sting? | PASS 2026-09-13 | `milestones/m4-evaluation.md` |
 
 The Godot migration sits between M1 and M2, gated on parity rather than on a question of its own
 (`specs/2026-08-22-chrome-direction-design.md`).
@@ -1030,14 +1035,11 @@ has since been thrown away as intended. M2 is the foundation M0 deliberately did
 ### Still ahead
 
 **Dungeon generation.** `LayoutGenerator`, `ExitPlacer`, spatial validation, and world-space packing
-so a dungeon's rooms have non-overlapping rectangles to render. Answers M1's outstanding half.
+so a dungeon's rooms have non-overlapping rectangles to render. Answers M1's outstanding half. The
+M4 site is the specification (`milestones/m4-evaluation.md`).
 
-**The delve.** §9, and the reason M4 has a gate question: session-scoped party state, the objective
-and exit events, the delve clock, consumables as a counter map, and clickable props. Mostly wiring
-already-working systems into a sequence rather than new systems — the expensive part is the
-projection work that carries hurt, clock and objective state across a room boundary as fiction, which
-is the same problem M3 is already inside. **Prove it on authored rooms before generated ones**, or a
-generator bug and a game-feel problem are indistinguishable.
+**The delve.** Built. §9, proved on authored rooms 2026-09-13: you can lose a run, and this one
+stung from inside the session. What play handed forward is the evaluation's §8, not more spine.
 
 **Content, the rules engine, and the stance layer, together.** More than one enemy, more than one
 attack, more than one party member — the SRD-shaped engine of §6 that adjudicates them, and the

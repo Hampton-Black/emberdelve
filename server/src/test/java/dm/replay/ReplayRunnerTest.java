@@ -164,6 +164,24 @@ class ReplayRunnerTest {
     }
 
     @Test
+    @DisplayName("the M4 gate session replays identically")
+    void theM4GateSessionReplays() throws Exception {
+        var session = Path.of("../docs/evidence/session-m4-delve.jsonl");
+
+        var result = ReplayRunner.replay(session);
+
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
+        assertTrue(result.compared() >= 200,
+                "the gate session must cover the clocks, the occupants and the wipe; compared="
+                        + result.compared());
+        String jsonl = Files.readString(session);
+        assertTrue(jsonl.contains("\"objective_taken\""),
+                "the gate session took the reliquary");
+        assertTrue(jsonl.contains("\"PARTY_LOST\""),
+                "the gate session lost the delve");
+    }
+
+    @Test
     @DisplayName("the M3 gate session is refused at schema 3, never upgraded")
     void theM3GateSessionIsRefusedAtSchema3() {
         var session = Path.of("../docs/evidence/session-m3-traversal.jsonl");
