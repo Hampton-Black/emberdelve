@@ -32,7 +32,7 @@ public record GeneratedRoom(
         var definitions = props.stream()
                 .map(p -> new RoomDefinition.PropDefinition(
                         p.id(), p.type(), p.x(), p.y(), p.rotation(), p.hidden(),
-                        UNDRESSED, null, null))
+                        UNDRESSED, null, null, p.actions()))
                 .toList();
 
         return new RoomDefinition(

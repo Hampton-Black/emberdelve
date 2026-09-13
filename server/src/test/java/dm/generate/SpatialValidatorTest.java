@@ -24,7 +24,7 @@ class SpatialValidatorTest {
     private static final Square START = new Square(0, 0);
 
     private static Prop pillar(String id, int x, int y) {
-        return new Prop(id, PropType.PILLAR, x, y, 0, false);
+        return new Prop(id, PropType.PILLAR, x, y, 0, false, java.util.List.of());
     }
 
     @Test

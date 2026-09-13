@@ -78,7 +78,8 @@ public final class PropPlacer {
                         square.x(),
                         square.y(),
                         facing(random, shape, square, partyStart, entry.type()),
-                        false));
+                        false,
+                        java.util.List.of()));
             }
         }
         return List.copyOf(placed);
@@ -127,7 +128,7 @@ public final class PropPlacer {
                 return candidate;
             }
             var trial = new ArrayList<>(placed);
-            trial.add(new Prop("trial", type, candidate.x(), candidate.y(), 0, false));
+            trial.add(new Prop("trial", type, candidate.x(), candidate.y(), 0, false, java.util.List.of()));
             if (SpatialValidator.check(shape, trial, partyStart).isEmpty()) {
                 return candidate;
             }

@@ -164,6 +164,9 @@ public final class WsHandler {
                 }
             }
 
+            // Reserved for emberdelve-4h9.4. The client may send early; swallow until take lands.
+            case "useProp" -> { }
+
             // T5 debug hooks. These exist to prove diffs render without a model in the path,
             // and are replaced by real tool dispatch in T7.
             case "debugReveal" -> sendDiffs(ctx, engine.revealProp(message.path("propId").asText()));

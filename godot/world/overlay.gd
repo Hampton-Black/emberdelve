@@ -30,6 +30,7 @@ const HOVER_TINT := Color8(0xe8, 0xdc, 0xc0)
 ## `no_depth_test` was tried and rejected: it reads as paint on the object instead of a mark on
 ## the square, and the square is what the click was about.
 const EXIT_TINT := Color8(0x3c, 0xd2, 0xc8)
+const PROP_TINT := Color8(0x9c, 0x6b, 0xd4)
 const BLOCKED_TINT := Color8(0xe0, 0x3b, 0x30)
 
 const MOVE_SIZE := 0.86
@@ -39,6 +40,7 @@ var _move_mat: StandardMaterial3D
 var _target_mat: StandardMaterial3D
 var _hover_mat: StandardMaterial3D
 var _exit_mat: StandardMaterial3D
+var _prop_mat: StandardMaterial3D
 var _blocked_mat: StandardMaterial3D
 
 
@@ -86,6 +88,10 @@ func intent(entity_id: String, square: Variant = null, target_id: String = "") -
 	if not door.is_empty():
 		return door
 
+	var prop := _prop_intent(target_id)
+	if not prop.is_empty():
+		return prop
+
 	# Out of combat there is no turn and nothing to spend, so anywhere on the
 	# floor will do. The server still refuses squares with something solid on them.
 	var player := _first_player(scene)
@@ -125,6 +131,24 @@ func _exit_intent(target_id: String) -> Dictionary:
 	}
 
 
+## A prop with a server-offered action, or {} if the pick was scenery.
+func _prop_intent(target_id: String) -> Dictionary:
+	if target_id.is_empty():
+		return {}
+	var prop := Table.prop(target_id)
+	if prop.is_empty():
+		return {}
+	var actions: Variant = prop.get("actions", [])
+	if actions.is_empty():
+		return {}
+	return {
+		"kind": "prop",
+		"prop_id": target_id,
+		"action": String(actions[0]),
+		"square": Vector2i(int(prop.get("x", 0)), int(prop.get("y", 0))),
+	}
+
+
 ## Sent, never applied locally. The token does not budge until the server says
 ## it moved (invariant #1). The swing is Table.strike, not this path.
 func commit(action: Dictionary) -> void:
@@ -138,6 +162,8 @@ func commit(action: Dictionary) -> void:
 			Net.attack(String(action["actor_id"]), String(action["target_id"]))
 		"exit":
 			Table.cross_exit(String(action["exit_id"]))
+		"prop":
+			Net.use_prop(String(action["prop_id"]), String(action["action"]))
 
 
 ## `kind` is the intent the hover is previewing, so a door does not look like a floor tile you
@@ -159,6 +185,8 @@ func set_hover(square: Variant = null, kind: String = "") -> void:
 	match kind:
 		"exit":
 			hover.material_override = _exit_mat
+		"prop":
+			hover.material_override = _prop_mat
 		"blocked":
 			hover.material_override = _blocked_mat
 		_:
@@ -231,6 +259,7 @@ func _ensure() -> void:
 		_target_mat = _tint_material(TARGET_TINT, 0.42)
 		_hover_mat = _tint_material(HOVER_TINT, 0.5)
 		_exit_mat = _tint_material(EXIT_TINT, 0.7)
+		_prop_mat = _tint_material(PROP_TINT, 0.7)
 		_blocked_mat = _tint_material(BLOCKED_TINT, 0.7)
 	if get_node_or_null("Moves") == null:
 		var moves := Node3D.new()

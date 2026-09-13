@@ -836,3 +836,157 @@ func test_no_camera_corner_makes_a_room_you_are_not_in_clickable() -> void:
 	assert_gt(crossings, 0,
 		"the floor seen through the open door still picks the door, or crossing back by "
 		+ "pointing at the room you came from has quietly stopped working")
+
+
+# ---- Props as click targets (emberdelve-7m6)
+
+
+func _doorway_with_actioned_prop() -> Dictionary:
+	var scene := DOORWAY.duplicate(true)
+	scene["props"].append({
+		"id": "relic-fixture", "type": "RUBBLE", "x": 6, "y": 4, "rotation": 0,
+		"hidden": false, "actions": ["take"],
+	})
+	return SceneFixtures.scene(scene)
+
+
+func _prop_mesh_aabb(world: Node, prop_id: String) -> AABB:
+	var prop := world.get_node_or_null("Props/crypt/%s" % prop_id) as Node3D
+	assert_not_null(prop, "prop %s" % prop_id)
+	if prop == null:
+		return AABB()
+	var leaf := AABB()
+	var first := true
+	for mesh in prop.find_children("*", "MeshInstance3D", true, false):
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		leaf = box if first else leaf.merge(box)
+		first = false
+	assert_false(first, "prop %s has a mesh" % prop_id)
+	return leaf
+
+
+func test_brazier_east_does_not_steal_the_north_door() -> void:
+	# Regression: brazier-east stands between the camera and the north wall. Scenery must not
+	# shadow the doorway when the ray passes through both.
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var door: Node3D = null
+	for child in (world.get_node("Room/Walls") as Node3D).get_children():
+		if child.has_meta("exit_id"):
+			door = child as Node3D
+	assert_not_null(door, "the tagged doorway")
+	if door == null:
+		return
+	var leaf := AABB()
+	var first := true
+	for mesh in door.find_children("*", "MeshInstance3D", true, false):
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		leaf = box if first else leaf.merge(box)
+		first = false
+	if first:
+		return
+
+	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
+	assert_eq(String(picked.get("target_id", "")), "door-north",
+		"brazier-east is scenery; the doorway still wins")
+
+
+func test_an_actioned_prop_is_returned_by_pick_at() -> void:
+	var world := _world_with_scene(_doorway_with_actioned_prop())
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var leaf := _prop_mesh_aabb(world, "relic-fixture")
+	if leaf.size == Vector3.ZERO:
+		return
+	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
+	assert_eq(String(picked.get("target_id", "")), "relic-fixture")
+
+
+func test_a_prop_without_actions_is_not_a_pick_target() -> void:
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	if cam == null:
+		return
+
+	var leaf := _prop_mesh_aabb(world, "brazier-east")
+	if leaf.size == Vector3.ZERO:
+		return
+	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
+	assert_eq(String(picked.get("target_id", "")), "",
+		"scenery props are not pick targets")
+
+
+func test_the_carried_torch_is_not_a_pick_target() -> void:
+	var world := _world_with_scene(SceneFixtures.scene(DOORWAY))
+	await wait_process_frames(2)
+	var fighter := world.get_node_or_null("Tokens/fighter")
+	assert_not_null(fighter, "fighter")
+	if fighter == null:
+		return
+	var torch := fighter.find_child("CarriedTorch", true, false)
+	assert_not_null(torch, "CarriedTorch on handslot.l")
+	if torch == null:
+		return
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	if cam == null:
+		return
+
+	var leaf := AABB()
+	var first := true
+	for mesh in torch.find_children("*", "MeshInstance3D", true, false):
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		leaf = box if first else leaf.merge(box)
+		first = false
+	if first:
+		return
+
+	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
+	assert_eq(String(picked.get("target_id", "")), "",
+		"the carried torch is never a pick target")
+
+
+func test_committing_a_prop_intent_sends_use_prop() -> void:
+	Net.outbound.clear()
+	var world := _world_with_scene(_doorway_with_actioned_prop())
+	var overlay := _overlay(world)
+	assert_not_null(overlay, "Overlay")
+	if overlay == null:
+		return
+
+	var action: Dictionary = overlay.intent("", Vector2i(6, 4), "relic-fixture")
+	assert_eq(String(action.get("kind", "")), "prop")
+	assert_eq(String(action.get("prop_id", "")), "relic-fixture")
+	assert_eq(String(action.get("action", "")), "take")
+
+	overlay.commit(action)
+
+	assert_eq(Net.outbound.size(), 1)
+	assert_eq(String(Net.outbound[0].get("type", "")), "useProp")
+	assert_eq(String(Net.outbound[0].get("propId", "")), "relic-fixture")
+	assert_eq(String(Net.outbound[0].get("action", "")), "take")
+
+
+func test_a_prop_intent_does_not_look_like_a_floor_move() -> void:
+	var world := _world_with_scene(_doorway_with_actioned_prop())
+	var overlay := _overlay(world)
+	assert_not_null(overlay, "Overlay")
+	if overlay == null:
+		return
+	var hover := overlay.get_node("Hover") as MeshInstance3D
+
+	overlay.set_hover(Vector2i(4, 4), "move")
+	var move: Color = (hover.material_override as StandardMaterial3D).albedo_color
+	overlay.set_hover(Vector2i(6, 4), "prop")
+	var prop: Color = (hover.material_override as StandardMaterial3D).albedo_color
+
+	assert_ne(move, prop, "a prop intent must not look like a floor move")

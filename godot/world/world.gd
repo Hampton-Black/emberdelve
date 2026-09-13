@@ -616,21 +616,39 @@ func pick_at(viewport_pos: Vector2) -> Dictionary:
 ## one crossing the server would accept anyway. `test_no_camera_corner_makes_a_room_you_are_not
 ## _in_clickable` sweeps all four corners over that whole floor to keep it the only thing.
 func _target_under(origin: Vector3, dir: Vector3, floor_t: float) -> String:
-	var walls := get_node_or_null("Room/Walls") as Node3D
-	if walls == null:
-		return ""
 	var best_id := ""
 	var best_t := floor_t
-	for child in walls.get_children():
-		if not (child is Node3D) or not child.has_meta("exit_id"):
-			continue
-		var box := _visual_aabb(child as Node3D)
-		if box.size == Vector3.ZERO:
-			continue
-		var t := _ray_aabb_t(origin, dir, box)
-		if t < best_t:
-			best_t = t
-			best_id = String(child.get_meta("exit_id"))
+
+	var walls := get_node_or_null("Room/Walls") as Node3D
+	if walls != null:
+		for child in walls.get_children():
+			if not (child is Node3D) or not child.has_meta("exit_id"):
+				continue
+			var box := _visual_aabb(child as Node3D)
+			if box.size == Vector3.ZERO:
+				continue
+			var t := _ray_aabb_t(origin, dir, box)
+			if t < best_t:
+				best_t = t
+				best_id = String(child.get_meta("exit_id"))
+
+	var props := get_node_or_null("Props/%s" % _room_id) as Node3D
+	if props != null:
+		for child in props.get_children():
+			if not (child is Node3D):
+				continue
+			var prop := Table.prop(String(child.name))
+			var actions: Variant = prop.get("actions", [])
+			if actions.is_empty():
+				continue
+			var box := _visual_aabb(child as Node3D)
+			if box.size == Vector3.ZERO:
+				continue
+			var t := _ray_aabb_t(origin, dir, box)
+			if t < best_t:
+				best_t = t
+				best_id = String(child.name)
+
 	return best_id
 
 

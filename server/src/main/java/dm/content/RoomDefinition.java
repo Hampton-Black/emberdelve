@@ -65,10 +65,11 @@ public record RoomDefinition(
             boolean hidden,
             String description,
             String revealHint,
-            String contains
+            String contains,
+            java.util.List<String> actions
     ) {
         public Prop toProp() {
-            return new Prop(id, type, x, y, rotation, hidden);
+            return new Prop(id, type, x, y, rotation, hidden, actions);
         }
     }
 

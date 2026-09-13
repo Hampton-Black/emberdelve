@@ -163,6 +163,9 @@ func use_item(actor_id: String, item: String) -> void:
 func rest(actor_id: String) -> void:
 	send({"type": "rest", "actorId": actor_id})
 
+func use_prop(prop_id: String, action: String) -> void:
+	send({"type": "useProp", "propId": prop_id, "action": action})
+
 ## The seven debug messages. They exist so the feel can be tuned with no model, no key and no
 ## latency in the path — see Task 13.
 func debug(message: Dictionary) -> void:

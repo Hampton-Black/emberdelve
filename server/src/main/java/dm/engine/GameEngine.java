@@ -498,7 +498,7 @@ public final class GameEngine {
     private List<Prop> visiblePropsOf(RoomDefinition def, Set<String> revealed) {
         return def.props().stream()
                 .filter(p -> !p.hidden() || revealed.contains(p.id()))
-                .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false))
+                .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false, p.actions()))
                 .toList();
     }
 
