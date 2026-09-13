@@ -73,6 +73,7 @@ public final class Dressings {
                         room.dmNotes().theSarcophagus(),
                         room.dmNotes().theSarcophagusOpened(),
                         room.dmNotes().theDoor()),
-                room.fires());
+                room.fires(),
+                room.occupants());
     }
 }

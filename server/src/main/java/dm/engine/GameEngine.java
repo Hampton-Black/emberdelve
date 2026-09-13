@@ -7,6 +7,7 @@ import dm.content.RoomDefinition;
 import dm.model.ClockId;
 import dm.model.Consumable;
 import dm.model.ConsequenceId;
+import dm.model.Disposition;
 import dm.model.Diff;
 import dm.model.Directive;
 import dm.model.DirectiveRail;
@@ -202,7 +203,8 @@ public final class GameEngine {
 
     private List<ConsequenceId> alertFillOptions() {
         var options = new ArrayList<>(ClockTables.ALERT_FILL);
-        if (kindHere("goblin", true)) {
+        // Brute+2 is never designed; ALERT fattens a fight up to three living hostiles. Spec §14.
+        if (livingHostilesHere() >= 3) {
             options.remove(ConsequenceId.PATROL_ARRIVES);
             options.remove(ConsequenceId.SOMETHING_WANDERS_IN);
         }
@@ -622,6 +624,15 @@ public final class GameEngine {
      * would only ever produce a rejection the player finds annoying.
      */
     public List<Diff> crossExit(String exitId) {
+        return crossExit(exitId, true);
+    }
+
+    /**
+     * {@code releaseOccupants} is the live path. Replay applies {@link Event.PartyMoved} without
+     * minting the room's authored encounter — {@link Event.EntitySpawned} already named who was
+     * waiting.
+     */
+    public List<Diff> crossExit(String exitId, boolean releaseOccupants) {
         requireOpen();
         if (combat.isActive()) {
             // Fleeing is a rules milestone. Without this the fight's initiative order survives
@@ -671,6 +682,8 @@ public final class GameEngine {
                 .map(Entity::id)
                 .toList();
 
+        boolean firstArrival = !state().hasVisited(exit.toRoomId());
+
         // Dressed before the move, so anything reading state() after this call finds a room
         // that already knows what it looks like.
         recordDressing(exit.toRoomId());
@@ -680,6 +693,9 @@ public final class GameEngine {
         var diffs = new ArrayList<Diff>();
         diffs.addAll(tickClock(ClockId.LIGHT));
         diffs.addAll(tickClock(ClockId.ALERT));
+        if (releaseOccupants && firstArrival) {
+            diffs.addAll(spawnAuthoredOccupants());
+        }
         // A room change replaces everything, which is what a fresh Scene is for. The caller
         // sends one; clock diffs still land in the log and on a Scene that roomView() reads.
         return diffs;
@@ -845,6 +861,39 @@ public final class GameEngine {
     private boolean kindHere(String kind, boolean livingOnly) {
         return state().entitiesHere().stream()
                 .anyMatch(e -> kind.equals(e.kind()) && (!livingOnly || e.isAlive()));
+    }
+
+    private long livingHostilesHere() {
+        return state().entitiesHere().stream()
+                .filter(e -> e.isAlive() && !e.isPlayerControlled())
+                .count();
+    }
+
+    /**
+     * First visit only. Replay names the same creatures via {@link Event.EntitySpawned}.
+     */
+    private List<Diff> spawnAuthoredOccupants() {
+        var diffs = new ArrayList<Diff>();
+        boolean hostile = false;
+        for (var occupant : room().occupants()) {
+            int x = occupant.x();
+            int y = occupant.y();
+            if (!squareFree(x, y)) {
+                var open = openSquare();
+                x = open.x();
+                y = open.y();
+            }
+            diffs.addAll(spawnHostile(occupant.kind(), x, y));
+            if (occupant.disposition() == Disposition.HOSTILE) {
+                hostile = true;
+            }
+        }
+        if (hostile && !combat.isActive()) {
+            var buffer = new CombatSink.Buffer();
+            combat.start(buffer);
+            diffs.addAll(buffer.collectedDiffs());
+        }
+        return diffs;
     }
 
     private String nextEntityId(String kind) {

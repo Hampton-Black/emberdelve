@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -42,6 +43,42 @@ class SiteTest {
         for (var id : exitIds) {
             engine.crossExit(id);
         }
+    }
+
+    /** The vault door starts a fight. Take is withheld until it ends. */
+    private static void clearTheVaultFight(GameEngine engine) {
+        assertTrue(engine.combat().isActive(), "setup: the vault brute is HOSTILE");
+        var sink = new CombatSink.Buffer();
+        int guard = 0;
+        while (engine.combat().isActive() && ++guard < 50) {
+            String actor = engine.combat().activeId();
+            if (engine.combat().isPlayerTurn()) {
+                var view = engine.combat().view();
+                if (view.legalTargets().contains("brute")) {
+                    engine.combat().attack(actor, "brute", sink);
+                    continue;
+                }
+                var brute = engine.state().find("brute").orElseThrow();
+                var step = view.legalMoves().stream()
+                        .min(Comparator.comparingInt(s -> Math.max(
+                                Math.abs(s.x() - brute.x()), Math.abs(s.y() - brute.y()))))
+                        .orElse(null);
+                if (step != null) {
+                    var fighter = engine.state().find(actor).orElseThrow();
+                    if (fighter.distanceTo(brute) > 1) {
+                        engine.combat().moveTo(actor, step.x(), step.y(), sink);
+                        if (engine.combat().view().legalTargets().contains("brute")) {
+                            engine.combat().attack(actor, "brute", sink);
+                            continue;
+                        }
+                    }
+                }
+                engine.combat().endTurn(actor, sink);
+            } else {
+                engine.combat().endTurn(actor, sink);
+            }
+        }
+        assertFalse(engine.combat().isActive(), "the vault fight should have ended");
     }
 
     @Test
@@ -120,6 +157,7 @@ class SiteTest {
 
         walk(engine, "door-north", "door-north");
         assertEquals("vault", engine.state().roomId());
+        clearTheVaultFight(engine);
 
         engine.takeProp("gold-chest");
         assertTrue(engine.state().holdingObjective(), "already holding the reliquary");
@@ -142,6 +180,8 @@ class SiteTest {
         var engine = started(log);
 
         walk(engine, "door-north", "door-north", "door-north", "door-north");
+        assertEquals("vault", engine.state().roomId());
+        clearTheVaultFight(engine);
         var diffs = engine.takeProp("gold-chest");
 
         assertFalse(engine.state().holdingObjective());
@@ -222,7 +262,7 @@ class SiteTest {
     }
 
     @Test
-    @DisplayName("chapel, undercroft and vault have goblin spawn slots, and no second goblin is authored")
+    @DisplayName("chapel, undercroft and vault have encounter slots; crypt's goblin stays in the sarcophagus")
     void encounterSlotsWithoutASecondGoblin() {
         for (var roomId : List.of("chapel", "undercroft", "vault")) {
             var spawn = CONTENT.room(roomId).startPositions().goblinSpawn();
@@ -238,6 +278,9 @@ class SiteTest {
                         roomId + " " + prop.id() + " must not author a second goblin");
             }
         }
+        assertEquals(2, CONTENT.room("undercroft").occupants().size());
+        assertEquals(1, CONTENT.room("vault").occupants().size());
+        assertTrue(CONTENT.room("chapel").occupants().isEmpty());
     }
 
     @Test

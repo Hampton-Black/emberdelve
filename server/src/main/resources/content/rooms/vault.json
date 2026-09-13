@@ -105,5 +105,8 @@
     "overview": "The last chamber. Dark. A gold chest on the west side, a stag on the east, and the open door they came through south. There is no door further on.",
     "sensory": "Still air, colder than the undercroft. Metal and dust. Their own breathing is loud.",
     "theDoor": "The door south stands open. A fight is the only thing that would stop them walking back."
-  }
+  },
+  "occupants": [
+    { "kind": "brute", "x": 7, "y": 4, "disposition": "HOSTILE" }
+  ]
 }

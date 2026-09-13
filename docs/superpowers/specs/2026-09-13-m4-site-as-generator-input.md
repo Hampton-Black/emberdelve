@@ -13,9 +13,9 @@ because the ending shows it.
 - **A hidden prop with a `revealHint`**, hinted on the object a player will actually look at (the
   shrine, the bookcase, the chest they came for — not a wall they walked past). `contains` when
   something is inside. Free-form dress-pass secrets are not this.
-- **An encounter slot** (`goblinSpawn` today). Authored, with a disposition later. Not a model's
-  decision to invent a fight. About three rooms in a site hold a fight; the slot is there even
-  when this session's only entity id is still `goblin`.
+- **An encounter slot** (`goblinSpawn`, plus `occupants` with a `Disposition`). Authored, not a
+  model's decision to invent a fight. About three rooms in a site hold a fight; brute+two mobs is
+  never authored. The slot is there even when a room's occupants list is empty.
 - **An objective or prize anchor** when the room has one. The objective is engine-owned
   (`reliquary`, `actions: ["take"]`). A greed prize is a second takeable, not a second objective.
 - **A `fires` object, or none.** Where there is one: `lit`, `to`, `moved`. At least one room per

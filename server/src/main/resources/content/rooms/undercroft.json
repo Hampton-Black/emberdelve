@@ -120,5 +120,9 @@
     "overview": "A low undercroft, cracked flags and a bookcase that does not belong. An open door south to the chapel, an open door north toward something colder.",
     "sensory": "Colder than the chapel. The smell is wet paper and old wood. Footsteps sound closer than they are.",
     "theDoor": "Both doors stand open. A fight is the only thing that would stop them walking through."
-  }
+  },
+  "occupants": [
+    { "kind": "goblin", "x": 4, "y": 5, "disposition": "WARY" },
+    { "kind": "goblin", "x": 6, "y": 5, "disposition": "WARY" }
+  ]
 }

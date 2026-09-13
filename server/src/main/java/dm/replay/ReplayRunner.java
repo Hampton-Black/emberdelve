@@ -88,12 +88,12 @@ public final class ReplayRunner {
                 // The exit id is recorded, so replay walks the same door rather than inferring
                 // one from the destination — a room with two ways into it would otherwise be a
                 // coin flip that diverges on the landing square.
-                case Event.PartyMoved e -> engine.crossExit(e.throughExitId());
+                case Event.PartyMoved e -> engine.crossExit(e.throughExitId(), false);
                 case Event.ObjectiveTaken e -> engine.takeProp(e.propId());
                 case Event.PropTaken e -> engine.takeProp(e.propId());
                 case Event.DelveEnded e -> {
                     if (!e.throughExitId().isBlank()) {
-                        engine.crossExit(e.throughExitId());
+                        engine.crossExit(e.throughExitId(), false);
                     }
                 }
                 // Everything else is an input the engine does not act on, or an outcome the

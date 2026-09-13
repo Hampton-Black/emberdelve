@@ -2,6 +2,7 @@ package dm.content;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import dm.model.Appearances;
+import dm.model.Disposition;
 import dm.model.Exit;
 import dm.model.FloorType;
 import dm.model.LightingPreset;
@@ -29,7 +30,8 @@ public record RoomDefinition(
         List<Exit> exits,
         StartPositions startPositions,
         DmNotes dmNotes,
-        Fires fires
+        Fires fires,
+        List<Occupant> occupants
 ) {
 
     /**
@@ -38,6 +40,7 @@ public record RoomDefinition(
      */
     public RoomDefinition {
         exits = exits == null ? List.of() : List.copyOf(exits);
+        occupants = occupants == null ? List.of() : List.copyOf(occupants);
     }
 
     public RoomDefinition(
@@ -46,7 +49,16 @@ public record RoomDefinition(
             List<PropDefinition> props, List<Exit> exits,
             StartPositions startPositions, DmNotes dmNotes) {
         this(roomId, name, width, height, floorType, wallType, lighting, props, exits,
-                startPositions, dmNotes, null);
+                startPositions, dmNotes, null, List.of());
+    }
+
+    public RoomDefinition(
+            String roomId, String name, int width, int height,
+            FloorType floorType, WallType wallType, LightingPreset lighting,
+            List<PropDefinition> props, List<Exit> exits,
+            StartPositions startPositions, DmNotes dmNotes, Fires fires) {
+        this(roomId, name, width, height, floorType, wallType, lighting, props, exits,
+                startPositions, dmNotes, fires, List.of());
     }
 
     /**
@@ -54,6 +66,23 @@ public record RoomDefinition(
      * Spec §7c.
      */
     public record Fires(String lit, LightingPreset to, String moved) {
+    }
+
+    /**
+     * An authored encounter waiting in the room. Released once, on first visit.
+     * Disposition is fire-time, not a field on the entity. Spec §6d / §14.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Occupant(String kind, int x, int y, Disposition disposition) {
+        public Occupant {
+            if (kind == null || !(kind.equals("goblin") || kind.equals("brute"))) {
+                throw new IllegalArgumentException(
+                        "occupant kind must be goblin or brute, got '" + kind + "'");
+            }
+            if (disposition == null) {
+                throw new IllegalArgumentException("occupant needs a disposition");
+            }
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
