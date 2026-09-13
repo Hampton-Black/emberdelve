@@ -85,7 +85,21 @@ public final class WsHandler {
             enterExit(message, testOutbound);
             return;
         }
-        throw new IllegalArgumentException("test seam only supports enterExit: " + type);
+        if ("useProp".equals(type)) {
+            if (!"take".equals(message.path("action").asText(""))) {
+                return;
+            }
+            try {
+                var diffs = engine.takeProp(message.path("propId").asText(""));
+                if (!diffs.isEmpty()) {
+                    testOutbound.accept(new ServerMessage.Diffs(diffs));
+                }
+            } catch (IllegalArgumentException e) {
+                testOutbound.accept(new ServerMessage.Error(e.getMessage()));
+            }
+            return;
+        }
+        throw new IllegalArgumentException("test seam only supports enterExit/useProp: " + type);
     }
 
     public void register(WsConfig ws) {
@@ -124,6 +138,10 @@ public final class WsHandler {
 
     private void handle(WsContext ctx, JsonNode message) {
         String type = message.path("type").asText();
+        if (engine.state().ending().isPresent() && !"restart".equals(type)) {
+            send(ctx, new ServerMessage.Error("The delve is over."));
+            return;
+        }
 
         switch (type) {
             case "freeText" -> freeText(ctx,
@@ -164,8 +182,17 @@ public final class WsHandler {
                 }
             }
 
-            // Reserved for emberdelve-4h9.4. The client may send early; swallow until take lands.
-            case "useProp" -> { }
+            // A takeable prop. Click and take_prop share GameEngine.takeProp.
+            case "useProp" -> {
+                if (!"take".equals(message.path("action").asText(""))) {
+                    break;
+                }
+                try {
+                    sendDiffs(ctx, engine.takeProp(message.path("propId").asText("")));
+                } catch (IllegalArgumentException e) {
+                    send(ctx, new ServerMessage.Error(e.getMessage()));
+                }
+            }
 
             // T5 debug hooks. These exist to prove diffs render without a model in the path,
             // and are replaced by real tool dispatch in T7.
@@ -244,6 +271,13 @@ public final class WsHandler {
         var visitedBefore = Set.copyOf(engine.state().visitedRoomIds());
         engine.crossExit(message.path("exitId").asText(""));
         deliver.accept(new ServerMessage.Scene(engine.scene()));
+        if (engine.state().ending().isPresent()) {
+            // Extraction has no arrival: the close is 4h9.5. Lift the client's hold.
+            if (dm == null) {
+                deliver.accept(new ServerMessage.NarrationEnd());
+            }
+            return;
+        }
         if (dm != null) {
             dm.noteCrossing(fromName, engine.room().name(),
                     visitedBefore.contains(engine.room().roomId()));

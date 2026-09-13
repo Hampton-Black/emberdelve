@@ -26,6 +26,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = Diff.ConsumablesChanged.class, name = "ConsumablesChanged"),
         @JsonSubTypes.Type(value = Diff.CanRestChanged.class, name = "CanRestChanged"),
         @JsonSubTypes.Type(value = Diff.PartyLightChanged.class, name = "PartyLightChanged"),
+        @JsonSubTypes.Type(value = Diff.PropRemoved.class, name = "PropRemoved"),
+        @JsonSubTypes.Type(value = Diff.DelveEnded.class, name = "DelveEnded"),
 })
 public sealed interface Diff {
 
@@ -69,4 +71,10 @@ public sealed interface Diff {
      * Never a radius or a segment count. Spec §7a, §10.
      */
     record PartyLightChanged(PartyLight partyLight) implements Diff {}
+
+    /** A takeable prop left the board because the party is holding it. */
+    record PropRemoved(String propId) implements Diff {}
+
+    /** The delve ended. Spec §10. */
+    record DelveEnded(Ending ending) implements Diff {}
 }

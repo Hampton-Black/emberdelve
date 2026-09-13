@@ -990,3 +990,76 @@ func test_a_prop_intent_does_not_look_like_a_floor_move() -> void:
 	var prop: Color = (hover.material_override as StandardMaterial3D).albedo_color
 
 	assert_ne(move, prop, "a prop intent must not look like a floor move")
+
+
+func _doorway_with_reliquary() -> Dictionary:
+	var scene := DOORWAY.duplicate(true)
+	scene["props"].append({
+		"id": "reliquary", "type": "CHEST", "x": 4, "y": 2, "rotation": 0,
+		"hidden": false, "actions": ["take"],
+	})
+	scene["exits"].append({
+		"id": "stair-south", "x": 6, "y": 0, "direction": "SOUTH",
+		"toRoomId": "", "wayOut": true,
+	})
+	return SceneFixtures.scene(scene)
+
+
+func test_an_actioned_reliquary_is_returned_by_pick_at() -> void:
+	var world := _world_with_scene(_doorway_with_reliquary())
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var leaf := _prop_mesh_aabb(world, "reliquary")
+	if leaf.size == Vector3.ZERO:
+		return
+	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
+	assert_eq(String(picked.get("target_id", "")), "reliquary")
+
+
+func test_committing_a_way_out_asks_instead_of_crossing() -> void:
+	Net.outbound.clear()
+	var world := _world_with_scene(_doorway_with_reliquary())
+	var overlay := _overlay(world)
+	assert_not_null(overlay, "Overlay")
+	if overlay == null:
+		return
+
+	var action: Dictionary = overlay.intent("", Vector2i(6, 0), "stair-south")
+	assert_eq(String(action.get("kind", "")), "exit")
+	overlay.commit(action)
+
+	assert_eq(Net.outbound.size(), 0, "a way-out click must not send enterExit")
+	assert_false(Table.leave_confirm.is_empty(), "the chin confirm is pending")
+	assert_eq(String(Table.leave_confirm.get("exit_id", "")), "stair-south")
+
+
+func test_staying_from_the_way_out_confirm_does_not_send() -> void:
+	Net.outbound.clear()
+	var world := _world_with_scene(_doorway_with_reliquary())
+	var overlay := _overlay(world)
+	if overlay == null:
+		return
+	overlay.commit(overlay.intent("", Vector2i(6, 0), "stair-south"))
+	Table.stay()
+
+	assert_eq(Net.outbound.size(), 0)
+	assert_true(Table.leave_confirm.is_empty())
+
+
+func test_leaving_from_the_way_out_confirm_sends_enter_exit() -> void:
+	Net.outbound.clear()
+	var world := _world_with_scene(_doorway_with_reliquary())
+	var overlay := _overlay(world)
+	if overlay == null:
+		return
+	overlay.commit(overlay.intent("", Vector2i(6, 0), "stair-south"))
+	Table.confirm_leave()
+
+	assert_eq(Net.outbound.size(), 1)
+	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
+	assert_eq(String(Net.outbound[0].get("exitId", "")), "stair-south")
+	assert_true(Table.leave_confirm.is_empty())

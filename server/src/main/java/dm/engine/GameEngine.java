@@ -392,7 +392,31 @@ public final class GameEngine {
                 combat.view(), state().consumableCount(Consumable.POTION),
                 state().consumableCount(Consumable.TORCH),
                 state().consumableCount(Consumable.ROPE), canSpendTorch(), canRest(),
-                partyLight());
+                partyLight(), state().holdingObjective(), state().ending().orElse(null));
+    }
+
+    /**
+     * Take a takeable prop. The click and {@code take_prop} both come through here.
+     * Spec §4c, §8f.
+     */
+    public List<Diff> takeProp(String propId) {
+        requireOpen();
+        if (combat.isActive()) {
+            throw new IllegalArgumentException("You cannot take that in the middle of a fight.");
+        }
+        var definition = room().prop(propId);
+        var prop = definition.toProp();
+        if (prop.hidden() && !state().revealedHere().contains(propId)) {
+            throw new IllegalArgumentException("'" + propId + "' is not visible");
+        }
+        if (!prop.actions().contains("take")) {
+            throw new IllegalArgumentException("'" + propId + "' cannot be taken");
+        }
+        if (state().takenHere().contains(propId)) {
+            throw new IllegalArgumentException("'" + propId + "' has already been taken");
+        }
+        log.append(new Event.ObjectiveTaken(Instant.now(), state().roomId(), propId));
+        return List.of(new Diff.PropRemoved(propId));
     }
 
     /** Exploration-only; no living hostile in this room. Spec §5b. */
@@ -496,8 +520,10 @@ public final class GameEngine {
 
     /** A room's props as the client may see them: hidden ones withheld unless revealed there. */
     private List<Prop> visiblePropsOf(RoomDefinition def, Set<String> revealed) {
+        var taken = state().takenIn(def.roomId());
         return def.props().stream()
                 .filter(p -> !p.hidden() || revealed.contains(p.id()))
+                .filter(p -> !taken.contains(p.id()))
                 .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false, p.actions()))
                 .toList();
     }
@@ -520,6 +546,7 @@ public final class GameEngine {
      * would only ever produce a rejection the player finds annoying.
      */
     public List<Diff> crossExit(String exitId) {
+        requireOpen();
         if (combat.isActive()) {
             // Fleeing is a rules milestone. Without this the fight's initiative order survives
             // in a room nobody is standing in.
@@ -533,6 +560,15 @@ public final class GameEngine {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
                         "No exit '" + exitId + "' in " + here.roomId()));
+
+        if (exit.wayOut()) {
+            var ending = state().holdingObjective()
+                    ? dm.model.Ending.EXTRACTED_WITH_OBJECTIVE
+                    : dm.model.Ending.EXTRACTED_WITHOUT;
+            log.append(new Event.DelveEnded(Instant.now(), ending, exitId));
+            directives.clear();
+            return List.of(new Diff.DelveEnded(ending));
+        }
 
         if (!rooms.has(exit.toRoomId())) {
             throw new IllegalArgumentException(
@@ -579,6 +615,7 @@ public final class GameEngine {
      * whatever the player clicked.
      */
     public void moveTo(String actorId, int x, int y, CombatSink sink) {
+        requireOpen();
         if (combat.isActive()) {
             combat.moveTo(actorId, x, y, sink);
             return;
@@ -614,6 +651,7 @@ public final class GameEngine {
     }
 
     public List<Diff> revealProp(String propId) {
+        requireOpen();
         var definition = room().prop(propId);
 
         if (state().revealedHere().contains(propId)) {
@@ -640,6 +678,7 @@ public final class GameEngine {
      * supports, and it should say so instead of corrupting itself quietly.
      */
     public List<Diff> spawnGoblin(int x, int y) {
+        requireOpen();
         boolean canRestBefore = canRest();
         var definition = content.entity("goblin");
 
@@ -681,6 +720,7 @@ public final class GameEngine {
      * tunes the real thing rather than a lookalike.
      */
     public RollResult rollCheck(String actorId, Skill skill, Difficulty difficulty) {
+        requireOpen();
         var actor = state().find(actorId).orElseThrow(
                 () -> new IllegalArgumentException("No such entity: " + actorId));
 
@@ -708,11 +748,18 @@ public final class GameEngine {
         return x >= 0 && x < room.width() && y >= 0 && y < room.height();
     }
 
+    private void requireOpen() {
+        if (state().ending().isPresent()) {
+            throw new IllegalArgumentException("The delve is over.");
+        }
+    }
+
     /**
      * Spend a potion or a torch. Exploration-only; the client may also send {@code useItem}
      * with no model in the path. Spec §5b.
      */
     public List<Diff> useItem(String actorId, Consumable item) {
+        requireOpen();
         if (combat.isActive()) {
             throw new IllegalArgumentException("You cannot use that in the middle of a fight.");
         }
@@ -755,6 +802,7 @@ public final class GameEngine {
      * living hostile in the room, including WARY. Spec §5b.
      */
     public List<Diff> rest(String actorId) {
+        requireOpen();
         if (combat.isActive()) {
             throw new IllegalArgumentException("You cannot rest in the middle of a fight.");
         }

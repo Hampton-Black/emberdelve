@@ -80,6 +80,25 @@
       "hidden": true,
       "revealHint": "A votive alcove behind a loose facing stone, level with the sarcophagus. Careful examination of the sarcophagus or the surrounding wall would find it.",
       "description": "A shallow alcove behind a displaced stone, holding a clay votive lamp and a bundle of grave-cloth gone black with age."
+    },
+    {
+      "id": "reliquary",
+      "type": "CHEST",
+      "x": 4,
+      "y": 2,
+      "rotation": 0,
+      "hidden": false,
+      "actions": ["take"],
+      "description": "A small iron-bound reliquary, set near the stair they came down. The latch is not locked."
+    },
+    {
+      "id": "stair-south",
+      "type": "DOOR",
+      "x": 6,
+      "y": 0,
+      "rotation": 0,
+      "hidden": false,
+      "description": "The stair the party came down, open to the grey light of the ruin above."
     }
   ],
   "exits": [
@@ -89,6 +108,14 @@
       "y": 11,
       "direction": "NORTH",
       "toRoomId": "gallery"
+    },
+    {
+      "id": "stair-south",
+      "x": 6,
+      "y": 0,
+      "direction": "SOUTH",
+      "toRoomId": "",
+      "wayOut": true
     }
   ],
   "startPositions": {

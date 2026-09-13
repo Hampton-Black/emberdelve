@@ -15,7 +15,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * @param toRoomId the scene on the other side. Never shown to the model — spec §7a
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record Exit(String id, int x, int y, Direction direction, String toRoomId) {
+public record Exit(String id, int x, int y, Direction direction, String toRoomId,
+                   boolean wayOut) {
+
+    public Exit(String id, int x, int y, Direction direction, String toRoomId) {
+        this(id, x, y, direction, toRoomId, false);
+    }
 
     public Square square() {
         return new Square(x, y);

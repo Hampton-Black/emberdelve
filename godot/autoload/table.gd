@@ -22,8 +22,10 @@ signal mode_changed(mode: String)
 signal entity_added(entity: Dictionary)
 signal entity_moved(entity_id: String, from: Vector2i, to: Vector2i)
 signal prop_revealed(prop: Dictionary)
+signal prop_removed(prop_id: String)
 signal entity_died(entity_id: String)
 signal room_lighting_changed(room_id: String)
+signal leave_confirm_changed()
 
 var connected := false
 var demo_mode := false
@@ -34,6 +36,10 @@ var mode := "EXPLORATION"
 ## Whether the player has started the session. Gates a real event: until someone has clicked,
 ## the server has not been asked to narrate the opening.
 var started := false
+
+## Pending way-out confirm, or {}. Spec §4d: only the site's way out asks.
+## { "exit_id": String, "holding": bool }
+var leave_confirm: Dictionary = {}
 
 ## Set while a restart is in flight, so the fresh scene the server sends back is recognised as
 ## the end of this session rather than the middle of one.
@@ -63,6 +69,8 @@ func reset() -> void:
 	scene = {}
 	mode = "EXPLORATION"
 	started = false
+	leave_confirm = {}
+	leave_confirm_changed.emit()
 	_reset_talk()   # the transcript half, added in Task 8
 
 
@@ -242,6 +250,26 @@ func _apply_now(list: Array) -> void:
 			"PartyLightChanged":
 				scene["partyLight"] = String(diff["partyLight"])
 
+			"PropRemoved":
+				var gone_id := String(diff["propId"])
+				var gone_prop := prop(gone_id)
+				var gone_at := _index_of_prop(gone_id)
+				if gone_at >= 0:
+					room()["props"].remove_at(gone_at)
+				if not gone_prop.is_empty():
+					var blocked: Array = scene.get("blocked", [])
+					var next_blocked: Array = []
+					for cell in blocked:
+						if int(cell.get("x", -1)) != int(gone_prop.get("x", -2)) \
+								or int(cell.get("y", -1)) != int(gone_prop.get("y", -2)):
+							next_blocked.append(cell)
+					scene["blocked"] = next_blocked
+				scene["holdingObjective"] = true
+				announcements.append(func() -> void: prop_removed.emit(gone_id))
+
+			"DelveEnded":
+				scene["ending"] = String(diff["ending"])
+
 	_settle_combat(opened, closed)   # Task 8
 	scene_changed.emit()
 	if opened or closed:
@@ -367,8 +395,35 @@ func say_as_player(text: String) -> void:
 
 
 ## Every exit commit goes through here. The arrival holds the exploration bar dead while doors
-## stay live — spec §8d.
+## stay live — spec §8d. A way-out click asks in the chin instead of sending; a typed use_exit
+## does not come through this path.
 func cross_exit(exit_id: String) -> void:
+	var exit := exit_by_id(exit_id)
+	if bool(exit.get("wayOut", false)):
+		leave_confirm = {
+			"exit_id": exit_id,
+			"holding": bool(scene.get("holdingObjective", false)),
+		}
+		leave_confirm_changed.emit()
+		return
+	_send_cross(exit_id)
+
+
+func confirm_leave() -> void:
+	var id := String(leave_confirm.get("exit_id", ""))
+	leave_confirm = {}
+	leave_confirm_changed.emit()
+	if id.is_empty():
+		return
+	_send_cross(id)
+
+
+func stay() -> void:
+	leave_confirm = {}
+	leave_confirm_changed.emit()
+
+
+func _send_cross(exit_id: String) -> void:
 	Clock.silence()
 	awaiting_dm = true
 	transcript_changed.emit()

@@ -988,7 +988,9 @@ public final class DmService {
                     .append(", at (").append(entity.x()).append(",").append(entity.y())
                     .append(")\n");
         }
-        sb.append("- objective: not yet found\n");
+        sb.append("- objective: ")
+                .append(state.holdingObjective() ? "held" : "not yet found")
+                .append("\n");
         sb.append("- torch: ")
                 .append(PartyLight.of(state.clock(ClockId.LIGHT).filled())
                         .name().toLowerCase(Locale.ROOT))

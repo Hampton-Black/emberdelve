@@ -50,7 +50,7 @@ public final class PropPlacer {
     private static Affinity affinityOf(PropType type) {
         return switch (type) {
             // The door and the alcove are both cut into a wall; the brazier stands against one.
-            case ALCOVE, DOOR, BRAZIER -> Affinity.WALL;
+            case ALCOVE, DOOR, BRAZIER, CHEST -> Affinity.WALL;
             case PILLAR -> Affinity.OFF_WALL;
             case SARCOPHAGUS -> Affinity.AXIS_FAR;
             case RUBBLE -> Affinity.CLUSTER;

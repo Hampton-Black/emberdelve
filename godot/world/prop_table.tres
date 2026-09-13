@@ -9,5 +9,6 @@ scenes = {
 "BRAZIER": "res://world/props/brazier.tscn",
 "PILLAR": "res://world/props/pillar.tscn",
 "RUBBLE": "res://world/props/rubble.tscn",
-"ALCOVE": "res://world/props/alcove.tscn"
+"ALCOVE": "res://world/props/alcove.tscn",
+"CHEST": "res://world/props/chest.tscn"
 }

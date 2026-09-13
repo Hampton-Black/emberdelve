@@ -89,6 +89,12 @@ public final class ReplayRunner {
                 // one from the destination — a room with two ways into it would otherwise be a
                 // coin flip that diverges on the landing square.
                 case Event.PartyMoved e -> engine.crossExit(e.throughExitId());
+                case Event.ObjectiveTaken e -> engine.takeProp(e.propId());
+                case Event.DelveEnded e -> {
+                    if (!e.throughExitId().isBlank()) {
+                        engine.crossExit(e.throughExitId());
+                    }
+                }
                 // Everything else is an input the engine does not act on, or an outcome the
                 // engine produces for itself. Replaying either would double it.
                 default -> { }

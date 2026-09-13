@@ -37,6 +37,7 @@ public final class ToolSchema {
     public static final String MOVE_ENTITY = "move_entity";
     public static final String USE_ITEM = "use_item";
     public static final String REST = "rest";
+    public static final String TAKE_PROP = "take_prop";
 
     /** Everything {@code spawn_entity} can bring into the room. M0 has one creature. */
     public static final List<String> SPAWNABLE_KINDS = List.of("goblin");
@@ -179,6 +180,16 @@ public final class ToolSchema {
                     "actor_id"));
         }
 
+        var takeable = takeablePropIds(engine);
+        if (withChecks && !takeable.isEmpty()) {
+            tools.add(tool(TAKE_PROP,
+                    "Take something from this room that the party can carry. Only when the "
+                            + "player has said they are taking it.",
+                    properties -> enumProp(properties, "prop_id", takeable,
+                            "Which thing they take."),
+                    "prop_id"));
+        }
+
         if (!actorIds.isEmpty()) {
             tools.add(tool(MOVE_ENTITY,
                     "Move someone to a square. Use it when the narration says they went "
@@ -213,6 +224,20 @@ public final class ToolSchema {
         }
 
         return tools;
+    }
+
+    private static List<String> takeablePropIds(GameEngine engine) {
+        if (engine.combat().isActive() || engine.state().ending().isPresent()) {
+            return List.of();
+        }
+        var taken = engine.state().takenHere();
+        var revealed = engine.state().revealedHere();
+        return engine.room().toProps().stream()
+                .filter(p -> p.actions().contains("take"))
+                .filter(p -> !p.hidden() || revealed.contains(p.id()))
+                .filter(p -> !taken.contains(p.id()))
+                .map(dm.model.Prop::id)
+                .toList();
     }
 
     private static List<String> usableItems(GameEngine engine) {

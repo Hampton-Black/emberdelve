@@ -21,6 +21,9 @@ class TwoRoomsTest {
         for (var roomId : new String[] {"crypt", "gallery"}) {
             var room = CONTENT.room(roomId);
             for (var exit : room.exits()) {
+                if (exit.wayOut()) {
+                    continue;
+                }
                 var other = CONTENT.room(exit.toRoomId());
                 var back = other.exits().stream()
                         .filter(e -> e.toRoomId().equals(roomId))

@@ -83,6 +83,12 @@ public final class CombatEngine {
         return log.state();
     }
 
+    private void requireOpen() {
+        if (state().ending().isPresent()) {
+            throw new IllegalArgumentException("The delve is over.");
+        }
+    }
+
     /** True while a fight is running. Folded, not held. */
     public boolean isActive() {
         return state().combat().isPresent();
@@ -128,6 +134,7 @@ public final class CombatEngine {
      * order is a tie broken by accident.
      */
     public void start(CombatSink sink) {
+        requireOpen();
         // A fight with only one side in it would begin and never end: nothing would ever
         // satisfy isOver(), and the turn would sit on a combatant with nobody to attack.
         if (isActive() || isOver()) {
@@ -180,6 +187,7 @@ public final class CombatEngine {
     // ---- The player's turn ----
 
     public void moveTo(String actorId, int x, int y, CombatSink sink) {
+        requireOpen();
         var actor = requireActive(actorId);
         var destination = new Square(x, y);
 
@@ -199,6 +207,7 @@ public final class CombatEngine {
     }
 
     public void attack(String actorId, String targetId, CombatSink sink) {
+        requireOpen();
         var actor = requireActive(actorId);
 
         if (!actionAvailable()) {
@@ -276,6 +285,7 @@ public final class CombatEngine {
     }
 
     public void endTurn(String actorId, CombatSink sink) {
+        requireOpen();
         requireActive(actorId);
         advanceTurn();
         sink.diffs(List.of(new Diff.CombatChanged(view())));

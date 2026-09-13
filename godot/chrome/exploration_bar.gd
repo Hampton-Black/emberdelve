@@ -23,6 +23,7 @@ func _ready() -> void:
 	Table.combat_changed.connect(_redraw)
 	Table.transcript_changed.connect(_redraw)
 	Table.errored.connect(func(_m: String) -> void: _redraw())
+	Table.leave_confirm_changed.connect(_redraw)
 	_redraw()
 
 
@@ -81,7 +82,8 @@ func _btn_style(bg: Color, border: Color) -> StyleBoxFlat:
 
 func _redraw() -> void:
 	var fighting := Table.combat_beat != null
-	if Table.scene.is_empty() or Table.mode != "EXPLORATION" or fighting:
+	if Table.scene.is_empty() or Table.mode != "EXPLORATION" or fighting \
+			or not Table.leave_confirm.is_empty():
 		visible = false
 		custom_minimum_size = Vector2.ZERO
 		return

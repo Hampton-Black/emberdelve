@@ -218,20 +218,21 @@ log written at an older `Event.SCHEMA_VERSION` is **refused, never upgraded** �
 log is free and an upgrader is a tax paid forever. No party splits (the whole party moves). No
 fleeing (exits are illegal in combat).
 
-## LLM tools — exactly these nine
+## LLM tools — exactly these ten
 
 On the **mechanics** pass: `roll_check` (skill + difficulty enums), `reveal_prop` (per-room closed
 enum of hidden prop ids), `spawn_entity` (kind: `goblin` only), `start_combat`, `use_exit`
 (current room's exits; withheld in combat), `move_entity` (living `entitiesHere()`, bounds of
 this room), `use_item` (consumable enum: `potion`, `torch` — not `rope`; withheld in combat and
 when count is zero; torch withheld when LIGHT is empty), `rest` (withheld in combat and when any
-living hostile is in the room).
+living hostile is in the room), `take_prop` (closed enum of takeable ids in this room; withheld
+when none remain).
 
 On the **reconcile** pass only: `reveal_prop`, `spawn_entity`, `start_combat`, `assert_fact`, and
-`move_entity`. No dice in that phase — the outcome has already been narrated. **`use_exit` is
-mechanics-only; `move_entity` is both phases.** A tool belongs in reconcile when a false positive
-is cheap to live with and the narrator is the one holding the information — walking to a pillar
-is; leaving the room is not.
+`move_entity`. No dice in that phase — the outcome has already been narrated. **`use_exit` and
+`take_prop` are mechanics-only; `move_entity` is both phases.** A tool belongs in reconcile when a
+false positive is cheap to live with and the narrator is the one holding the information — walking
+to a pillar is; leaving the room, or taking the objective, is not.
 
 Every enum is closed and validated server-side. Invalid calls are rejected with a structured
 error; the model retries once, then the turn degrades to narration-only.

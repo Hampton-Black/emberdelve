@@ -7,7 +7,8 @@ public enum PropType {
     PILLAR,
     RUBBLE,
     ALCOVE,
-    DOOR;
+    DOOR,
+    CHEST;
 
     /**
      * Whether a creature can stand on this prop's square. Derived from the type rather than
@@ -16,7 +17,7 @@ public enum PropType {
      */
     public boolean blocksMovement() {
         return switch (this) {
-            case SARCOPHAGUS, BRAZIER, PILLAR, RUBBLE -> true;
+            case SARCOPHAGUS, BRAZIER, PILLAR, RUBBLE, CHEST -> true;
             // Both sit in a wall: the alcove is a recess, and the door is a slab in the face
             // of one. Standing in the doorway is legal.
             case ALCOVE, DOOR -> false;

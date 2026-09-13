@@ -78,8 +78,9 @@ class TraversalToolsTest {
         var values = useExit.path("parameters").path("properties")
                 .path("exit_id").path("enum");
 
-        assertEquals(1, values.size());
+        assertEquals(2, values.size());
         assertEquals("door-north", values.get(0).asText());
+        assertEquals("stair-south", values.get(1).asText());
     }
 
     @Test

@@ -39,6 +39,7 @@ func _ready() -> void:
 	rig = get_node_or_null("Camera3D") as CameraRigScript
 	Table.scene_changed.connect(_on_scene_changed)
 	Table.prop_revealed.connect(_on_prop_revealed)
+	Table.prop_removed.connect(_on_prop_removed)
 	Table.mode_changed.connect(_on_mode_changed)
 	Table.entity_added.connect(_on_entity_added)
 	Table.entity_moved.connect(_on_entity_moved)
@@ -232,6 +233,16 @@ func _rebuild_rooms() -> void:
 ## the current room's hidden props, so the diff channel is current-room-scoped by convention.
 func _on_prop_revealed(prop: Dictionary) -> void:
 	_instance_prop(prop, _room_id)
+
+
+func _on_prop_removed(prop_id: String) -> void:
+	var holder := get_node_or_null("Props/%s" % _room_id)
+	if holder == null:
+		return
+	var node := holder.get_node_or_null(NodePath(prop_id))
+	if node != null:
+		holder.remove_child(node)
+		node.free()
 
 
 ## Everything standing on every floor the player can see, room by room.

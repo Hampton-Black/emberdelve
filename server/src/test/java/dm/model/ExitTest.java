@@ -66,11 +66,18 @@ class ExitTest {
     void cryptCarriesItsExit() {
         var crypt = CONTENT.room("crypt");
 
-        assertEquals(1, crypt.exits().size());
+        assertEquals(2, crypt.exits().size());
         var exit = crypt.exits().getFirst();
         assertEquals("door-north", exit.id());
         assertEquals(Direction.NORTH, exit.direction());
         assertEquals(11, exit.y(), "the north wall of a 12-high room");
+        assertFalse(exit.wayOut());
+
+        var wayOut = crypt.exits().getLast();
+        assertEquals("stair-south", wayOut.id());
+        assertEquals(Direction.SOUTH, wayOut.direction());
+        assertEquals(0, wayOut.y(), "the south wall of a 12-high room");
+        assertTrue(wayOut.wayOut());
 
         assertEquals(exit, crypt.exitAt(exit.x(), exit.y()).orElseThrow());
         assertTrue(crypt.exitAt(0, 0).isEmpty());

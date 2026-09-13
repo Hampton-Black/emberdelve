@@ -29,6 +29,9 @@ const MESH_PROPS := {
 		{"path": "kaykit_halloween/ribcage", "height": 0.45, "footprint": 0.75},
 		{"path": "kaykit_halloween/skull", "height": 0.4, "footprint": 0.7},
 	],
+	"CHEST": [
+		{"path": "dungeon/Chest", "height": 0.7, "footprint": 0.8},
+	],
 }
 
 @export var kind: String = ""

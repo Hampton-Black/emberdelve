@@ -47,7 +47,11 @@ public record SceneState(
          * How much light the party is casting. Derived from LIGHT filled, never stored beside
          * the clock. Never a segment count or a radius. Spec §7a, §10.
          */
-        PartyLight partyLight
+        PartyLight partyLight,
+        /** Whether the party is carrying the site's objective. Spec §4c, §10. */
+        boolean holdingObjective,
+        /** How the delve ended, or null while it is still running. Spec §4, §10. */
+        Ending ending
 ) {
     /** The room named by {@link #roomId()}, in the same list as everything else. */
     public RoomView currentRoom() {

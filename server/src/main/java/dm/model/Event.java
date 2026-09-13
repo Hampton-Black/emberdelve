@@ -37,6 +37,8 @@ import java.util.Optional;
         @JsonSubTypes.Type(value = Event.ConsumablesGranted.class, name = "consumables_granted"),
         @JsonSubTypes.Type(value = Event.ItemUsed.class, name = "item_used"),
         @JsonSubTypes.Type(value = Event.Rested.class, name = "rested"),
+        @JsonSubTypes.Type(value = Event.ObjectiveTaken.class, name = "objective_taken"),
+        @JsonSubTypes.Type(value = Event.DelveEnded.class, name = "delve_ended"),
 })
 public sealed interface Event {
 
@@ -158,6 +160,15 @@ public sealed interface Event {
 
     /** A rest taken. {@code hpAfter} is the actor's hit points after healing, clamped to max. */
     record Rested(Instant at, String actorId, int hpAfter) implements Event {}
+
+    /** The party took the site's objective. Spec §4c. */
+    record ObjectiveTaken(Instant at, String roomId, String propId) implements Event {}
+
+    /**
+     * The delve ended. {@code throughExitId} is the way-out that was crossed, empty on
+     * {@link Ending#PARTY_LOST}. Replay walks the same door. Spec §4.
+     */
+    record DelveEnded(Instant at, Ending ending, String throughExitId) implements Event {}
 
     static NarrationLogged narration(String speakerId, String text) {
         return new NarrationLogged(Instant.now(), speakerId, text);

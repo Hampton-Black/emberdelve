@@ -76,6 +76,7 @@ public final class ToolDispatcher {
                 case ToolSchema.USE_ITEM -> useItem(args);
                 case ToolSchema.REST -> rest(args);
                 case ToolSchema.MOVE_ENTITY -> moveEntity(args);
+                case ToolSchema.TAKE_PROP -> takeProp(args);
                 default -> Result.rejected("no such tool: " + call.name());
             };
         } catch (Exception e) {
@@ -210,12 +211,27 @@ public final class ToolDispatcher {
         } catch (IllegalArgumentException e) {
             return Result.rejected(e.getMessage());
         }
+        if (engine.state().ending().isPresent()) {
+            return new Result(true,
+                    "The party left the site. Do not describe a room they have not walked into.",
+                    List.of(), List.of(), true);
+        }
         // No diffs: a room change replaces everything and the caller sends a fresh Scene.
         // Spec §9.
         return new Result(true,
                 "The party left " + from + " and is now in " + engine.state().roomId()
                         + ". Describe what they walk into. Do not describe " + from + " again.",
                 List.of(), List.of(), true);
+    }
+
+    private Result takeProp(JsonNode args) {
+        String propId = args.path("prop_id").asText("");
+        try {
+            List<Diff> diffs = engine.takeProp(propId);
+            return Result.applied("Took '" + propId + "'. The party is carrying it.", diffs);
+        } catch (IllegalArgumentException e) {
+            return Result.rejected(e.getMessage());
+        }
     }
 
     private Result rest(JsonNode args) {

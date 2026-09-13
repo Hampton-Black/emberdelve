@@ -1165,3 +1165,58 @@ func test_debug_buttons_are_locked_while_the_dm_has_the_floor() -> void:
 	Table.transcript_changed.emit()
 	for child in bar.get_children():
 		assert_false((child as Button).disabled)
+
+
+# ---- Way-out confirm (emberdelve-4h9.4)
+
+func _leave_confirm() -> Control:
+	var script: GDScript = load("res://chrome/leave_confirm.gd")
+	assert_not_null(script, "leave_confirm.gd")
+	if script == null:
+		return Control.new()
+	var node: Control = script.new()
+	add_child_autofree(node)
+	return node
+
+
+func test_way_out_confirm_names_whether_the_reliquary_is_carried() -> void:
+	var scene := CRYPT.duplicate(true)
+	scene["exits"] = [{
+		"id": "stair-south", "x": 6, "y": 0, "direction": "SOUTH",
+		"toRoomId": "", "wayOut": true,
+	}]
+	scene["holdingObjective"] = true
+	Table.set_scene(SceneFixtures.scene(scene))
+	Table.cross_exit("stair-south")
+	var confirm := _leave_confirm()
+	await wait_frames(1)
+	assert_true(confirm.visible)
+	var prompt: Label = confirm.find_child("Prompt", true, false)
+	assert_not_null(prompt, "Prompt")
+	if prompt == null:
+		return
+	assert_eq(prompt.text, "Leave the site, with the reliquary?")
+	assert_not_null(confirm.find_child("Leave", true, false), "LEAVE")
+	assert_not_null(confirm.find_child("Stay", true, false), "STAY")
+
+	Table.stay()
+	await wait_frames(1)
+	assert_false(confirm.visible)
+
+
+func test_way_out_confirm_without_the_objective_says_without() -> void:
+	var scene := CRYPT.duplicate(true)
+	scene["exits"] = [{
+		"id": "stair-south", "x": 6, "y": 0, "direction": "SOUTH",
+		"toRoomId": "", "wayOut": true,
+	}]
+	scene["holdingObjective"] = false
+	Table.set_scene(SceneFixtures.scene(scene))
+	Table.cross_exit("stair-south")
+	var confirm := _leave_confirm()
+	await wait_frames(1)
+	var prompt: Label = confirm.find_child("Prompt", true, false)
+	assert_not_null(prompt, "Prompt")
+	if prompt == null:
+		return
+	assert_eq(prompt.text, "Leave the site, without the reliquary?")

@@ -197,6 +197,42 @@ func test_crossing_a_door_silences_the_clock_and_waits_on_the_dm() -> void:
 	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
 
 
+func test_a_way_out_click_asks_and_stay_does_not_send() -> void:
+	var scene := CRYPT.duplicate(true)
+	scene["exits"] = [{
+		"id": "stair-south", "x": 6, "y": 0, "direction": "SOUTH",
+		"toRoomId": "", "wayOut": true,
+	}]
+	scene["holdingObjective"] = true
+	Table.set_scene(SceneFixtures.scene(scene))
+	Net.outbound.clear()
+
+	Table.cross_exit("stair-south")
+	assert_eq(Net.outbound.size(), 0)
+	assert_eq(String(Table.leave_confirm.get("exit_id", "")), "stair-south")
+	assert_true(bool(Table.leave_confirm.get("holding", false)))
+	assert_false(Table.awaiting_dm)
+
+	Table.stay()
+	assert_eq(Net.outbound.size(), 0)
+	assert_true(Table.leave_confirm.is_empty())
+
+
+func test_confirming_leave_sends_enter_exit() -> void:
+	var scene := CRYPT.duplicate(true)
+	scene["exits"] = [{
+		"id": "stair-south", "x": 6, "y": 0, "direction": "SOUTH",
+		"toRoomId": "", "wayOut": true,
+	}]
+	Table.set_scene(SceneFixtures.scene(scene))
+	Net.outbound.clear()
+	Table.cross_exit("stair-south")
+	Table.confirm_leave()
+	assert_eq(Net.outbound.size(), 1)
+	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
+	assert_eq(String(Net.outbound[0].get("exitId", "")), "stair-south")
+
+
 func test_a_new_turn_drops_the_rest_of_the_last_one() -> void:
 	Table.append_narration({"speakerId": "narrator", "text": "one"})
 	Table.append_narration({"speakerId": "narrator", "text": "two"})
