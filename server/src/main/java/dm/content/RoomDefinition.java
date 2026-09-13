@@ -1,6 +1,7 @@
 package dm.content;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import dm.model.Appearances;
 import dm.model.Exit;
 import dm.model.FloorType;
 import dm.model.LightingPreset;
@@ -66,10 +67,23 @@ public record RoomDefinition(
             String description,
             String revealHint,
             String contains,
-            java.util.List<String> actions
+            java.util.List<String> actions,
+            String appearance
     ) {
+        public PropDefinition {
+            actions = actions == null ? java.util.List.of() : java.util.List.copyOf(actions);
+            appearance = appearance == null ? "" : appearance;
+            if (!appearance.isEmpty() && !Appearances.isKnown(type, appearance)) {
+                throw new IllegalArgumentException(
+                        id + " appearance '" + appearance + "' is not a look of " + type);
+            }
+            if (appearance.isEmpty() && Appearances.requiresAppearance(type)) {
+                throw new IllegalArgumentException(id + " of type " + type + " needs an appearance");
+            }
+        }
+
         public Prop toProp() {
-            return new Prop(id, type, x, y, rotation, hidden, actions);
+            return new Prop(id, type, x, y, rotation, hidden, actions, appearance);
         }
     }
 

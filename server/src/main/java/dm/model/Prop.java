@@ -11,6 +11,9 @@ import java.util.List;
  *
  * <p>{@code actions} names what a click on this prop may do. Empty means scenery — drawn, not
  * addressable. The client does not invent legality (invariant #1).
+ *
+ * <p>{@code appearance} is a closed kit look. The server ships it; the client never chooses it.
+ * The DM reads {@code description}, not this name.
  */
 public record Prop(
         String id,
@@ -19,17 +22,24 @@ public record Prop(
         int y,
         int rotation,
         boolean hidden,
-        List<String> actions
+        List<String> actions,
+        String appearance
 ) {
     public Prop {
         actions = actions == null ? List.of() : List.copyOf(actions);
+        appearance = appearance == null ? "" : appearance;
     }
 
     public Prop(String id, PropType type, int x, int y, int rotation, boolean hidden) {
-        this(id, type, x, y, rotation, hidden, List.of());
+        this(id, type, x, y, rotation, hidden, List.of(), "");
+    }
+
+    public Prop(String id, PropType type, int x, int y, int rotation, boolean hidden,
+                List<String> actions) {
+        this(id, type, x, y, rotation, hidden, actions, "");
     }
 
     public Prop revealed() {
-        return new Prop(id, type, x, y, rotation, false, actions);
+        return new Prop(id, type, x, y, rotation, false, actions, appearance);
     }
 }

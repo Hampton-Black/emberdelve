@@ -18,6 +18,7 @@ import dm.model.Exit;
 import dm.model.Mode;
 import dm.model.ObjectiveFate;
 import dm.model.PartyLight;
+import dm.model.Appearances;
 import dm.model.Prop;
 import dm.model.RollRequest;
 import dm.model.RollResult;
@@ -590,7 +591,8 @@ public final class GameEngine {
         return def.props().stream()
                 .filter(p -> !p.hidden() || revealed.contains(p.id()))
                 .filter(p -> !taken.contains(p.id()))
-                .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false, p.actions()))
+                .map(p -> new Prop(p.id(), p.type(), p.x(), p.y(), p.rotation(), false, p.actions(),
+                        Appearances.orDefault(p.type(), p.appearance())))
                 .toList();
     }
 

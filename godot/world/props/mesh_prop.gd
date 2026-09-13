@@ -6,45 +6,30 @@ extends Node3D
 ## scene. `height` and `footprint` are per model: a snapped-off column brought up to the
 ## height of a whole one is not a broken pillar, it is a thin pillar.
 ##
-## Which model a given prop gets is hashed from the room and the prop's id — `Room.hash32`,
-## never `randi()`, so three pillars come back the same way on a reconnect.
+## The server ships `appearance`; this node looks it up. It never hashes a look of its own
+## (invariant #1). An empty appearance falls back to the type's first catalog entry so a
+## fixture that omits the field still draws. An unknown appearance draws nothing.
 ##
 ## @tool so editor tooling can call `configure` — a non-tool script is a placeholder in
 ## the editor and keeps no methods. Nothing here has a side effect and there is no
 ## `_ready`, so it does nothing in the editor unless something asks it to.
 
-const MESH_PROPS := {
-	"PILLAR": [
-		{"path": "kaykit_dungeon/pillar", "height": 1.6, "footprint": 0.9},
-		{"path": "kaykit_dungeon/pillar_decorated", "height": 1.6, "footprint": 0.9},
-		{"path": "kaykit_dungeon/column", "height": 0.73, "footprint": 0.9},
-		{"path": "kaykit_halloween/pillar", "height": 1.6, "footprint": 0.9},
-	],
-	"RUBBLE": [
-		{"path": "kaykit_dungeon/rubble_half", "height": 0.5, "footprint": 0.85},
-		{"path": "kaykit_dungeon/rubble_large", "height": 0.5, "footprint": 0.85},
-		{"path": "kaykit_halloween/bone_A", "height": 0.35, "footprint": 0.7},
-		{"path": "kaykit_halloween/bone_B", "height": 0.35, "footprint": 0.7},
-		{"path": "kaykit_halloween/bone_C", "height": 0.35, "footprint": 0.7},
-		{"path": "kaykit_halloween/ribcage", "height": 0.45, "footprint": 0.75},
-		{"path": "kaykit_halloween/skull", "height": 0.4, "footprint": 0.7},
-	],
-	"CHEST": [
-		{"path": "dungeon/Chest", "height": 0.7, "footprint": 0.8},
-	],
-}
+const Appearances := preload("res://world/appearances.gd")
 
 @export var kind: String = ""
 
 
-func configure(prop: Dictionary, room_id: String) -> void:
-	var type := kind if not kind.is_empty() else String(prop.get("type", ""))
-	var variants: Array = MESH_PROPS.get(type, [])
-	if variants.is_empty():
+func configure(prop: Dictionary, _room_id: String) -> void:
+	var appearance := String(prop.get("appearance", ""))
+	var spec: Dictionary = Appearances.spec_for(appearance)
+	if spec.is_empty() and not appearance.is_empty():
 		return
-	var idx: int = Room.hash32("%s:prop:%s" % [room_id, String(prop.get("id", ""))]) % variants.size()
-	var spec: Dictionary = variants[idx]
-	var mesh := make(String(spec["path"]), float(spec["height"]), float(spec["footprint"]))
+	if spec.is_empty():
+		var type := kind if not kind.is_empty() else String(prop.get("type", ""))
+		spec = Appearances.default_for(type)
+	if spec.is_empty():
+		return
+	var mesh := make(Appearances.mesh_path(spec), float(spec["height"]), float(spec["footprint"]))
 	if mesh == null:
 		return
 	for child in get_children():
@@ -52,7 +37,7 @@ func configure(prop: Dictionary, room_id: String) -> void:
 		child.free()
 	mesh.name = "Mesh"
 	add_child(mesh)
-	set_meta("mesh_path", String(spec["path"]))
+	set_meta("mesh_path", Appearances.mesh_path(spec))
 
 
 static func make(path: String, height: float, footprint: float) -> Node3D:

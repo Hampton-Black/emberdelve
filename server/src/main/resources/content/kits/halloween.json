@@ -1,0 +1,14 @@
+{
+  "kitId": "halloween",
+  "floors": ["STONE", "CRACKED_STONE"],
+  "walls": ["CARVED"],
+  "lightings": ["DIM", "DARK"],
+  "size": { "min": 8, "max": 14 },
+  "props": [
+    { "type": "REMAINS",   "minCount": 0, "maxCount": 3, "unique": false },
+    { "type": "CONTAINER", "minCount": 0, "maxCount": 2, "unique": false },
+    { "type": "FURNITURE", "minCount": 0, "maxCount": 2, "unique": false },
+    { "type": "SCENERY",   "minCount": 0, "maxCount": 2, "unique": false },
+    { "type": "PILLAR",    "minCount": 0, "maxCount": 2, "unique": false }
+  ]
+}

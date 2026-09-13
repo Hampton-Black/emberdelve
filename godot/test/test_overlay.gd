@@ -995,7 +995,8 @@ func test_a_prop_intent_does_not_look_like_a_floor_move() -> void:
 func _doorway_with_reliquary() -> Dictionary:
 	var scene := DOORWAY.duplicate(true)
 	scene["props"].append({
-		"id": "reliquary", "type": "CHEST", "x": 4, "y": 2, "rotation": 0,
+		"id": "reliquary", "type": "CONTAINER", "appearance": "chest",
+		"x": 4, "y": 2, "rotation": 0,
 		"hidden": false, "actions": ["take"],
 	})
 	scene["exits"].append({
@@ -1063,3 +1064,92 @@ func test_leaving_from_the_way_out_confirm_sends_enter_exit() -> void:
 	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
 	assert_eq(String(Net.outbound[0].get("exitId", "")), "stair-south")
 	assert_true(Table.leave_confirm.is_empty())
+
+
+# ---- Dense room: scenery must not shadow a handle (emberdelve-4h9.7 / 7m6)
+
+
+func _authored_crypt_scene() -> Dictionary:
+	var Preview = load("res://dev/preview_room.gd")
+	var crypt: Dictionary = Preview.view_of("crypt")
+	assert_false(crypt.has("error"), str(crypt.get("error", "")))
+	var props: Array = crypt.get("props", [])
+	assert_gte(props.size(), 20, "the authored crypt must be densely furnished")
+	var kits := {}
+	for prop in props:
+		var appearance := String(prop.get("appearance", ""))
+		if appearance.is_empty():
+			continue
+		# kit is the folder prefix of the mesh path — appearances.gd owns the map.
+		kits[appearance] = true
+	assert_gte(props.size(), 20)
+	crypt["mode"] = "EXPLORATION"
+	crypt["combat"] = null
+	crypt["blocked"] = []
+	crypt["entities"] = [{
+		"id": "fighter", "kind": "fighter", "name": "Roderick",
+		"x": 6, "y": 1, "hp": 12, "maxHp": 12, "isPlayerControlled": true,
+	}]
+	return SceneFixtures.scene(crypt)
+
+
+func test_the_authored_crypt_draws_from_at_least_two_kits() -> void:
+	var Appear = load("res://world/appearances.gd")
+	assert_not_null(Appear, "appearances.gd")
+	if Appear == null or not Appear.has_method("spec_for"):
+		assert_true(false, "appearances.gd.spec_for")
+		return
+	var Preview = load("res://dev/preview_room.gd")
+	var crypt: Dictionary = Preview.view_of("crypt")
+	var kits := {}
+	for prop in crypt.get("props", []):
+		var spec: Dictionary = Appear.spec_for(String(prop.get("appearance", "")))
+		if spec.is_empty():
+			continue
+		kits[String(spec.get("kit", ""))] = true
+	assert_gte(kits.size(), 2, "kits used: " + str(kits.keys()))
+
+
+func test_dense_scenery_does_not_steal_the_north_door() -> void:
+	var world := _world_with_scene(_authored_crypt_scene())
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var door: Node3D = null
+	for child in (world.get_node("Room/Walls") as Node3D).get_children():
+		if child.has_meta("exit_id") and String(child.get_meta("exit_id")) == "door-north":
+			door = child as Node3D
+	assert_not_null(door, "the tagged north doorway")
+	if door == null:
+		return
+	var leaf := AABB()
+	var first := true
+	for mesh in door.find_children("*", "MeshInstance3D", true, false):
+		var box: AABB = mesh.global_transform * mesh.get_aabb()
+		leaf = box if first else leaf.merge(box)
+		first = false
+	if first:
+		return
+
+	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
+	assert_eq(String(picked.get("target_id", "")), "door-north",
+		"scenery in a dense room must not shadow the doorway")
+
+
+func test_dense_scenery_does_not_steal_the_reliquary() -> void:
+	var world := _world_with_scene(_authored_crypt_scene())
+	await wait_process_frames(2)
+	var cam: Camera3D = world.get_node_or_null("Camera3D") as Camera3D
+	assert_not_null(cam, "Camera3D")
+	if cam == null:
+		return
+
+	var leaf := _prop_mesh_aabb(world, "reliquary")
+	if leaf.size == Vector3.ZERO:
+		return
+	var picked: Dictionary = world.pick_at(cam.unproject_position(leaf.get_center()))
+	assert_eq(String(picked.get("target_id", "")), "reliquary",
+		"scenery must not shadow an actioned handle")

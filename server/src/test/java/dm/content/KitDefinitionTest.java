@@ -38,10 +38,20 @@ class KitDefinitionTest {
     }
 
     @Test
-    @DisplayName("the kit carries a sarcophagus, because M0's script needs one")
-    void carriesSarcophagus() {
-        var kit = new ContentLoader().kit("crypt");
+    @DisplayName("ruins and halloween kits load as palettes of the new types")
+    void extraKitsLoad() {
+        var loader = new ContentLoader();
+        var ruins = loader.kit("ruins");
+        var halloween = loader.kit("halloween");
 
-        assertTrue(kit.props().stream().anyMatch(p -> p.type() == PropType.SARCOPHAGUS));
+        assertEquals("ruins", ruins.kitId());
+        assertEquals("halloween", halloween.kitId());
+        assertTrue(ruins.props().stream().anyMatch(p -> p.type() == PropType.STATUE));
+        assertTrue(halloween.props().stream().anyMatch(p -> p.type() == PropType.REMAINS));
+        for (var kit : java.util.List.of(ruins, halloween)) {
+            for (var entry : kit.props()) {
+                assertNotNull(entry.type());
+            }
+        }
     }
 }

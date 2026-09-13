@@ -51,6 +51,7 @@
       "y": 4,
       "rotation": 0,
       "hidden": false,
+      "appearance": "pillar",
       "description": "A squat pillar, its base ringed with old wax."
     },
     {
@@ -60,6 +61,7 @@
       "y": 4,
       "rotation": 0,
       "hidden": false,
+      "appearance": "pillar_decorated",
       "description": "A squat pillar. Something has scratched a tally into it \u2014 eleven marks, the last one incomplete."
     },
     {
@@ -69,6 +71,7 @@
       "y": 2,
       "rotation": 45,
       "hidden": false,
+      "appearance": "rubble_half",
       "description": "A spill of fallen masonry where the ceiling has given way."
     },
     {
@@ -83,13 +86,174 @@
     },
     {
       "id": "reliquary",
-      "type": "CHEST",
+      "type": "CONTAINER",
+      "appearance": "chest",
       "x": 4,
       "y": 2,
       "rotation": 0,
       "hidden": false,
       "actions": ["take"],
       "description": "A small iron-bound reliquary, set near the stair they came down. The latch is not locked."
+    },
+    {
+      "id": "barrel-west",
+      "type": "CONTAINER",
+      "appearance": "barrel",
+      "x": 1,
+      "y": 2,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A warped barrel shoved against the west wall, its hoops rusted shut."
+    },
+    {
+      "id": "crate-east",
+      "type": "CONTAINER",
+      "appearance": "crate",
+      "x": 10,
+      "y": 2,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A splintered crate, empty except for straw gone to dust."
+    },
+    {
+      "id": "coffin-corner",
+      "type": "CONTAINER",
+      "appearance": "coffin",
+      "x": 0,
+      "y": 2,
+      "rotation": 90,
+      "hidden": false,
+      "description": "A plain coffin stood on end in the corner, the lid still nailed."
+    },
+    {
+      "id": "pot-west",
+      "type": "CONTAINER",
+      "appearance": "pot1",
+      "x": 1,
+      "y": 5,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A clay pot, the kind grave-goods come in, its mouth sealed with wax."
+    },
+    {
+      "id": "vase-east",
+      "type": "CONTAINER",
+      "appearance": "vase",
+      "x": 10,
+      "y": 5,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A tall vase, chipped at the lip, holding nothing but grit."
+    },
+    {
+      "id": "bucket-west",
+      "type": "CONTAINER",
+      "appearance": "bucket",
+      "x": 1,
+      "y": 8,
+      "rotation": 0,
+      "hidden": false,
+      "description": "An iron bucket beside the west brazier, dry."
+    },
+    {
+      "id": "fox",
+      "type": "STATUE",
+      "appearance": "fox",
+      "x": 1,
+      "y": 10,
+      "rotation": 90,
+      "hidden": false,
+      "description": "A stone fox, sitting, watching the north door. One ear is broken off."
+    },
+    {
+      "id": "horse",
+      "type": "STATUE",
+      "appearance": "horse",
+      "x": 10,
+      "y": 10,
+      "rotation": 270,
+      "hidden": false,
+      "description": "A horse statue, smaller than life, its rider long since knocked away."
+    },
+    {
+      "id": "lantern-north",
+      "type": "FURNITURE",
+      "appearance": "lantern_standing",
+      "x": 8,
+      "y": 10,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A standing lantern, unlit, between the east brazier and the north wall."
+    },
+    {
+      "id": "shrine-north",
+      "type": "FURNITURE",
+      "appearance": "shrine",
+      "x": 10,
+      "y": 11,
+      "rotation": 180,
+      "hidden": false,
+      "description": "A small shrine jammed into the north-east corner, its niche empty."
+    },
+    {
+      "id": "chair-north",
+      "type": "FURNITURE",
+      "appearance": "chair",
+      "x": 3,
+      "y": 11,
+      "rotation": 180,
+      "hidden": false,
+      "description": "A wooden chair facing the north door, as if someone had been waiting."
+    },
+    {
+      "id": "skull-north",
+      "type": "REMAINS",
+      "appearance": "skull",
+      "x": 2,
+      "y": 10,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A yellowed skull on the flagstones, missing the jaw."
+    },
+    {
+      "id": "ribcage-east",
+      "type": "REMAINS",
+      "appearance": "ribcage",
+      "x": 11,
+      "y": 3,
+      "rotation": 0,
+      "hidden": false,
+      "description": "A ribcage, animal or child, it is hard to say, slumped against the east wall."
+    },
+    {
+      "id": "cobweb-west",
+      "type": "SCENERY",
+      "appearance": "cobweb",
+      "x": 0,
+      "y": 7,
+      "rotation": 90,
+      "hidden": false,
+      "description": "A thick cobweb spanning the west wall, grey with dust."
+    },
+    {
+      "id": "banner-east",
+      "type": "SCENERY",
+      "appearance": "banner",
+      "x": 11,
+      "y": 7,
+      "rotation": 270,
+      "hidden": false,
+      "description": "A faded banner on the east wall, the device worn to a stain."
+    },
+    {
+      "id": "candles-north",
+      "type": "SCENERY",
+      "appearance": "candles",
+      "x": 4,
+      "y": 11,
+      "rotation": 180,
+      "hidden": false,
+      "description": "A huddle of candles on the north wall, burned down to nubs."
     },
     {
       "id": "stair-south",

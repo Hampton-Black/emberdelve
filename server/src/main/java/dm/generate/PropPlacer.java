@@ -1,6 +1,7 @@
 package dm.generate;
 
 import dm.content.KitDefinition;
+import dm.model.Appearances;
 import dm.model.Prop;
 import dm.model.PropType;
 import dm.model.Square;
@@ -50,10 +51,10 @@ public final class PropPlacer {
     private static Affinity affinityOf(PropType type) {
         return switch (type) {
             // The door and the alcove are both cut into a wall; the brazier stands against one.
-            case ALCOVE, DOOR, BRAZIER, CHEST -> Affinity.WALL;
-            case PILLAR -> Affinity.OFF_WALL;
+            case ALCOVE, DOOR, BRAZIER, CONTAINER, FURNITURE, SCENERY -> Affinity.WALL;
+            case PILLAR, STATUE -> Affinity.OFF_WALL;
             case SARCOPHAGUS -> Affinity.AXIS_FAR;
-            case RUBBLE -> Affinity.CLUSTER;
+            case RUBBLE, REMAINS -> Affinity.CLUSTER;
         };
     }
 
@@ -79,7 +80,8 @@ public final class PropPlacer {
                         square.y(),
                         facing(random, shape, square, partyStart, entry.type()),
                         false,
-                        java.util.List.of()));
+                        java.util.List.of(),
+                        Appearances.defaultFor(entry.type())));
             }
         }
         return List.copyOf(placed);

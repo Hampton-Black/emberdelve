@@ -7,6 +7,7 @@ const SceneFixtures := preload("res://test/scene_fixtures.gd")
 ## prop_table.gd, and test_room.gd for the segment that carries it.
 const TYPES: Array[String] = [
 	"SARCOPHAGUS", "BRAZIER", "PILLAR", "RUBBLE", "ALCOVE",
+	"CONTAINER", "STATUE", "FURNITURE", "REMAINS", "SCENERY",
 ]
 
 const CRYPT := {
@@ -75,6 +76,8 @@ func test_all_six_types_resolve() -> void:
 		var node: Node = packed.instantiate()
 		assert_not_null(node, "%s instantiates" % type)
 		node.free()
+	assert_null(table.scene_for("CHEST"), "CHEST folded into CONTAINER")
+	assert_null(table.scene_for("DOOR"), "DOOR is the wall, not a prop mesh")
 
 
 func test_hidden_props_are_not_instanced() -> void:

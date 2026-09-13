@@ -1,0 +1,13 @@
+{
+  "kitId": "ruins",
+  "floors": ["STONE", "CRACKED_STONE"],
+  "walls": ["STONE", "CARVED"],
+  "lightings": ["TORCHLIT", "DIM", "DARK"],
+  "size": { "min": 10, "max": 16 },
+  "props": [
+    { "type": "STATUE",    "minCount": 0, "maxCount": 2, "unique": false },
+    { "type": "CONTAINER", "minCount": 0, "maxCount": 3, "unique": false },
+    { "type": "FURNITURE", "minCount": 0, "maxCount": 2, "unique": false },
+    { "type": "SCENERY",   "minCount": 0, "maxCount": 3, "unique": false }
+  ]
+}

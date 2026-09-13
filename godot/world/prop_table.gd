@@ -5,8 +5,8 @@ extends Resource
 ## PropType → scene path. Promoting a prop is one table entry, and demoting it — because a
 ## model reads badly at 480x270, say — is deleting one. Neither touches the scene schema.
 ##
-## This is the `MESH_PROPS` seam from `client/src/scene/props.ts`. Variants inside a type
-## (which column) stay on the mesh-prop scene; this table is the type itself.
+## This is the `MESH_PROPS` seam from `client/src/scene/props.ts`. Appearance, not a
+## second type, picks the kit mesh; this table is the mechanical type itself.
 ##
 ## DOOR is absent on purpose, and it is the demotion this comment describes. A door is not an
 ## object standing in a square, it is the wall segment the square backs onto — KayKit's

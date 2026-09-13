@@ -8,6 +8,8 @@ const Preview := preload("res://dev/preview_room.gd")
 
 var _dock: Control
 var _pick: OptionButton
+var _prop_pick: OptionButton
+var _appear_pick: OptionButton
 var _status: Label
 var _size := Vector2i.ZERO
 var _room_id := ""
@@ -47,6 +49,16 @@ func _make_dock() -> Control:
 	load_btn.pressed.connect(_load)
 	row.add_child(load_btn)
 	box.add_child(row)
+	var dress := HBoxContainer.new()
+	_prop_pick = OptionButton.new()
+	_prop_pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_prop_pick.item_selected.connect(_on_prop)
+	dress.add_child(_prop_pick)
+	_appear_pick = OptionButton.new()
+	_appear_pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_appear_pick.item_selected.connect(_on_appearance)
+	dress.add_child(_appear_pick)
+	box.add_child(dress)
 	var hint := Label.new()
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.text = "Open a blank 3D scene, never world.tscn. Turn off Preview Sun and Preview Environment before judging how a mesh looks."
@@ -72,6 +84,62 @@ func _on_pick(index: int) -> void:
 	Preview.last_room = _pick.get_item_text(index)
 
 
+func _on_prop(_index: int) -> void:
+	if _loading:
+		return
+	_fill_appearances()
+
+
+func _on_appearance(index: int) -> void:
+	if _loading or _room_id.is_empty() or _prop_pick.item_count == 0:
+		return
+	var prop_id := _prop_pick.get_item_text(_prop_pick.selected)
+	var appearance := _appear_pick.get_item_text(index)
+	var err := Preview.write_room_appearance(_room_id, prop_id, appearance)
+	if not err.is_empty():
+		_status.text = err
+		return
+	_load()
+	_status.text = "wrote %s appearance %s" % [prop_id, appearance]
+
+
+func _refresh_dress() -> void:
+	_loading = true
+	_prop_pick.clear()
+	var view: Dictionary = Preview.view_of(_room_id)
+	for prop in view.get("props", []):
+		var id := String(prop.get("id", ""))
+		if id.is_empty():
+			continue
+		_prop_pick.add_item(id)
+	_fill_appearances()
+	_loading = false
+
+
+func _fill_appearances() -> void:
+	_appear_pick.clear()
+	if _prop_pick.item_count == 0 or _room_id.is_empty():
+		return
+	var prop_id := _prop_pick.get_item_text(maxi(_prop_pick.selected, 0))
+	var view: Dictionary = Preview.view_of(_room_id)
+	var type := ""
+	var current := ""
+	for prop in view.get("props", []):
+		if String(prop.get("id", "")) != prop_id:
+			continue
+		type = String(prop.get("type", ""))
+		current = String(prop.get("appearance", ""))
+		break
+	var looks: PackedStringArray = Preview.appearances_for(type)
+	var select := 0
+	for i in looks.size():
+		_appear_pick.add_item(looks[i])
+		if looks[i] == current:
+			select = i
+	if _appear_pick.item_count > 0:
+		_appear_pick.select(select)
+
+
 func _load() -> void:
 	var root := EditorInterface.get_edited_scene_root()
 	var room_id := Preview.picked_room()
@@ -91,6 +159,7 @@ func _load() -> void:
 	_size = Vector2i(int(report["width"]), int(report["height"]))
 	_seen.clear()
 	_capture(root)
+	_refresh_dress()
 	_status.text = "%s — %dx%d, %d floor, %d walls, %d of %d props" % [
 		report["roomId"], report["width"], report["height"],
 		report["floor"], report["walls"], report["props"], report["propsTotal"],

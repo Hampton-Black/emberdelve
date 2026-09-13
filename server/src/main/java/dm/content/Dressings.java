@@ -53,7 +53,7 @@ public final class Dressings {
                 .map(p -> new RoomDefinition.PropDefinition(
                         p.id(), p.type(), p.x(), p.y(), p.rotation(), p.hidden(),
                         dressing.propDescriptions().getOrDefault(p.id(), ""),
-                        p.revealHint(), p.contains(), p.actions()))
+                        p.revealHint(), p.contains(), p.actions(), p.appearance()))
                 .toList();
 
         return new RoomDefinition(

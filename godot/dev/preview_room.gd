@@ -24,6 +24,7 @@ const HOLDER := "RoomPreview"
 const CONTENT := "../server/src/main/resources/content/rooms"
 const SHOW_HIDDEN := true
 const LIGHT_LIKE_THE_GAME := true
+const Appearances := preload("res://world/appearances.gd")
 
 ## Last room the dock picked. File > Run uses this so the room is not a const to edit.
 static var last_room := ""
@@ -181,6 +182,38 @@ static func write_prop(path: String, prop_id: String, x: int, y: int, rotation: 
 
 static func write_room_prop(room_id: String, prop_id: String, x: int, y: int, rotation: int) -> String:
 	return write_prop(room_path(room_id), prop_id, x, y, rotation)
+
+
+static func appearances_for(type: String) -> PackedStringArray:
+	return Appearances.of_type(type)
+
+
+static func write_appearance(path: String, prop_id: String, appearance: String) -> String:
+	if not FileAccess.file_exists(path):
+		return "no room file at %s" % path
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return "%s is not a JSON object" % path
+	var found := false
+	for prop in parsed.get("props", []):
+		if String(prop.get("id", "")) != prop_id:
+			continue
+		prop["appearance"] = appearance
+		found = true
+		break
+	if not found:
+		return "no prop '%s' in %s" % [prop_id, path]
+	_whole_numbers(parsed)
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return "cannot write %s" % path
+	file.store_string(JSON.stringify(parsed, "  ") + "\n")
+	file.close()
+	return ""
+
+
+static func write_room_appearance(room_id: String, prop_id: String, appearance: String) -> String:
+	return write_appearance(room_path(room_id), prop_id, appearance)
 
 
 ## True when a viewport drag should persist. Mid-drag grid snaps move the mesh only.

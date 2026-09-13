@@ -62,7 +62,11 @@ public final class RoomDumper {
             case RUBBLE -> '%';
             case ALCOVE -> 'a';
             case DOOR -> '+';
-            case CHEST -> 'C';
+            case CONTAINER -> 'C';
+            case STATUE -> 'T';
+            case FURNITURE -> 'F';
+            case REMAINS -> 'r';
+            case SCENERY -> ',';
         };
     }
 }

@@ -23,6 +23,7 @@
       "y": 4,
       "rotation": 0,
       "hidden": false,
+      "appearance": "pillar",
       "description": "A fluted pillar, first of a line of four. Something has been chiselled off it at shoulder height, thoroughly, leaving a pale scar."
     },
     {
@@ -32,6 +33,7 @@
       "y": 4,
       "rotation": 0,
       "hidden": false,
+      "appearance": "pillar_decorated",
       "description": "Its partner across the aisle, scarred in the same place and the same way."
     },
     {
@@ -41,6 +43,7 @@
       "y": 11,
       "rotation": 0,
       "hidden": false,
+      "appearance": "column",
       "description": "The third pillar. This one still carries its carving: a procession of small robed figures, all walking south."
     },
     {
@@ -50,6 +53,7 @@
       "y": 11,
       "rotation": 0,
       "hidden": false,
+      "appearance": "halloween_pillar",
       "description": "The fourth. Its figures walk south too, and the last of them has no head."
     },
     {
@@ -68,6 +72,7 @@
       "y": 8,
       "rotation": 0,
       "hidden": false,
+      "appearance": "rubble_large",
       "description": "A cone of fallen ceiling, tiles and mortar, with the dust long settled into it."
     },
     {

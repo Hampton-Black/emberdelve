@@ -272,3 +272,46 @@ func test_should_write_prop_only_on_drop_not_mid_drag() -> void:
 		"release after a drag must write once")
 	assert_false(Preview.should_write_prop(false, false, true),
 		"square change without a release must not write")
+
+
+func test_appearances_for_a_type_come_from_the_closed_catalog() -> void:
+	var Preview = _script(PREVIEW)
+	if not _has(Preview, "appearances_for"):
+		return
+	var looks: PackedStringArray = Preview.appearances_for("CONTAINER")
+	assert_true("chest" in looks)
+	assert_true("barrel" in looks)
+	assert_false("fox" in looks, "STATUE looks do not belong on a CONTAINER")
+	assert_false("no_such_mesh" in looks)
+
+
+func test_write_appearance_mutates_only_that_field() -> void:
+	var Preview = _script(PREVIEW)
+	if not _has(Preview, "rooms_dir") or not _has(Preview, "write_appearance"):
+		return
+	var crypt := String(Preview.rooms_dir()).path_join("crypt.json")
+	assert_true(FileAccess.file_exists(crypt), crypt)
+	var original := FileAccess.get_file_as_string(crypt)
+	var tmp := "user://preview_appearance_roundtrip.json"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	assert_not_null(f, tmp)
+	if f == null:
+		return
+	f.store_string(original)
+	f.close()
+	var abs_tmp := ProjectSettings.globalize_path(tmp)
+
+	var err := String(Preview.write_appearance(abs_tmp, "reliquary", "barrel"))
+	assert_eq(err, "", "write_appearance returns an empty string on success")
+	if not err.is_empty():
+		return
+
+	var before: Dictionary = JSON.parse_string(original)
+	var after: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(tmp))
+	var moved_before := _prop(before, "reliquary")
+	var moved_after := _prop(after, "reliquary")
+	assert_eq(String(moved_after.get("appearance", "")), "barrel")
+	assert_eq(int(moved_after["x"]), int(moved_before["x"]))
+	assert_eq(int(moved_after["y"]), int(moved_before["y"]))
+	assert_eq(moved_after.get("actions"), moved_before.get("actions"))
+	assert_eq(String(moved_after.get("type", "")), "CONTAINER")
