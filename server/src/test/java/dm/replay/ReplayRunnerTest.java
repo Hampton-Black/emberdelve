@@ -182,6 +182,24 @@ class ReplayRunnerTest {
     }
 
     @Test
+    @DisplayName("the M4 extract session replays identically")
+    void theM4ExtractSessionReplays() throws Exception {
+        var session = Path.of("../docs/evidence/session-m4-extract.jsonl");
+
+        var result = ReplayRunner.replay(session);
+
+        assertTrue(result.matched(), "divergence at: " + result.firstDivergence());
+        assertTrue(result.compared() >= 80,
+                "the extract session must cover the way out with the reliquary; compared="
+                        + result.compared());
+        String jsonl = Files.readString(session);
+        assertTrue(jsonl.contains("\"objective_taken\""),
+                "the extract session took the reliquary");
+        assertTrue(jsonl.contains("\"EXTRACTED_WITH_OBJECTIVE\""),
+                "the extract session left with it");
+    }
+
+    @Test
     @DisplayName("the M3 gate session is refused at schema 3, never upgraded")
     void theM3GateSessionIsRefusedAtSchema3() {
         var session = Path.of("../docs/evidence/session-m3-traversal.jsonl");

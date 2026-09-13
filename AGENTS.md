@@ -537,12 +537,15 @@ not children of the epic.
 
 - **The doubt window sat in the vault, not at 5 HP in a doorway.** Two goblins still do not spend
   enough hit points; a brute does. Encounter places the window.
-- **Failed talk still starts a fight.** Look-around no longer does.
-- **LIGHT fill and room fires are different objects.** A dead party torch in a room whose bowls
-  still burn is correct by the fold and wrong by "pitch darkness".
+- **Failed talk starting a fight is the game.** Look-around no longer does. Do not patch a wary
+  goblin that draws steel after a failed persuasion.
+- **LIGHT fill and room fires are different objects, and play now wants them coupled when the
+  torch dies.** Dead torch under still-lit bowls is spec §7c; torch *and* braziers out is the
+  look they want. `emberdelve-4f9`.
 - **ALERT's band and ALERT's fill cannot both be true as written.** `on you` is dead while a fill
   zeros the clock.
-- **Every goblin is Vessk.** `emberdelve-5yj`.
+- **Every goblin is Vessk.** `emberdelve-5yj`. Copy still says goblin in front of a skeleton
+  mesh: `emberdelve-87x`.
 - **Generated rooms still have nothing to find, and now they also have no occupants.** The
   authored site is the specification.
 
