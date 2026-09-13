@@ -182,6 +182,21 @@ func test_the_players_own_line_lands_immediately() -> void:
 	assert_true(Table.awaiting_dm)
 
 
+func test_crossing_a_door_silences_the_clock_and_waits_on_the_dm() -> void:
+	var notes: Array[String] = []
+	Clock.speak({"speakerId": "narrator", "text": "in the air"}, func() -> void:
+		notes.append("in the air"))
+	await wait_frames(2)
+	Clock.speak({"speakerId": "narrator", "text": "dropped"}, func() -> void:
+		notes.append("dropped"))
+	Net.outbound.clear()
+	Table.cross_exit("door-north")
+	assert_true(Table.awaiting_dm)
+	assert_eq(notes, ["in the air", "dropped"])
+	assert_eq(Net.outbound.size(), 1)
+	assert_eq(String(Net.outbound[0].get("type", "")), "enterExit")
+
+
 func test_a_new_turn_drops_the_rest_of_the_last_one() -> void:
 	Table.append_narration({"speakerId": "narrator", "text": "one"})
 	Table.append_narration({"speakerId": "narrator", "text": "two"})

@@ -125,6 +125,7 @@ public final class WsHandler {
                 if (dm != null) {
                     dm.noteCrossing(fromName, engine.room().name(),
                             visitedBefore.contains(engine.room().roomId()));
+                    turns.submit(() -> dm.narrateArrival(turnSink(ctx)));
                 }
             }
 

@@ -112,9 +112,8 @@ public final class DmService {
             new java.util.concurrent.atomic.AtomicBoolean();
 
     /**
-     * Arrival and clock clauses waiting for the next free-text prose phase. The rail itself
-     * lives on the engine, so a crossing that fires a sign and then {@link #noteCrossing}
-     * cannot silently overwrite it.
+     * Clock clauses waiting on the directive rail. The rail itself lives on the engine, so a
+     * crossing that fires a sign and then {@link #noteCrossing} cannot silently overwrite it.
      */
 
     /**
@@ -231,6 +230,20 @@ public final class DmService {
      * giving up — the player asked for the pause. Spec §8d.
      */
     public void narrateRest(TurnSink sink) {
+        narrateRail("The party rests.", sink);
+    }
+
+    /**
+     * Narrates a click crossing and any clock signs that fired with it. Takes the lock rather
+     * than giving up — a crossing ticks both clocks and may start a fight. Spec §8d.
+     *
+     * <p>{@link #noteCrossing} already appended the threshold marker; only the reply is kept.
+     */
+    public void narrateArrival(TurnSink sink) {
+        narrateRail("The party crosses the threshold.", sink);
+    }
+
+    private void narrateRail(String stageDirection, TurnSink sink) {
         narrating.lock();
         try {
             String directive = takePendingArrival();
@@ -239,7 +252,7 @@ public final class DmService {
                 return;
             }
             var failed = new boolean[]{false};
-            var prose = runProsePhase("The party rests.", List.of(), sink, failed, false,
+            var prose = runProsePhase(stageDirection, List.of(), sink, failed, false,
                     directive);
             if (!failed[0]) {
                 history.add(DmClient.ChatMessage.assistant(prose.text()));
@@ -969,7 +982,7 @@ public final class DmService {
 
     /**
      * Records that the party crossed a threshold: a seam line in the transcript, and an arrival
-     * directive for the next free-text prose phase.
+     * directive on the rail for the crossing's prose call.
      */
     public void noteCrossing(String fromRoomName, String toRoomName, boolean returning) {
         history.add(DmClient.ChatMessage.user(thresholdMarker(fromRoomName, toRoomName)));

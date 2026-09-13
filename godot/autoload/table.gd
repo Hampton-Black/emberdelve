@@ -366,6 +366,15 @@ func say_as_player(text: String) -> void:
 	transcript_changed.emit()
 
 
+## Every exit commit goes through here. The arrival holds the exploration bar dead while doors
+## stay live — spec §8d.
+func cross_exit(exit_id: String) -> void:
+	Clock.silence()
+	awaiting_dm = true
+	transcript_changed.emit()
+	Net.enter_exit(exit_id)
+
+
 ## Every roll reaches the log; only dramatic ones get thrown.
 ##
 ## Queued like everything else, so "the dice decide, then the DM speaks" is true by construction

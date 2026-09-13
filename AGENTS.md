@@ -630,11 +630,11 @@ alive in the crypt was not drawn from the gallery and read as absence rather tha
 moved the ADR from Proposed to Accepted — the confinement had compiled since `xgg.5` and had never
 been clicked at.
 
-**Nobody missed the narration on a crossing.** Clicking a door crosses in silence: 15 of the 17
-crossings across both sessions produced no narration, because `WsHandler.enterExit` arms
-`pendingArrival` and never runs a prose phase. Judged in play to be right. Clicking a door and
-walking through *is* the honest path, and the arrival beat was not what was missing.
-`emberdelve-xgg.12` — recorded, not scheduled, the same way M0's tool-free-turn latency was.
+**Nobody missed the narration on a crossing (M3 judgement, reversed for M4).** On 2026-09-07, 15 of
+the 17 crossings across both sessions produced no narration, and neither player remarked on it —
+clicking a door and walking through *is* the honest path, and in M3 a crossing cost nothing.
+M4 ticks both clocks on every entry and a crossing can start a fight; every crossing narrates now
+(`emberdelve-xgg.12`, spec §8d).
 
 **What was missing was knowing whether a door could be crossed at all.** `crossExit` refuses
 exactly one thing, leaving mid-fight. There is no locked, no barred, no stuck — and every authored

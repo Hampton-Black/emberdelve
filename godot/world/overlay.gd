@@ -137,7 +137,7 @@ func commit(action: Dictionary) -> void:
 		"attack":
 			Net.attack(String(action["actor_id"]), String(action["target_id"]))
 		"exit":
-			Net.enter_exit(String(action["exit_id"]))
+			Table.cross_exit(String(action["exit_id"]))
 
 
 ## `kind` is the intent the hover is previewing, so a door does not look like a floor tile you
