@@ -178,6 +178,16 @@ class RestTest {
     }
 
     @Test
+    @DisplayName("spawnGoblin diffs carry CanRestChanged when a hostile walks in")
+    void spawnGoblinGreysRest() {
+        var diffs = engine.spawnGoblin(6, 6);
+
+        assertFalse(engine.scene().canRest());
+        assertTrue(diffs.stream().anyMatch(d -> d instanceof Diff.CanRestChanged cc
+                && !cc.canRest()));
+    }
+
+    @Test
     @DisplayName("a client rest drains the rail into one prose call")
     void restNarratesViaScriptedDm() {
         var prose = new ScriptedDmClient("You catch your breath against the cold stone.");

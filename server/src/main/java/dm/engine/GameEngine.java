@@ -71,7 +71,8 @@ public final class GameEngine {
                     "The entrance must be '" + WorldState.EMPTY.roomId() + "' until the fold's "
                             + "starting room is configurable, got '" + rooms.first().roomId() + "'");
         }
-        this.combat = new CombatEngine(log, dice, this::room, this::onFightStart);
+        this.combat = new CombatEngine(log, dice, this::room, this::onFightStart,
+                this::canRest, this::withCanRestIfChanged);
         this.directives = new DirectiveRail(() -> this.combat.isActive());
     }
 
@@ -161,6 +162,7 @@ public final class GameEngine {
                 diffs.addAll(buffer.collectedDiffs());
             }
             case DRAWN_BY_THE_NOISE -> {
+                boolean canRestBefore = canRest();
                 hostileElsewhere().ifPresent(hostile -> {
                     var at = defaultGoblinSpawn();
                     log.append(new Event.EntityMoved(Instant.now(), hostile.id(),
@@ -171,6 +173,7 @@ public final class GameEngine {
                     combat.start(buffer);
                     diffs.addAll(buffer.collectedDiffs());
                 });
+                addCanRestIfChanged(diffs, canRestBefore);
             }
             default -> { }
         }
@@ -378,6 +381,21 @@ public final class GameEngine {
         }
         return state().entitiesHere().stream()
                 .noneMatch(e -> e.isAlive() && !e.isPlayerControlled());
+    }
+
+    private List<Diff> withCanRestIfChanged(List<Diff> diffs, boolean canRestBefore) {
+        if (canRest() == canRestBefore) {
+            return diffs;
+        }
+        var out = new ArrayList<>(diffs);
+        out.add(new Diff.CanRestChanged(canRest()));
+        return out;
+    }
+
+    private void addCanRestIfChanged(List<Diff> diffs, boolean canRestBefore) {
+        if (canRest() != canRestBefore) {
+            diffs.add(new Diff.CanRestChanged(canRest()));
+        }
     }
 
     private boolean canSpendTorch() {
@@ -601,6 +619,7 @@ public final class GameEngine {
      * supports, and it should say so instead of corrupting itself quietly.
      */
     public List<Diff> spawnGoblin(int x, int y) {
+        boolean canRestBefore = canRest();
         var definition = content.entity("goblin");
 
         var existing = state().find(definition.id());
@@ -612,7 +631,10 @@ public final class GameEngine {
 
         var goblin = definition.spawn(definition.id(), room().roomId(), x, y);
         log.append(new Event.EntitySpawned(Instant.now(), goblin));
-        return List.of(new Diff.EntityAdded(goblin.toView()));
+        var diffs = new ArrayList<Diff>();
+        diffs.add(new Diff.EntityAdded(goblin.toView()));
+        addCanRestIfChanged(diffs, canRestBefore);
+        return diffs;
     }
 
     /** Where the goblin comes out of the sarcophagus, if the DM does not name a square. */

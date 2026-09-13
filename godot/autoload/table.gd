@@ -236,6 +236,9 @@ func _apply_now(list: Array) -> void:
 				scene["rope"] = int(diff["rope"])
 				scene["canSpendTorch"] = bool(diff["canSpendTorch"])
 
+			"CanRestChanged":
+				scene["canRest"] = bool(diff["canRest"])
+
 	_settle_combat(opened, closed)   # Task 8
 	scene_changed.emit()
 	if opened or closed:

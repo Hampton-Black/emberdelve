@@ -161,6 +161,12 @@ func test_room_lighting_changed_writes_the_preset_onto_the_room() -> void:
 	assert_eq(Table.room_by_id("crypt")["lighting"], "DARK")
 
 
+func test_can_rest_changed_writes_the_hint_onto_the_scene() -> void:
+	Table.apply_diffs([{"kind": "CanRestChanged", "canRest": false}])
+	await wait_frames(2)
+	assert_eq(Table.scene["canRest"], false)
+
+
 # ---- The transcript, paced by the voice
 
 func test_the_players_own_line_lands_immediately() -> void:

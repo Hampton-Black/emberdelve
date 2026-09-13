@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -46,6 +47,8 @@ public final class CombatEngine {
     private final DiceRoller dice;
     private final Supplier<RoomDefinition> currentRoom;
     private final Consumer<CombatSink> onFightStart;
+    private final Supplier<Boolean> canRestSnapshot;
+    private final BiFunction<List<Diff>, Boolean, List<Diff>> withCanRestHint;
 
     public CombatEngine(EventLog log, DiceRoller dice, Supplier<RoomDefinition> currentRoom) {
         this(log, dice, currentRoom, sink -> { });
@@ -53,10 +56,18 @@ public final class CombatEngine {
 
     public CombatEngine(EventLog log, DiceRoller dice, Supplier<RoomDefinition> currentRoom,
                         Consumer<CombatSink> onFightStart) {
+        this(log, dice, currentRoom, onFightStart, () -> true, (diffs, ignored) -> diffs);
+    }
+
+    CombatEngine(EventLog log, DiceRoller dice, Supplier<RoomDefinition> currentRoom,
+                 Consumer<CombatSink> onFightStart, Supplier<Boolean> canRestSnapshot,
+                 BiFunction<List<Diff>, Boolean, List<Diff>> withCanRestHint) {
         this.log = log;
         this.dice = dice;
         this.currentRoom = currentRoom;
         this.onFightStart = onFightStart;
+        this.canRestSnapshot = canRestSnapshot;
+        this.withCanRestHint = withCanRestHint;
     }
 
     /**
@@ -123,6 +134,7 @@ public final class CombatEngine {
             return;
         }
 
+        boolean canRestBefore = canRestSnapshot.get();
         onFightStart.accept(sink);
 
         var rolled = new ArrayList<Combatant>();
@@ -145,12 +157,17 @@ public final class CombatEngine {
         var order = List.copyOf(rolled);
         log.append(new Event.CombatStarted(Instant.now(), order,
                 rolled.stream().map(c -> initiativeRolls.get(c.entityId())).toList()));
-        sink.diffs(List.of(new Diff.ModeChanged(Mode.COMBAT), new Diff.CombatChanged(view())));
+        sink.diffs(withCanRestHint.apply(
+                List.of(new Diff.ModeChanged(Mode.COMBAT), new Diff.CombatChanged(view())),
+                canRestBefore));
     }
 
     private void end(CombatSink sink) {
+        boolean canRestBefore = canRestSnapshot.get();
         log.append(new Event.CombatEnded(Instant.now()));
-        sink.diffs(List.of(new Diff.ModeChanged(Mode.EXPLORATION), new Diff.CombatChanged(null)));
+        sink.diffs(withCanRestHint.apply(
+                List.of(new Diff.ModeChanged(Mode.EXPLORATION), new Diff.CombatChanged(null)),
+                canRestBefore));
     }
 
     /** True once one side has nobody left standing. */

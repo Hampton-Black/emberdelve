@@ -47,11 +47,10 @@ public sealed interface Event {
      * <p>2 (M3): entities carry a {@code roomId}, so every {@code party_spawned} and
      * {@code entity_spawned} line written at schema 1 describes an entity standing nowhere.
      *
-     * <p>3 (M4): clocks, consequences and a room's fires becoming folded lighting.
-     *
-     * <p>4 (M4): {@code rested} records a pause that heals and ticks both clocks.
+     * <p>3 (M4): clocks, consequences, a room's fires becoming folded lighting, and
+     * {@code rested} recording a pause that heals and ticks both clocks.
      */
-    int SCHEMA_VERSION = 4;
+    int SCHEMA_VERSION = 3;
 
     Instant at();
 

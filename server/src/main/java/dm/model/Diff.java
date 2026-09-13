@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = Diff.CombatChanged.class, name = "CombatChanged"),
         @JsonSubTypes.Type(value = Diff.RoomLightingChanged.class, name = "RoomLightingChanged"),
         @JsonSubTypes.Type(value = Diff.ConsumablesChanged.class, name = "ConsumablesChanged"),
+        @JsonSubTypes.Type(value = Diff.CanRestChanged.class, name = "CanRestChanged"),
 })
 public sealed interface Diff {
 
@@ -58,4 +59,7 @@ public sealed interface Diff {
      */
     record ConsumablesChanged(int potions, int torches, int rope, boolean canSpendTorch)
             implements Diff {}
+
+    /** Whether the Rest button is legal. A closed hint, not a segment count — spec §5b. */
+    record CanRestChanged(boolean canRest) implements Diff {}
 }
