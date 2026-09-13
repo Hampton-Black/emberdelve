@@ -15,6 +15,17 @@ const CameraRigScript := preload("res://world/camera_rig.gd")
 const PROP_TABLE := preload("res://world/prop_table.tres")
 const TOKEN_SCENE := preload("res://world/tokens/token.tscn")
 
+## Player-controlled tokens sit on this layer so the party's OmniLight can light them
+## without they themselves shadowing it. Membership is isPlayerControlled, never "fighter".
+const PARTY_RENDER_LAYER := 2
+const PARTY_LIGHT_Y := 0.95
+const PARTY_LOOK := {
+	"FULL": {"range": 6.0, "energy": 2.6, "color": Color(1.00, 0.72, 0.40), "flicker": 0.03},
+	"LOW": {"range": 4.6, "energy": 2.3, "color": Color(1.00, 0.60, 0.24), "flicker": 0.06},
+	"GUTTERING": {"range": 3.4, "energy": 2.0, "color": Color(1.00, 0.50, 0.19), "flicker": 0.12},
+	"FAILING": {"range": 2.3, "energy": 1.6, "color": Color(1.00, 0.40, 0.14), "flicker": 0.22},
+}
+
 var rig: CameraRigScript
 var _room_id := ""
 ## Where each room sits in world space, and how big it is — absolute positions in the server's
@@ -36,10 +47,12 @@ func _ready() -> void:
 	Table.room_lighting_changed.connect(_on_room_lighting_changed)
 	_on_scene_changed()
 	_fit_world_viewport()
+	_update_party_light()
 
 
 func _process(_delta: float) -> void:
 	_fit_world_viewport()
+	_update_party_light()
 
 
 func register_room(room_id: String, size: Vector2i, origin: Vector3) -> void:
@@ -402,6 +415,70 @@ func _follow_party() -> void:
 	if count == 0:
 		return
 	rig.follow(centre / float(count))
+
+
+## One OmniLight3D, sibling of Tokens. Positioned each frame at the centroid of living
+## player-controlled tokens. Cannot live under Room (MAX_TORCH_LIGHTS), on a token
+## (_rebuild_tokens frees them), or on the hand bone (the chop swings). Spec §7a.
+func _ensure_party_light() -> OmniLight3D:
+	var light := get_node_or_null("PartyLight") as OmniLight3D
+	if light != null:
+		return light
+	light = OmniLight3D.new()
+	light.name = "PartyLight"
+	light.omni_attenuation = 2.0
+	light.shadow_enabled = true
+	light.shadow_caster_mask = 0xFFFFF & ~(1 << (PARTY_RENDER_LAYER - 1))
+	add_child(light)
+	return light
+
+
+func _update_party_light() -> void:
+	var light := _ensure_party_light()
+	var level := String(Table.scene.get("partyLight", "FULL"))
+	_sync_carried_torches(level)
+	if Table.scene.is_empty() or level == "OUT":
+		light.visible = false
+		return
+	var look: Dictionary = PARTY_LOOK.get(level, PARTY_LOOK["FULL"])
+	light.visible = true
+	light.omni_range = float(look["range"])
+	light.light_color = look["color"] as Color
+	var flicker := float(look["flicker"])
+	var wave := 1.0 + flicker * sin(float(Time.get_ticks_msec()) * 0.012)
+	light.light_energy = float(look["energy"]) * wave
+	var centre: Variant = _living_party_centroid()
+	if centre != null:
+		light.global_position = (centre as Vector3) + Vector3(0.0, PARTY_LIGHT_Y, 0.0)
+
+
+func _living_party_centroid() -> Variant:
+	var holder := get_node_or_null("Tokens") as Node3D
+	if holder == null:
+		return null
+	var acc := Vector3.ZERO
+	var n := 0
+	for child in holder.get_children():
+		var token := child as Token
+		if token == null or token.dead:
+			continue
+		var entity: Dictionary = Table.entity(String(token.name))
+		if entity.is_empty() or not bool(entity.get("isPlayerControlled", false)):
+			continue
+		acc += token.global_position
+		n += 1
+	if n == 0:
+		return null
+	return acc / float(n)
+
+
+func _sync_carried_torches(level: String) -> void:
+	var holder := get_node_or_null("Tokens") as Node3D
+	if holder == null:
+		return
+	for child in holder.get_children():
+		if child is Token:
+			(child as Token).sync_carried_torch(level)
 
 
 func _fit_world_viewport() -> void:

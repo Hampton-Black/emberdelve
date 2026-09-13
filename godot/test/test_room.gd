@@ -712,10 +712,14 @@ func test_a_room_you_have_left_keeps_its_surfaces_and_gives_up_its_lights() -> v
 	assert_gt(_torch_count(left), 0, "the brackets stay on its walls")
 	assert_eq(_omni_count(left), 0, "but nothing in it burns")
 	# The budget stays per-room however far the dungeon runs: only the room the party is in
-	# ever adds a light.
-	assert_eq(_omni_count(world), _omni_count(world.get_node("Room") as Node3D),
-		"every OmniLight3D in the world belongs to the current room")
-	assert_gt(_omni_count(world), 0, "and the current room is lit")
+	# ever adds a light. The party's OmniLight3D is a World sibling on purpose, and is not
+	# a room fire.
+	var party := world.get_node_or_null("PartyLight") as OmniLight3D
+	var room_lights := _omni_count(world.get_node("Room") as Node3D)
+	var world_room_lights := _omni_count(world) - (1 if party != null else 0)
+	assert_eq(world_room_lights, room_lights,
+		"every room OmniLight3D in the world belongs to the current room")
+	assert_gt(room_lights, 0, "and the current room is lit")
 
 
 func _torch_count(room: Node) -> int:

@@ -13,6 +13,7 @@ import dm.model.Entity;
 import dm.model.Event;
 import dm.model.Exit;
 import dm.model.Mode;
+import dm.model.PartyLight;
 import dm.model.Prop;
 import dm.model.RollRequest;
 import dm.model.RollResult;
@@ -85,8 +86,13 @@ public final class GameEngine {
      * must not announce a threshold on the way down. Hook for emberdelve-4h9.2 / 4h9.12.
      */
     public List<Diff> resetLight() {
+        var before = partyLight();
         log.append(new Event.ClockTicked(Instant.now(), ClockId.LIGHT, 0));
-        return List.of();
+        var after = partyLight();
+        if (after == before) {
+            return List.of();
+        }
+        return List.of(new Diff.PartyLightChanged(after));
     }
 
     /** Hook for emberdelve-4h9.11: a rest ticks both clocks. */
@@ -105,6 +111,7 @@ public final class GameEngine {
             return List.of();
         }
         boolean torchBefore = id == ClockId.LIGHT && canSpendTorch();
+        var lightBefore = id == ClockId.LIGHT ? partyLight() : null;
         int next = Math.min(previous + 1, clock.segments());
         log.append(new Event.ClockTicked(Instant.now(), id, next));
         var diffs = new ArrayList<Diff>();
@@ -120,6 +127,12 @@ public final class GameEngine {
         }
         if (id == ClockId.LIGHT && canSpendTorch() != torchBefore) {
             diffs.add(consumablesDiff());
+        }
+        if (id == ClockId.LIGHT) {
+            var lightAfter = partyLight();
+            if (lightAfter != lightBefore) {
+                diffs.add(new Diff.PartyLightChanged(lightAfter));
+            }
         }
         return diffs;
     }
@@ -227,10 +240,17 @@ public final class GameEngine {
 
     private void fire(ClockId clock, ConsequenceId id) {
         log.append(new Event.ConsequenceFired(Instant.now(), clock, id));
-        var clause = ClockTables.clause(id);
+        var clause = id == ConsequenceId.LIGHT_OUT
+                ? ClockTables.lightOutClause(state().consumableCount(Consumable.TORCH))
+                : ClockTables.clause(id);
         if (!clause.isBlank()) {
             directives.latch(Directive.aboutParty(clause));
         }
+    }
+
+    /** Folded from LIGHT filled. Never stored. Spec §7a. */
+    private PartyLight partyLight() {
+        return PartyLight.of(state().clock(ClockId.LIGHT).filled());
     }
 
     /** The log. The only way anything in this engine writes. */
@@ -371,7 +391,8 @@ public final class GameEngine {
         return new SceneState(here.roomId(), roomViews, entities, blocked, state().mode(),
                 combat.view(), state().consumableCount(Consumable.POTION),
                 state().consumableCount(Consumable.TORCH),
-                state().consumableCount(Consumable.ROPE), canSpendTorch(), canRest());
+                state().consumableCount(Consumable.ROPE), canSpendTorch(), canRest(),
+                partyLight());
     }
 
     /** Exploration-only; no living hostile in this room. Spec §5b. */
@@ -722,7 +743,7 @@ public final class GameEngine {
             diffs.add(new Diff.StatChanged(actorId, "hp", hpFrom, hpTo));
         }
         if (item == Consumable.TORCH) {
-            resetLight();
+            diffs.addAll(resetLight());
             directives.latch(Directive.aboutParty(ClockTables.TORCH_RELIT));
         }
         diffs.add(consumablesDiff());

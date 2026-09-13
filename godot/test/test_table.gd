@@ -167,6 +167,12 @@ func test_can_rest_changed_writes_the_hint_onto_the_scene() -> void:
 	assert_eq(Table.scene["canRest"], false)
 
 
+func test_party_light_changed_writes_the_level_onto_the_scene() -> void:
+	Table.apply_diffs([{"kind": "PartyLightChanged", "partyLight": "LOW"}])
+	await wait_frames(2)
+	assert_eq(Table.scene["partyLight"], "LOW")
+
+
 # ---- The transcript, paced by the voice
 
 func test_the_players_own_line_lands_immediately() -> void:

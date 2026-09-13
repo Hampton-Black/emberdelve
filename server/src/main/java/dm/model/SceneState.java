@@ -42,7 +42,12 @@ public record SceneState(
          */
         boolean canSpendTorch,
         /** Whether resting is legal right now — not combat and no living hostile here. */
-        boolean canRest
+        boolean canRest,
+        /**
+         * How much light the party is casting. Derived from LIGHT filled, never stored beside
+         * the clock. Never a segment count or a radius. Spec §7a, §10.
+         */
+        PartyLight partyLight
 ) {
     /** The room named by {@link #roomId()}, in the same list as everything else. */
     public RoomView currentRoom() {

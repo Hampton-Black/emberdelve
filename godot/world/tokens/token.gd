@@ -11,6 +11,11 @@ const BAR_HEIGHT := 0.085
 const CROSSFADE_SECONDS := 0.2
 # Just enough to read the figure in the dark between braziers. 0.22 was a floodlight.
 const SELF_LIT := 0.05
+## Same layer World.PARTY_RENDER_LAYER uses. Party VisualInstance3Ds sit here so the
+## carried torch lights them without they themselves shadowing it.
+const PARTY_RENDER_LAYER := 2
+const TORCH_LIT := "res://world/kits/kaykit_dungeon/torch_lit.gltf"
+const TORCH_OUT := "res://world/kits/kaykit_dungeon/torch.gltf"
 
 const MODELS := {
 	"fighter": {
@@ -69,6 +74,8 @@ var _tween: Tween
 var _fill: MeshInstance3D
 var _fill_mat: StandardMaterial3D
 var _height := 0.8
+var _torch_attach: BoneAttachment3D
+var _torch_out := false
 
 
 func configure(entity: Dictionary) -> void:
@@ -238,6 +245,9 @@ func _mount_figure(kind: String) -> void:
 	figure.add_child(model)
 	_fit(model, _height)
 	_self_lit(model)
+	if not _hostile:
+		_mount_carried_torch(model)
+		_mark_party_layer(self)
 	_player = _bind_clips(model)
 
 
@@ -308,12 +318,69 @@ func _self_lit(root: Node) -> void:
 				continue
 			var mat := (src as BaseMaterial3D).duplicate() as BaseMaterial3D
 			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
-			mat.emission_enabled = true
-			mat.emission = Color.WHITE
-			mat.emission_energy_multiplier = SELF_LIT
-			if mat.albedo_texture:
-				mat.emission_texture = mat.albedo_texture
+			if _hostile:
+				mat.emission_enabled = false
+			else:
+				mat.emission_enabled = true
+				mat.emission = Color.WHITE
+				mat.emission_energy_multiplier = SELF_LIT
+				if mat.albedo_texture:
+					mat.emission_texture = mat.albedo_texture
 			mesh.set_surface_override_material(i, mat)
+
+
+func _mount_carried_torch(model: Node3D) -> void:
+	var skel := model.find_child("Skeleton3D", true, false) as Skeleton3D
+	if skel == null or skel.find_bone("handslot.l") < 0:
+		return
+	var attach := BoneAttachment3D.new()
+	attach.name = "CarriedTorch"
+	attach.bone_name = "handslot.l"
+	skel.add_child(attach)
+	_torch_attach = attach
+	sync_carried_torch(String(Table.scene.get("partyLight", "FULL")))
+
+
+## Lit mesh while the pool burns; unlit at OUT. Never comes off. Spec §7a.
+func sync_carried_torch(party_light: String) -> void:
+	if _torch_attach == null:
+		return
+	var want_out := party_light == "OUT"
+	if _torch_attach.get_child_count() > 0 and _torch_out == want_out:
+		return
+	_torch_out = want_out
+	for child in _torch_attach.get_children():
+		_torch_attach.remove_child(child)
+		child.free()
+	var path := TORCH_OUT if want_out else TORCH_LIT
+	if not ResourceLoader.exists(path):
+		return
+	var packed: PackedScene = load(path)
+	if packed == null:
+		return
+	var mesh_root := packed.instantiate() as Node3D
+	if mesh_root == null:
+		return
+	mesh_root.name = "Mesh"
+	# Dungeon kit is a 4-unit module; the Knight is already height-fitted. A handheld
+	# stick, not a wall sconce.
+	mesh_root.scale = Vector3.ONE * 0.35
+	_torch_attach.add_child(mesh_root)
+	_mark_party_layer(_torch_attach)
+
+
+func _mark_party_layer(root: Node) -> void:
+	if _hostile:
+		return
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node is VisualInstance3D:
+			var vis := node as VisualInstance3D
+			vis.set_layer_mask_value(1, false)
+			vis.set_layer_mask_value(PARTY_RENDER_LAYER, true)
+		for child in node.get_children():
+			stack.append(child)
 
 
 func _placeholder(figure: Node3D) -> void:

@@ -239,6 +239,9 @@ func _apply_now(list: Array) -> void:
 			"CanRestChanged":
 				scene["canRest"] = bool(diff["canRest"])
 
+			"PartyLightChanged":
+				scene["partyLight"] = String(diff["partyLight"])
+
 	_settle_combat(opened, closed)   # Task 8
 	scene_changed.emit()
 	if opened or closed:

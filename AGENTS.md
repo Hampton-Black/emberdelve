@@ -335,12 +335,13 @@ Three things that are not obvious and cost an hour each if forgotten:
   in one directory silently paints one of them with the other's atlas.
 - **Figures sit under the wall** — KayKit knight ~0.8 world units on a 1.0 square. Oversizing to
   1.25 was for a 480px pixel buffer where a to-scale human was ~24 pixels and read as a smudge.
-  That buffer is gone. Do not grow figures to “read at 480.” Do not “fix” the dark crypt by
-  raising the ambient; tokens still carry a faint emissive of their albedo.
-- **Characters carry a faint emissive of their own albedo.** The crypt is genuinely dark away
-  from the two braziers, which is right for the room and wrong for the figures standing in it.
-  This lifts tokens off the floor without touching scene lighting — do not "fix" it by raising
-  the ambient.
+  That buffer is gone.   Do not grow figures to “read at 480.” Do not “fix” the dark crypt by
+  raising the ambient; party tokens still carry a faint emissive of their albedo.
+- **Party tokens carry a faint emissive of their own albedo.** Hostiles do not —
+  they show where the party's light reaches them. The crypt is genuinely dark away
+  from the two braziers, which is right for the room and wrong for the figures
+  standing in it. This lifts party tokens off the floor without touching scene
+  lighting — do not "fix" it by raising the ambient.
 
 Current cast: KayKit **Knight** as the fighter, **Skeleton_Warrior** as the goblin.
 

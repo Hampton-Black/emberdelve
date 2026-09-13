@@ -61,13 +61,24 @@ public final class ClockTables {
             "The party has stopped to rest and catch their breath. A sentence or two — what "
                     + "the pause costs in this room, not a description from scratch.";
 
+    /**
+     * {@code LIGHT_OUT} as the narrator hears it. The last-torch sentence is supply, not a
+     * sixth {@code PartyLight} value — spec §7a.
+     */
+    public static String lightOutClause(int remainingTorches) {
+        if (remainingTorches <= 0) {
+            return clause(ConsequenceId.LIGHT_OUT) + " — your last torch, when none are left.";
+        }
+        return clause(ConsequenceId.LIGHT_OUT);
+    }
+
     /** Narrator clause for a sign or {@code LIGHT_OUT}. Spec §6c "About". */
     public static String clause(ConsequenceId id) {
         return switch (id) {
             case LIGHT_LOW -> "The ring of light has drawn in.";
             case LIGHT_GUTTERING -> "The flame stutters; the shadows swing.";
             case LIGHT_FAILING -> "Light at arm's length. One more and it is gone.";
-            case LIGHT_OUT -> "The torch has gone out — your last torch, when none are left.";
+            case LIGHT_OUT -> "The torch has gone out.";
             case SOMETHING_STIRRED -> "Far off, something moved and went quiet.";
             case THE_FLAME_LEANS -> "A draught, from somewhere that was shut.";
             case IT_IS_CLOSE -> "Near enough to hear. It knows roughly where you are.";
