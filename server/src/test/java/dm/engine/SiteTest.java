@@ -253,10 +253,28 @@ class SiteTest {
             assertTrue(kits.size() >= 2, roomId + " kits: " + kits);
             assertFalse(room.hiddenPropIds().isEmpty(), roomId + " needs something to find");
             for (var id : room.hiddenPropIds()) {
-                var prop = room.prop(id);
-                assertNotNull(prop.revealHint(), id);
-                assertFalse(prop.revealHint().isBlank(), id);
+                assertHintWherePlayersLook(roomId, room.prop(id));
             }
+        }
+
+        var gallery = CONTENT.room("gallery");
+        assertFalse(gallery.hiddenPropIds().isEmpty(), "gallery needs something to find");
+        for (var id : gallery.hiddenPropIds()) {
+            assertHintWherePlayersLook("gallery", gallery.prop(id));
+        }
+    }
+
+    private static void assertHintWherePlayersLook(String roomId, RoomDefinition.PropDefinition prop) {
+        var id = roomId + " " + prop.id();
+        assertNotNull(prop.revealHint(), id);
+        assertFalse(prop.revealHint().isBlank(), id);
+        if ("gallery".equals(roomId) && "niche".equals(prop.id())) {
+            var lower = prop.revealHint().toLowerCase(Locale.ROOT);
+            assertFalse(lower.contains("west wall"), id + " hints on the west wall: " + prop.revealHint());
+            assertFalse(lower.contains("tiling"), id + " hints on tiling: " + prop.revealHint());
+            assertFalse(lower.contains("grout"), id + " hints on grout: " + prop.revealHint());
+            assertTrue(lower.contains("brazier") || lower.contains("pillar"),
+                    id + " must hint on the brazier or pillars: " + prop.revealHint());
         }
     }
 
