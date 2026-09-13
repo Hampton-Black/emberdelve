@@ -86,6 +86,32 @@ func test_the_players_line_is_a_different_blue() -> void:
 	assert_eq(record.text, "[color=#7fa8d0]look at the sarcophagus[/color]")
 
 
+func test_a_second_goblins_line_uses_the_hostile_green_not_narrator_tan() -> void:
+	var crypt := CRYPT.duplicate(true)
+	crypt["entities"] = CRYPT["entities"] + [
+		{"id": "goblin-2", "kind": "goblin", "name": "Skrix", "x": 7, "y": 6,
+			"hp": 6, "maxHp": 6, "isPlayerControlled": false},
+	]
+	Table.set_scene(SceneFixtures.scene(crypt))
+	Table.transcript.append({"kind": "prose", "speakerId": "goblin-2",
+		"text": "Skrix hisses."})
+	var record := _transcript()
+	assert_eq(record.text, "[color=#8fae72]Skrix hisses.[/color]")
+
+
+func test_a_brutes_line_uses_the_hostile_green_not_narrator_tan() -> void:
+	var crypt := CRYPT.duplicate(true)
+	crypt["entities"] = CRYPT["entities"] + [
+		{"id": "brute", "kind": "brute", "name": "Brakk", "x": 5, "y": 5,
+			"hp": 16, "maxHp": 16, "isPlayerControlled": false},
+	]
+	Table.set_scene(SceneFixtures.scene(crypt))
+	Table.transcript.append({"kind": "prose", "speakerId": "brute",
+		"text": "Brakk growls."})
+	var record := _transcript()
+	assert_eq(record.text, "[color=#8fae72]Brakk growls.[/color]")
+
+
 func test_a_roll_line_names_who_rolled_and_takes_its_tone_from_tumble() -> void:
 	Table.transcript.append({"kind": "roll", "result": _skill_check()})
 	var record := _transcript()

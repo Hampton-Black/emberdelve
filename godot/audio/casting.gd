@@ -18,4 +18,17 @@ const DEFAULT := {"prefer": [], "pitch": 1.0, "rate": 1.0}
 
 
 static func for_speaker(speaker_id: String) -> Dictionary:
-	return TABLE.get(speaker_id, DEFAULT)
+	return TABLE.get(kind_for(speaker_id), DEFAULT)
+
+
+## Parser speaker ids are entity ids. Voice is keyed on kind — goblin-2 is still a goblin,
+## and the brute shares the hostile voice.
+static func kind_for(speaker_id: String) -> String:
+	if speaker_id == "narrator" or speaker_id == "player":
+		return speaker_id
+	var kind := String(Table.entity(speaker_id).get("kind", ""))
+	if kind.is_empty():
+		return speaker_id
+	if kind == "brute":
+		return "goblin"
+	return kind

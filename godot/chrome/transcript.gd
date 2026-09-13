@@ -26,7 +26,8 @@ func _redraw() -> void:
 	for entry in Table.transcript:
 		if entry["kind"] == "prose":
 			var who := String(entry["speakerId"])
-			var tint: Color = SPEAKER_COLOR.get(who, SPEAKER_COLOR["narrator"])
+			var tint: Color = SPEAKER_COLOR.get(
+				Casting.kind_for(who), SPEAKER_COLOR["narrator"])
 			out.append("[color=#%s]%s[/color]" % [tint.to_html(false), entry["text"]])
 		else:
 			out.append(_roll_line(entry["result"]))
