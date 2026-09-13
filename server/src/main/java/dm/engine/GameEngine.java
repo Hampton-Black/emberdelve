@@ -200,7 +200,7 @@ public final class GameEngine {
 
     private List<ConsequenceId> alertFillOptions() {
         var options = new ArrayList<>(ClockTables.ALERT_FILL);
-        if (state().find("goblin").isPresent()) {
+        if (kindHere("goblin", true)) {
             options.remove(ConsequenceId.PATROL_ARRIVES);
             options.remove(ConsequenceId.SOMETHING_WANDERS_IN);
         }
@@ -724,50 +724,130 @@ public final class GameEngine {
     }
 
     public List<Diff> revealProp(String propId) {
-        requireOpen();
-        var definition = room().prop(propId);
-
-        if (state().revealedHere().contains(propId)) {
-            return List.of();
-        }
-        log.append(new Event.PropRevealed(Instant.now(), state().roomId(), propId));
-        return List.of(new Diff.PropRevealed(definition.toProp().revealed()));
+        return revealProp(propId, true);
     }
 
     /**
-     * Puts the goblin on the grid. There is room for exactly one.
-     *
-     * <p>The entity id is the definition's, which is the constant {@code "goblin"}, and
-     * the world is keyed by id — so a second spawn never added a second creature, it
-     * overwrote the first. Overwriting a <em>dead</em> one is a resurrection: back at full hp,
-     * back on the board, and rolling initiative in the next fight as though nothing had
-     * happened. Vessk came back from a fight he had lost.
-     *
-     * <p>Refusing is the honest fix rather than the convenient one. Handing each spawn its own
-     * id would let a second goblin exist, but the id is still load-bearing outside the engine —
-     * {@code DmService} decides which sarcophagus note to show by whether an entity called
-     * "goblin" exists. {@code TtsClient} keys the voice on kind, so a "goblin-2" would sound
-     * like Vessk and still fail to open the lid. One goblin is what this build actually
-     * supports, and it should say so instead of corrupting itself quietly.
+     * {@code releaseContained} is the live path. Replay applies {@link Event.PropRevealed}
+     * without minting a creature — {@link Event.EntitySpawned} already named who came out.
+     */
+    public List<Diff> revealProp(String propId, boolean releaseContained) {
+        requireOpen();
+        var definition = room().prop(propId);
+        var diffs = new ArrayList<Diff>();
+        if (!state().revealedHere().contains(propId)) {
+            log.append(new Event.PropRevealed(Instant.now(), state().roomId(), propId));
+            diffs.add(new Diff.PropRevealed(definition.toProp().revealed()));
+        }
+        if (releaseContained) {
+            diffs.addAll(spawnContained(definition));
+        }
+        return diffs;
+    }
+
+    /**
+     * Puts a hostile on the grid under a unique id ({@code goblin}, {@code goblin-2},
+     * {@code brute}, …). Kind, not id, keys voice and mesh. A dead occupant of {@code goblin}
+     * stays dead; the next spawn is a different creature.
      */
     public List<Diff> spawnGoblin(int x, int y) {
+        return spawnHostile("goblin", x, y);
+    }
+
+    public List<Diff> spawnHostile(String kind, int x, int y) {
         requireOpen();
         boolean canRestBefore = canRest();
-        var definition = content.entity("goblin");
-
-        var existing = state().find(definition.id());
-        if (existing.isPresent()) {
-            throw new IllegalArgumentException(existing.get().isAlive()
-                    ? existing.get().name() + " is already on the grid."
-                    : existing.get().name() + " is dead. A spawn does not raise the dead.");
-        }
-
-        var goblin = definition.spawn(definition.id(), room().roomId(), x, y);
-        log.append(new Event.EntitySpawned(Instant.now(), goblin));
+        var definition = content.entity(kind);
+        var spawned = definition.spawn(nextEntityId(kind), room().roomId(), x, y);
+        log.append(new Event.EntitySpawned(Instant.now(), spawned));
         var diffs = new ArrayList<Diff>();
-        diffs.add(new Diff.EntityAdded(goblin.toView()));
+        diffs.add(new Diff.EntityAdded(spawned.toView()));
         addCanRestIfChanged(diffs, canRestBefore);
         return diffs;
+    }
+
+    /**
+     * Replay path: the log already named the creature. Do not mint a fresh goblin from
+     * content — that would ignore a recorded brute and restat an old fight.
+     */
+    public List<Diff> spawnRecorded(Entity entity) {
+        requireOpen();
+        boolean canRestBefore = canRest();
+        log.append(new Event.EntitySpawned(Instant.now(), entity));
+        var diffs = new ArrayList<Diff>();
+        diffs.add(new Diff.EntityAdded(entity.toView()));
+        addCanRestIfChanged(diffs, canRestBefore);
+        return diffs;
+    }
+
+    /**
+     * Debug start-combat's pack: two goblins and a brute, so a fight has composition with
+     * no model in the path. Leaves an already-present hostile alone.
+     */
+    public List<Diff> ensureDebugHostiles() {
+        requireOpen();
+        boolean hostileHere = state().entitiesHere().stream()
+                .anyMatch(e -> e.isAlive() && !e.isPlayerControlled());
+        if (hostileHere) {
+            return List.of();
+        }
+        var diffs = new ArrayList<Diff>();
+        diffs.addAll(spawnHostile("goblin", openSquare().x(), openSquare().y()));
+        diffs.addAll(spawnHostile("goblin", openSquare().x(), openSquare().y()));
+        diffs.addAll(spawnHostile("brute", openSquare().x(), openSquare().y()));
+        return diffs;
+    }
+
+    private List<Diff> spawnContained(RoomDefinition.PropDefinition prop) {
+        var kind = prop.contains();
+        if (kind == null || kind.isBlank() || kindHere(kind, false)) {
+            return List.of();
+        }
+        var at = defaultGoblinSpawn();
+        if (!squareFree(at.x(), at.y())) {
+            at = openSquare();
+        }
+        return spawnHostile(kind, at.x(), at.y());
+    }
+
+    private boolean kindHere(String kind, boolean livingOnly) {
+        return state().entitiesHere().stream()
+                .anyMatch(e -> kind.equals(e.kind()) && (!livingOnly || e.isAlive()));
+    }
+
+    private String nextEntityId(String kind) {
+        if (state().find(kind).isEmpty()) {
+            return kind;
+        }
+        int n = 2;
+        while (state().find(kind + "-" + n).isPresent()) {
+            n++;
+        }
+        return kind + "-" + n;
+    }
+
+    private RoomDefinition.Point openSquare() {
+        var prefer = defaultGoblinSpawn();
+        int width = room().width();
+        int height = room().height();
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int px = (prefer.x() + x) % width;
+                int py = (prefer.y() + y) % height;
+                if (squareFree(px, py)) {
+                    return new RoomDefinition.Point(px, py);
+                }
+            }
+        }
+        throw new IllegalStateException("no open square to spawn on");
+    }
+
+    private boolean squareFree(int x, int y) {
+        if (!isInBounds(x, y) || obstructs(room(), state().takenHere(), x, y)) {
+            return false;
+        }
+        return state().entitiesHere().stream()
+                .noneMatch(e -> e.isAlive() && e.x() == x && e.y() == y);
     }
 
     /** Where the goblin comes out of the sarcophagus, if the DM does not name a square. */

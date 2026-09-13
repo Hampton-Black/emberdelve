@@ -66,8 +66,8 @@ public final class ReplayRunner {
             }
             switch (event) {
                 case Event.PartySpawned ignored -> engine.start();
-                case Event.EntitySpawned e -> engine.spawnGoblin(e.entity().x(), e.entity().y());
-                case Event.PropRevealed e -> engine.revealProp(e.propId());
+                case Event.EntitySpawned e -> engine.spawnRecorded(e.entity());
+                case Event.PropRevealed e -> engine.revealProp(e.propId(), false);
                 case Event.CombatStarted ignored -> engine.combat().start(SILENT);
                 case Event.EntityMoved e -> move(engine, e);
                 case Event.AttackResolved e ->

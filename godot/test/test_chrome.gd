@@ -1216,6 +1216,7 @@ func test_a_click_on_the_world_view_sends_move_to() -> void:
 	# Production clicks land on WorldView (a Control). World._unhandled_input never
 	# sees them — the same SubViewport isolation that made Chrome forward Q/E.
 	Table.set_started()
+	Table.awaiting_dm = false
 	var packed: PackedScene = load("res://chrome/chrome.tscn")
 	assert_not_null(packed, "chrome.tscn")
 	if packed == null:
@@ -1261,6 +1262,7 @@ func test_hover_uses_control_local_position() -> void:
 	# SubViewportContainer then pushes the same event into the 3D world;
 	# World must not convert it again or the hover sits a board away.
 	Table.set_started()
+	Table.awaiting_dm = false
 	var packed: PackedScene = load("res://chrome/chrome.tscn")
 	assert_not_null(packed, "chrome.tscn")
 	if packed == null:

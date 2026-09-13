@@ -220,7 +220,10 @@ public final class WsHandler {
             case "debugScene" -> send(ctx, new ServerMessage.Scene(engine.scene()));
 
             // Combat without a model in the path, for the same reason debugRoll exists.
-            case "debugStartCombat" -> act(ctx, sink -> engine.combat().start(sink));
+            case "debugStartCombat" -> act(ctx, sink -> {
+                sink.diffs(engine.ensureDebugHostiles());
+                engine.combat().start(sink);
+            });
 
             // Re-runs the opening past its once-per-session guard, for tuning it without a restart.
             case "debugOpen" -> {

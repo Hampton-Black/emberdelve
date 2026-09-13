@@ -166,6 +166,14 @@ func test_a_legal_target_click_sends_attack_with_the_active_id() -> void:
 	assert_eq(Net.outbound[0]["targetId"], "goblin")
 
 
+func test_awaiting_dm_does_not_send_attack() -> void:
+	Table.set_scene(_fighting("keeper", [{"x": 3, "y": 2}], ["goblin"]))
+	Table.awaiting_dm = true
+	var world := _world_tree()
+	_commit_pick(world, "goblin", Vector2i(8, 6))
+	assert_eq(Net.outbound.size(), 0, "the board is locked while the DM has the floor")
+
+
 func test_an_illegal_combat_click_sends_nothing() -> void:
 	Table.set_scene(_fighting("keeper", [{"x": 3, "y": 2}], ["goblin"]))
 	var world := _world_tree()

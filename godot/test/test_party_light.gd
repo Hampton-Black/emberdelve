@@ -119,6 +119,22 @@ func test_hostile_figure_has_no_emission_and_the_party_does() -> void:
 	assert_eq(_emission_count(goblin), 0, "hostiles show where the pool reaches them")
 
 
+func test_brute_figure_has_no_self_lit_either() -> void:
+	var fighting := CRYPT.duplicate(true)
+	fighting["entities"] = [FIGHTER.duplicate(), {
+		"id": "brute", "kind": "brute", "name": "Brakk", "x": 5, "y": 5,
+		"hp": 16, "maxHp": 16, "isPlayerControlled": false,
+	}]
+	Table.set_scene(SceneFixtures.scene(fighting))
+	var world := _world_tree()
+	await wait_process_frames(2)
+	var brute := world.get_node_or_null("Tokens/brute")
+	assert_not_null(brute, "brute")
+	if brute == null:
+		return
+	assert_eq(_emission_count(brute), 0, "hostiles still carry no glow of their own")
+
+
 func test_env_dark_keeps_torchlit_colour_at_its_own_energy() -> void:
 	var world := _world_tree()
 	await wait_process_frames(2)

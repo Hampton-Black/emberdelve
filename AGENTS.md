@@ -197,7 +197,8 @@ a multi-tenant provider measure a moment, not a steady state.
 | Rooms | Five authored: `content/rooms/crypt.json`, `gallery.json`, `chapel.json`, `undercroft.json`, and `vault.json`. No generated dungeon. |
 | Party | `List<PartyMember>` containing one member |
 | Fighter | AC 16, HP 20, +5 to hit, 1d8+3 damage, speed 30ft, STR +3 |
-| Goblin | AC 15, HP 7, +4 to hit, 1d6+2 damage, speed 30ft |
+| Goblin | AC 12, HP 6, +3 to hit, 1d4+1 damage, speed 30ft |
+| Brute | AC 13, HP 16, +4 to hit, 1d8+2 damage, speed 30ft |
 | Attack resolution | `d20 + bonus >= AC`; nat 20 doubles dice. No crit tables, no resistances. |
 | Skill check DCs | A 5-value enum only: 5 / 10 / 15 / 20 / 25 |
 | Voices | Two voice IDs in config, chosen by entity **kind** |

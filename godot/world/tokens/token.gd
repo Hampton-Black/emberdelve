@@ -26,6 +26,10 @@ const MODELS := {
 		"path": "res://world/kits/characters/kaykit_skeletons/Skeleton_Warrior.glb",
 		"height": 0.68,
 	},
+	"brute": {
+		"path": "res://world/kits/characters/kaykit_skeletons/Skeleton_Warrior.glb",
+		"height": 0.68,
+	},
 }
 
 const CLIPS := {
@@ -50,6 +54,7 @@ const CLIPS := {
 const BASE_COLOR := {
 	"fighter": Color(0.839216, 0.788235, 0.658824),
 	"goblin": Color(0.560784, 0.290196, 0.239216),
+	"brute": Color(0.560784, 0.290196, 0.239216),
 }
 
 const FALLBACK := Color(0.8, 0.8, 0.8)

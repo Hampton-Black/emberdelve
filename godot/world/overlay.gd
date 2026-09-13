@@ -55,6 +55,8 @@ func _ready() -> void:
 ## Actor is `combat.activeId` in a fight, or the first living player-controlled
 ## entity out of one. Never a hardcoded creature id.
 func intent(entity_id: String, square: Variant = null, target_id: String = "") -> Dictionary:
+	if Table.awaiting_dm:
+		return {}
 	var scene := Table.scene
 	if scene.is_empty():
 		return {}
@@ -152,7 +154,7 @@ func _prop_intent(target_id: String) -> Dictionary:
 ## Sent, never applied locally. The token does not budge until the server says
 ## it moved (invariant #1). The swing is Table.strike, not this path.
 func commit(action: Dictionary) -> void:
-	if action.is_empty():
+	if action.is_empty() or Table.awaiting_dm:
 		return
 	match String(action.get("kind", "")):
 		"move", "blocked":

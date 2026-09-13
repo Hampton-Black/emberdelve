@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class CombatEngineTest {
 
-    /** Fighter: AC 16, 20 hp, +5 to hit, 1d8+3, DEX +1. Goblin: AC 15, 7 hp, +4, 1d6+2, DEX +2. */
+    /** Fighter: AC 16, 20 hp, +5 to hit, 1d8+3, DEX +1. Goblin: AC 12, 6 hp, +3, 1d4+1, DEX +2. */
     private static Fixture fight(Integer... faces) {
         var log = new EventLog();
         var engine = new GameEngine(new ContentLoader(), log, new ScriptedDiceRoller(faces));
@@ -154,7 +154,7 @@ class CombatEngineTest {
     @Test
     @DisplayName("a hit applies damage and reports it as a stat change")
     void hitAppliesDamage() {
-        // initiative 20/1 (fighter first), attack 14 (+5 = 19 vs AC 15), damage 4 (+3 = 7).
+        // initiative 20/1 (fighter first), attack 14 (+5 = 19 vs AC 12), damage 4 (+3 = 7).
         var fixture = fight(20, 1, 14, 4);
         fixture.start();
         fixture.place("fighter", 6, 5);
@@ -198,7 +198,7 @@ class CombatEngineTest {
         var sink = new CombatSink.Buffer();
         fixture.engine.combat().attack("fighter", "goblin", sink);
 
-        assertEquals(7, fixture.get("goblin").hp());
+        assertEquals(6, fixture.get("goblin").hp());
         assertTrue(sink.collectedRolls().stream()
                 .noneMatch(r -> r.request().purpose() == RollPurpose.DAMAGE));
     }
@@ -336,7 +336,7 @@ class CombatEngineTest {
     @Test
     @DisplayName("the goblin closes the distance and swings in the same turn")
     void goblinClosesAndAttacks() {
-        // initiative 1/20 (goblin first), then its attack 19 (+4 = 23 vs AC 16), damage 4.
+        // initiative 1/20 (goblin first), then its attack 19 (+3 = 22 vs AC 16), damage 4.
         var fixture = fight(1, 20, 19, 4);
         fixture.start();
         fixture.place("fighter", 6, 1);
@@ -347,7 +347,7 @@ class CombatEngineTest {
 
         assertTrue(fixture.get("goblin").isAdjacentTo(fixture.get("fighter")),
                 "it should have moved into reach");
-        assertEquals(14, fixture.get("fighter").hp(), "20 hp less 4+2 damage");
+        assertEquals(15, fixture.get("fighter").hp(), "20 hp less 4+1 damage");
         assertEquals("fighter", fixture.engine.combat().activeId(), "and then ended its turn");
     }
 
@@ -375,18 +375,18 @@ class CombatEngineTest {
     @Test
     @DisplayName("a wound is described, never counted — the narrator must not read hit points out")
     void woundIsDescribedNotCounted() {
-        // The goblin swings, because only the fighter has enough hit points to survive a hit and
-        // still be a fraction. 12 less 4+2 is half, which is "bloodied" rather than "6/12".
+        // One goblin hit is 1d4+1; from 16 that lands in the bloodied band (11/20), never a count.
         var fixture = fight(1, 20, 14, 4);
         fixture.start();
         fixture.place("goblin", 6, 5);
         fixture.place("fighter", 6, 4);
+        fixture.put(fixture.get("fighter").withHp(16));
 
         var sink = new CombatSink.Buffer();
         fixture.engine.combat().attack("goblin", "fighter", sink);
 
         var beat = sink.collectedBeats().getLast();
-        assertEquals("Vessk hits you for 6 damage. You are now bloodied.", beat);
+        assertEquals("Vessk hits you for 5 damage. You are now bloodied.", beat);
         assertFalse(beat.contains("/") || beat.toLowerCase().contains("hp"),
                 "a hit-point count here invites the model to say it");
     }
@@ -475,12 +475,11 @@ class CombatEngineTest {
         fixture.put(fixture.get("goblin").damaged(99));
         assertFalse(fixture.get("goblin").isAlive(), "setup: the goblin should be dead");
 
-        var refused = assertThrows(IllegalArgumentException.class,
-                () -> fixture.engine().spawnGoblin(6, 6));
-        assertTrue(refused.getMessage().contains("dead"), refused.getMessage());
+        fixture.engine().spawnGoblin(5, 6);
 
         assertFalse(fixture.get("goblin").isAlive(),
                 "a spawn brought the dead goblin back to full health");
+        assertTrue(fixture.get("goblin-2").isAlive());
     }
 
     @Test
@@ -489,7 +488,6 @@ class CombatEngineTest {
         var fixture = fight(20, 20, 20, 20, 20, 20);
 
         fixture.put(fixture.get("goblin").damaged(99));
-        assertThrows(IllegalArgumentException.class, () -> fixture.engine().spawnGoblin(6, 6));
 
         var sink = fixture.start();
 

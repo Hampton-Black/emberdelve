@@ -833,9 +833,14 @@ public final class DmService {
         // A generated room has no crypt-specific notes, and a Secrets heading with nothing
         // under it is an invitation to invent one — so when neither note exists the whole
         // block, preamble included, is omitted.
-        var sarcophagusNote = engine.state().find("goblin").isEmpty()
-                ? room.dmNotes().theSarcophagus()
-                : room.dmNotes().theSarcophagusOpened();
+        var occupantOut = room.props().stream()
+                .map(dm.content.RoomDefinition.PropDefinition::contains)
+                .filter(kind -> kind != null && !kind.isBlank())
+                .anyMatch(kind -> engine.state().entities().values().stream()
+                        .anyMatch(e -> kind.equals(e.kind())));
+        var sarcophagusNote = occupantOut
+                ? room.dmNotes().theSarcophagusOpened()
+                : room.dmNotes().theSarcophagus();
         var doorNote = room.dmNotes().theDoor();
         boolean anySecret = sarcophagusNote != null && !sarcophagusNote.isBlank()
                 || doorNote != null && !doorNote.isBlank();

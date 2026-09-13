@@ -71,7 +71,9 @@ public final class TtsClient {
      * <p>Package-private so the choice can be tested without a key or a network.
      */
     String voiceFor(String speakerId) {
-        return "goblin".equalsIgnoreCase(kindOf.apply(speakerId)) ? goblinVoice : narratorVoice;
+        String kind = kindOf.apply(speakerId);
+        return "goblin".equalsIgnoreCase(kind) || "brute".equalsIgnoreCase(kind)
+                ? goblinVoice : narratorVoice;
     }
 
     /**

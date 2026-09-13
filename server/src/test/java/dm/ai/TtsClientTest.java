@@ -18,6 +18,7 @@ class TtsClientTest {
             "goblin", "goblin",
             "goblin-1", "goblin",
             "goblin-2", "goblin",
+            "brute", "brute",
             "fighter", "fighter");
 
     private TtsClient client() {
@@ -32,6 +33,8 @@ class TtsClientTest {
         assertEquals("goblin-voice", client().voiceFor("goblin-1"),
                 "a dungeon with two goblins gives them distinct ids and one voice");
         assertEquals("goblin-voice", client().voiceFor("goblin-2"));
+        assertEquals("goblin-voice", client().voiceFor("brute"),
+                "the brute shares the hostile voice; a third voice is not this ticket");
     }
 
     @Test

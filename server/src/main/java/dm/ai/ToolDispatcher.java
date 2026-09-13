@@ -138,8 +138,10 @@ public final class ToolDispatcher {
 
     private Result spawnEntity(JsonNode args) {
         String kind = args.path("kind").asText("");
-        if (!"goblin".equals(kind)) {
-            return Result.rejected("only 'goblin' is statted in this build, got '" + kind + "'");
+        // Asked for a kind this tool does not offer. The brute is engine-chosen
+        // (authored spawns, ALERT, debug) — ADR-0013: the model must not pick lethality.
+        if (!ToolSchema.SPAWNABLE_KINDS.contains(kind)) {
+            return Result.rejected("only 'goblin' is spawnable by this tool, got '" + kind + "'");
         }
 
         int x = args.path("x").asInt(-1);
@@ -153,16 +155,6 @@ public final class ToolDispatcher {
                 .anyMatch(e -> e.x() == x && e.y() == y);
         if (occupied) {
             return Result.rejected("(" + x + "," + y + ") is already occupied — pick another square");
-        }
-
-        // The engine keeps one goblin and throws rather than overwrite it. Asked for a second,
-        // the model should be told why and left to write around it, not handed an exception.
-        var existing = engine.state().find("goblin");
-        if (existing.isPresent()) {
-            return Result.rejected(existing.get().isAlive()
-                    ? "there is already a goblin on the grid — it cannot be spawned twice"
-                    : "the goblin is dead and cannot be spawned again; this build stats one "
-                            + "goblin, and it does not come back");
         }
 
         List<Diff> diffs = engine.spawnGoblin(x, y);

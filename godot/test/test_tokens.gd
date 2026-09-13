@@ -330,3 +330,34 @@ func test_a_creature_revives_when_hit_points_return() -> void:
 	var current := String(player.current_animation)
 	assert_true(current.ends_with("idle") or current == "idle",
 		"hp > 0 stands the body back up: %s" % current)
+
+
+func test_brute_uses_the_skeleton_warrior_mesh() -> void:
+	var spec: Variant = Token.MODELS.get("brute")
+	assert_eq(typeof(spec), TYPE_DICTIONARY, "brute is a kind the token table knows")
+	if typeof(spec) != TYPE_DICTIONARY:
+		return
+	assert_eq(spec["path"], Token.MODELS["goblin"]["path"],
+		"same Skeleton_Warrior mesh — content and turn order, not art")
+	var fighting := CRYPT.duplicate(true)
+	fighting["entities"] = [FIGHTER.duplicate(), {
+		"id": "brute", "kind": "brute", "name": "Brakk", "x": 5, "y": 5,
+		"hp": 16, "maxHp": 16, "isPlayerControlled": false,
+	}]
+	Table.set_scene(SceneFixtures.scene(fighting))
+	var world := _world_tree()
+	var brute := _token(world, "brute")
+	assert_not_null(brute, "brute token")
+	if brute == null:
+		return
+	var figure := brute.get_node_or_null("Pivot/Figure") as Node3D
+	assert_not_null(figure, "Pivot/Figure")
+	if figure == null:
+		return
+	assert_gt(figure.get_child_count(), 0, "a mesh mounted, not an empty figure")
+	var capsules := 0
+	for mesh in figure.find_children("*", "MeshInstance3D", true, false):
+		var inst := mesh as MeshInstance3D
+		if inst != null and inst.mesh is CapsuleMesh:
+			capsules += 1
+	assert_eq(capsules, 0, "placeholder capsule means MODELS missed the brute")

@@ -1,0 +1,29 @@
+{
+  "id": "brute",
+  "kind": "brute",
+  "name": "Brakk",
+  "ac": 13,
+  "maxHp": 16,
+  "toHit": 4,
+  "damageDice": "1d8",
+  "damageModifier": 2,
+  "speedFeet": 30,
+  "abilityModifiers": {
+    "STR": 3,
+    "DEX": 1,
+    "CON": 2,
+    "INT": -2,
+    "WIS": 0,
+    "CHA": -2
+  },
+  "skillModifiers": {
+    "ATHLETICS": 5,
+    "PERCEPTION": 0,
+    "INVESTIGATION": -2,
+    "STEALTH": 1,
+    "PERSUASION": -2
+  },
+  "isPlayerControlled": false,
+  "description": "A hulking grave-warden in rusted plates, swinging a notched longsword.",
+  "voice": "goblin"
+}
