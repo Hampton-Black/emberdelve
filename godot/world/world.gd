@@ -12,7 +12,6 @@ extends Node3D
 ## you is still where you left it. How much of each one is drawn is `Room.level_for`.
 
 const CameraRigScript := preload("res://world/camera_rig.gd")
-const PROP_TABLE := preload("res://world/prop_table.tres")
 const TOKEN_SCENE := preload("res://world/tokens/token.tscn")
 
 ## Player-controlled tokens sit on this layer so the party's OmniLight can light them
@@ -75,13 +74,7 @@ func current_room_id() -> String:
 ## falls back to the current one rather than to NaN — a diff naming an unknown room is a bug
 ## worth seeing as a token in the wrong place, not as a token that has vanished.
 func grid_to_world(room_id: String, x: int, y: int) -> Vector3:
-	var size := _size_of(room_id)
-	var origin: Vector3 = _origins.get(room_id, Vector3.ZERO)
-	return origin + Vector3(
-		x - float(size.x) / 2.0 + 0.5,
-		0.0,
-		-(y - float(size.y) / 2.0 + 0.5),
-	)
+	return Grid.to_world(x, y, _size_of(room_id), _origins.get(room_id, Vector3.ZERO))
 
 
 ## The exact inverse of grid_to_world, for the same room.
@@ -93,12 +86,7 @@ func grid_to_world(room_id: String, x: int, y: int) -> Vector3:
 ## in silence.
 func world_to_grid(point: Vector3, room_id: String = "") -> Vector2i:
 	var id := _room_id if room_id.is_empty() else room_id
-	var size := _size_of(id)
-	var origin: Vector3 = _origins.get(id, Vector3.ZERO)
-	return Vector2i(
-		roundi(point.x - origin.x + float(size.x) / 2.0 - 0.5),
-		roundi(origin.z - point.z + float(size.y) / 2.0 - 0.5),
-	)
+	return Grid.to_square(point, _size_of(id), _origins.get(id, Vector3.ZERO))
 
 
 ## Whose floor a world-space point stands on — "" for a point on no floor at all.
@@ -287,18 +275,8 @@ func _instance_prop(prop: Dictionary, room_id: String) -> void:
 		return
 	if bool(prop.get("hidden", false)):
 		return
-	var packed: PackedScene = PROP_TABLE.scene_for(String(prop.get("type", "")))
-	if packed == null:
-		return
-	var node := packed.instantiate() as Node3D
-	if node == null:
-		return
-	node.name = id
-	node.position = grid_to_world(room_id, int(prop.get("x", 0)), int(prop.get("y", 0)))
-	node.rotation.y = deg_to_rad(float(prop.get("rotation", 0.0)))
-	holder.add_child(node)
-	if node.has_method("configure"):
-		node.configure(prop, room_id)
+	PropPlace.into(holder, prop, room_id,
+		grid_to_world(room_id, int(prop.get("x", 0)), int(prop.get("y", 0))))
 
 
 func _props_of(room_id: String) -> Node3D:

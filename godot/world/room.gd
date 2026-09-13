@@ -575,11 +575,7 @@ func _to_world(room_id: String, gx: int, gy: int, size: Vector2i) -> Vector3:
 	# grid_to_world already carries the registered origin, so nothing here moves the node too.
 	if world != null:
 		return world.grid_to_world(room_id, gx, gy)
-	return Vector3(
-		gx - float(size.x) / 2.0 + 0.5,
-		0.0,
-		-(gy - float(size.y) / 2.0 + 0.5),
-	)
+	return Grid.to_world(gx, gy, size, _origin())
 
 
 func _clear(node: Node) -> void:
