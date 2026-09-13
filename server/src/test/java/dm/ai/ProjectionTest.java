@@ -110,6 +110,7 @@ class ProjectionTest {
         assertFalse(partyBlock.toLowerCase().contains("lantern"), partyBlock);
 
         var entitiesBlock = section(text, "## Entities present");
+        assertTrue(entitiesBlock.contains("None."), entitiesBlock);
         assertFalse(entitiesBlock.contains("`fighter`"), entitiesBlock);
         assertFalse(entitiesBlock.contains("[the player]"), entitiesBlock);
         assertFalse(HP_FRACTION.matcher(entitiesBlock).find(), entitiesBlock);
@@ -214,6 +215,20 @@ class ProjectionTest {
         assertTrue(movedAt > afterSensory && movedAt < visible, text);
         assertFalse(text.contains(lit), text);
         assertTrue(engine.state().lightingIn("crypt").isPresent());
+    }
+
+    @Test
+    @DisplayName("entities present says None until a hostile arrives")
+    void entitiesPresentSaysNoneUntilSpawned() {
+        var engine = started();
+        var empty = section(projection(engine), "## Entities present");
+        assertTrue(empty.contains("None."), empty);
+        assertFalse(empty.contains("`goblin`"), empty);
+
+        engine.spawnGoblin(6, 6);
+        var withGoblin = section(projection(engine), "## Entities present");
+        assertFalse(withGoblin.contains("None"), withGoblin);
+        assertTrue(withGoblin.contains("`goblin`"), withGoblin);
     }
 
     @Test

@@ -848,10 +848,12 @@ public final class DmService {
         var partyIds = engine.state().party().stream()
                 .map(PartyMember::entityId)
                 .collect(Collectors.toSet());
+        boolean anyoneElse = false;
         for (var entity : engine.state().entitiesHere()) {
             if (partyIds.contains(entity.id())) {
                 continue;
             }
+            anyoneElse = true;
             sb.append("- `").append(entity.id()).append("` — ").append(entity.name())
                     .append(", at (").append(entity.x()).append(",").append(entity.y())
                     .append(")").append(entity.isAlive() ? "" : " [dead]")
@@ -864,6 +866,9 @@ public final class DmService {
                     // sitting unread in the content files.
                     .append(". ").append(engine.content().entity(entity.kind()).description())
                     .append("\n");
+        }
+        if (!anyoneElse) {
+            sb.append("None.\n");
         }
 
         var combat = engine.combat();
