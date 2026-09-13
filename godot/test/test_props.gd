@@ -218,6 +218,90 @@ func test_the_sarcophagus_is_a_tomb_not_a_crate() -> void:
 ## a teal, and a green that leans colder puts the door marker back where ADR-0011 found it
 ## invisible. The energy is well under the old orange 4.5 because the eye is most sensitive to
 ## green, so the same number reads far hotter — and the prose word is "guttering".
+func test_cold_brazier_has_no_light_and_dead_coals() -> void:
+	var packed: PackedScene = load("res://world/props/brazier.tscn")
+	var brazier: Node = packed.instantiate()
+	add_child_autofree(brazier)
+	assert_true(brazier.has_method("configure"), "brazier.configure")
+	if not brazier.has_method("configure"):
+		return
+	brazier.configure({"id": "fire", "type": "BRAZIER", "appearance": "cold"}, "crypt")
+	var light := _find_omni(brazier)
+	assert_not_null(light, "brazier OmniLight named flame")
+	if light == null:
+		return
+	assert_almost_eq(light.light_energy, 0.0, 0.01)
+	var coals := brazier.get_node_or_null("Meshes/Coals") as MeshInstance3D
+	assert_not_null(coals, "Meshes/Coals")
+	if coals == null:
+		return
+	var mat := coals.get_surface_override_material(0) as StandardMaterial3D
+	if mat == null:
+		mat = coals.get_active_material(0) as StandardMaterial3D
+	assert_not_null(mat, "coals material")
+	if mat == null:
+		return
+	assert_almost_eq(mat.emission_energy_multiplier, 0.0, 0.01)
+	assert_lt(mat.albedo_color.r + mat.albedo_color.g + mat.albedo_color.b, 0.8,
+		"dead coals are grey ash, not green")
+
+
+func test_cold_is_decided_by_appearance_not_prop_id() -> void:
+	var packed: PackedScene = load("res://world/props/brazier.tscn")
+	var brazier: Node = packed.instantiate()
+	add_child_autofree(brazier)
+	if not brazier.has_method("configure"):
+		return
+	brazier.configure({"id": "anything-but-brazier-head", "type": "BRAZIER",
+		"appearance": "cold"}, "crypt")
+	var light := _find_omni(brazier)
+	assert_not_null(light)
+	if light == null:
+		return
+	assert_almost_eq(light.light_energy, 0.0, 0.01,
+		"cold follows appearance, not a hard-coded prop id")
+
+
+func test_room_lighting_dark_douses_authored_lit_brazier() -> void:
+	var world := _world_tree()
+	var fire := _prop(world, "fire")
+	assert_not_null(fire, "fire")
+	if fire == null:
+		return
+	var light := _find_omni(fire)
+	assert_not_null(light)
+	if light == null:
+		return
+	assert_gt(light.light_energy, 0.0, "setup: crypt brazier burns")
+	Table.apply_diffs([{"kind": "RoomLightingChanged", "roomId": "crypt", "lighting": "DARK"}])
+	await wait_frames(2)
+	assert_almost_eq(light.light_energy, 0.0, 0.01, "DARK douses the brazier")
+	Table.apply_diffs([{"kind": "RoomLightingChanged", "roomId": "crypt", "lighting": "TORCHLIT"}])
+	await wait_frames(2)
+	assert_almost_eq(light.light_energy, 2.8, 0.05, "TORCHLIT relights an authored-lit brazier")
+
+
+func test_room_lighting_dark_leaves_cold_brazier_out() -> void:
+	var scene := CRYPT.duplicate(true)
+	scene["props"][1] = {"id": "fire", "type": "BRAZIER", "x": 2, "y": 8, "rotation": 0,
+		"hidden": false, "appearance": "cold"}
+	Table.set_scene(SceneFixtures.scene(scene))
+	var world := _world_tree()
+	var fire := _prop(world, "fire")
+	assert_not_null(fire)
+	if fire == null:
+		return
+	var light := _find_omni(fire)
+	assert_not_null(light)
+	if light == null:
+		return
+	assert_almost_eq(light.light_energy, 0.0, 0.01, "cold brazier starts out")
+	Table.apply_diffs([{"kind": "RoomLightingChanged", "roomId": "crypt", "lighting": "TORCHLIT"}])
+	await wait_frames(2)
+	assert_almost_eq(light.light_energy, 0.0, 0.01,
+		"TORCHLIT does not relight a cold brazier")
+
+
 func test_the_brazier_burns_green() -> void:
 	assert_true(ResourceLoader.exists("res://world/props/brazier.tscn"), "brazier.tscn")
 	if not ResourceLoader.exists("res://world/props/brazier.tscn"):

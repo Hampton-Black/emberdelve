@@ -1,4 +1,6 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://world/props/brazier.gd" id="1_script"]
 
 [sub_resource type="StandardMaterial3D" id="IronStem"]
 albedo_color = Color(0.180392, 0.168627, 0.156863, 1)
@@ -38,6 +40,7 @@ radial_segments = 10
 rings = 6
 
 [node name="Brazier" type="Node3D"]
+script = ExtResource("1_script")
 
 [node name="Meshes" type="Node3D" parent="."]
 scale = Vector3(0.65, 0.65, 0.65)

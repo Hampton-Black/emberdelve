@@ -72,6 +72,7 @@
       "y": 14,
       "rotation": 0,
       "hidden": false,
+      "appearance": "cold",
       "description": "A cold brazier at the head of the gallery, choked with grey ash. Whatever burned here burned out a long time before the green fires downstairs were lit."
     },
     {

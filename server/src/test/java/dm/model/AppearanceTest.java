@@ -35,11 +35,31 @@ class AppearanceTest {
     @DisplayName("every closed appearance names a kit mesh that exists on disk")
     void everyAppearanceHasAMesh() {
         var missing = Appearances.all().stream()
+                .filter(spec -> !spec.kit().isEmpty())
                 .filter(spec -> !Files.isRegularFile(spec.meshFile()))
                 .map(spec -> spec.id() + " → " + spec.meshFile())
                 .toList();
         assertEquals(java.util.List.of(), missing,
                 "a missing appearance must fail this test, not skip");
+    }
+
+    @Test
+    @DisplayName("BRAZIER lit and cold are known looks; cold is not id-specific")
+    void brazierLitAndColdAppearances() {
+        assertTrue(Appearances.isKnown(PropType.BRAZIER, "lit"));
+        assertTrue(Appearances.isKnown(PropType.BRAZIER, "cold"));
+        assertFalse(Appearances.isKnown(PropType.BRAZIER, "no_such_look"));
+        assertDoesNotThrow(() -> new dm.content.RoomDefinition.PropDefinition(
+                "fire", PropType.BRAZIER, 1, 2, 0, false,
+                "a cold brazier", "", "", java.util.List.of(), "cold"));
+    }
+
+    @Test
+    @DisplayName("the gallery's brazier-head is authored cold")
+    void galleryBrazierHeadIsCold() {
+        var prop = CONTENT.room("gallery").prop("brazier-head");
+        assertEquals(PropType.BRAZIER, prop.type());
+        assertEquals("cold", prop.appearance());
     }
 
     @Test

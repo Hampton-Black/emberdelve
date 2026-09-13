@@ -153,9 +153,20 @@ func _on_room_lighting_changed(room_id: String) -> void:
 	var node := _node_for_room(room_id)
 	if node != null:
 		node.rebuild_fires(view, _room_id)
+	_snap_brazier_fires(room_id)
 	var lighting := get_node_or_null("Room/Lighting")
 	if lighting != null and lighting.has_method("apply"):
 		lighting.apply()
+
+
+## Snap every BRAZIER in this room to the room's current fires preset — without rebuilding props.
+func _snap_brazier_fires(room_id: String) -> void:
+	var holder := _props_of(room_id)
+	if holder == null:
+		return
+	for child in holder.get_children():
+		if child.has_method("apply_fires"):
+			child.apply_fires(room_id)
 
 
 func _node_for_room(room_id: String) -> Room:

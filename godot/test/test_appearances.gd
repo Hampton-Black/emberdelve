@@ -42,6 +42,8 @@ func test_every_catalog_appearance_has_a_mesh_on_disk() -> void:
 		return
 	var missing: Array[String] = []
 	for spec in Appear.all():
+		if String(spec.get("kit", "")).is_empty():
+			continue
 		var path := String(Appear.res_path(spec))
 		if path.is_empty() or not ResourceLoader.exists(path):
 			missing.append("%s → %s" % [spec.get("id", "?"), path])

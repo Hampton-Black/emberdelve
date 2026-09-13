@@ -39,5 +39,7 @@
   "column":             {"type": "PILLAR",    "kit": "kaykit_dungeon",    "file": "column",             "height": 0.73, "footprint": 0.9},
   "halloween_pillar":   {"type": "PILLAR",    "kit": "kaykit_halloween",  "file": "pillar",             "height": 1.6,  "footprint": 0.9},
   "rubble_half":        {"type": "RUBBLE",    "kit": "kaykit_dungeon",    "file": "rubble_half",        "height": 0.5,  "footprint": 0.85},
-  "rubble_large":       {"type": "RUBBLE",    "kit": "kaykit_dungeon",    "file": "rubble_large",       "height": 0.5,  "footprint": 0.85}
+  "rubble_large":       {"type": "RUBBLE",    "kit": "kaykit_dungeon",    "file": "rubble_large",       "height": 0.5,  "footprint": 0.85},
+  "lit":                {"type": "BRAZIER",   "kit": "",                  "file": "",                   "height": 0.0,  "footprint": 0.0},
+  "cold":               {"type": "BRAZIER",   "kit": "",                  "file": "",                   "height": 0.0,  "footprint": 0.0}
 }
