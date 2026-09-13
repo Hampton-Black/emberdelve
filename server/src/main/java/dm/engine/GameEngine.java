@@ -518,6 +518,17 @@ public final class GameEngine {
                 .toList();
     }
 
+    /**
+     * Whether a solid prop on the authored floor plan still blocks this square.
+     * Taken props are gone from play even though the authored list still lists them.
+     */
+    static boolean obstructs(RoomDefinition room, Set<String> taken, int x, int y) {
+        return room.props().stream()
+                .anyMatch(p -> p.x() == x && p.y() == y
+                        && p.type().blocksMovement()
+                        && !taken.contains(p.id()));
+    }
+
     /** A room's props as the client may see them: hidden ones withheld unless revealed there. */
     private List<Prop> visiblePropsOf(RoomDefinition def, Set<String> revealed) {
         var taken = state().takenIn(def.roomId());
@@ -634,7 +645,7 @@ public final class GameEngine {
         if (!isInBounds(x, y)) {
             throw new IllegalArgumentException("Off the grid: " + x + "," + y);
         }
-        if (room().isObstructed(x, y)) {
+        if (obstructs(room(), state().takenHere(), x, y)) {
             throw new IllegalArgumentException("Something solid is already at " + x + "," + y);
         }
         boolean occupied = state().entitiesHere().stream()

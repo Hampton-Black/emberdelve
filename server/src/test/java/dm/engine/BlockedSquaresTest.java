@@ -73,4 +73,49 @@ class BlockedSquaresTest {
         var door = engine.scene().currentRoom().exits().getFirst();
         assertFalse(engine.scene().blocked().contains(new Square(door.x(), door.y())));
     }
+
+    @Test
+    @DisplayName("once a blocking prop is taken, its square is walkable")
+    void vacatedChestIsWalkable() {
+        var reliquary = new Square(4, 2);
+        assertTrue(engine.scene().blocked().contains(reliquary),
+                "the reliquary blocks before it is taken");
+
+        engine.takeProp("reliquary");
+
+        assertFalse(engine.scene().blocked().contains(reliquary),
+                "the reliquary no longer blocks once it is in hand");
+        assertDoesNotThrow(() -> engine.moveTo("fighter", 4, 2, new CombatSink.Buffer()));
+    }
+
+    @Test
+    @DisplayName("a square the board does not draw solid is one the engine will not refuse as solid")
+    void unblockedIsNotRefusedAsSolid() {
+        engine.takeProp("reliquary");
+        var scene = engine.scene();
+        var room = scene.currentRoom();
+
+        for (int x = 0; x < room.width(); x++) {
+            for (int y = 0; y < room.height(); y++) {
+                final int atX = x;
+                final int atY = y;
+                var square = new Square(atX, atY);
+                if (scene.blocked().contains(square)) {
+                    continue;
+                }
+                boolean occupied = scene.entities().stream()
+                        .anyMatch(e -> e.isAlive() && e.x() == atX && e.y() == atY
+                                && !e.id().equals("fighter"));
+                if (occupied) {
+                    continue;
+                }
+                try {
+                    engine.moveTo("fighter", atX, atY, new CombatSink.Buffer());
+                } catch (IllegalArgumentException boom) {
+                    assertFalse(boom.getMessage().contains("solid"),
+                            "unblocked square " + square + " refused as solid: " + boom.getMessage());
+                }
+            }
+        }
+    }
 }

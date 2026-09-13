@@ -467,7 +467,7 @@ public final class CombatEngine {
         var room = currentRoom.get();
         return square.x() >= 0 && square.x() < room.width()
                 && square.y() >= 0 && square.y() < room.height()
-                && !room.isObstructed(square.x(), square.y())
+                && !GameEngine.obstructs(room, state().takenIn(room.roomId()), square.x(), square.y())
                 && !occupied.contains(square);
     }
 
