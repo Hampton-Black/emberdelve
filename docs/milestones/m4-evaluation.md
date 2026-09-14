@@ -7,7 +7,8 @@
 **Status: PASS, signed 2026-09-13 against two logged Godot sessions on `m4-delve`. See §7.** The
 first run took the reliquary, chose the north door, and died in the vault holding it. The second
 took the reliquary and walked south: *Roderick came out.* Spec §11's two-session shape is now
-played. Empty-handed extract was not.
+played. Empty-handed extract was not. **Criterion 3 was not met** — no door in either run was a
+hard call (§2, §4). The headline question does not rest on it; the generator plan does.
 
 ---
 
@@ -41,7 +42,7 @@ session.
 |---|---|---|
 | 1 | Take the objective, then choose between leaving with it and going deeper | **Held, twice.** Greed run: click-took the reliquary, rested, walked north. Extract run: typed `take_prop`, walked south, `stair-south`. |
 | 2 | A second session in which the delve is lost | **Held.** Greed run: Brakk killed Roderick in the vault. Ending `PARTY_LOST`. The extract run is the other file spec §11 asked for, not a second wipe. Empty-handed extract was not played. |
-| 3 | Hurt, in front of a door, the decision is genuinely uncertain | **Held as greed, not as 5 HP.** The greed run was at 12 HP after the gallery, 16 after the rest — never five in a doorway. They named the death: too greedy, and it was fun. The extract run was at 20 HP the whole way and took the easy door on purpose. |
+| 3 | Hurt, in front of a door, the decision is genuinely uncertain | **Not met.** Spec §11: *if every door was an easy call in either direction, the numbers failed.* Lowest HP at any door was 10 (greed, crypt→gallery, potion clicked on arrival). The vault door was taken at 16/20, potion in hand, with nothing to say what was behind it. The extract run was at 20 HP throughout. Seven goblins in five fights dealt 16 damage in total; three of those fights dealt none. The death was a tail roll, not a doubt window (§4). They named it too greedy, and fun — both true, neither the criterion. |
 | 4 | Whether the clock was felt | **LIGHT was, both runs. ALERT was.** Greed: natural 1 filled LIGHT to `OUT` in the gallery; a spare torch; a follower. Extract: LIGHT died on the gallery→crypt crossing in the same bundle as `PATROL_ARRIVES`, the crypt's braziers went `DARK`, and the player liked that total dark more than the gallery still-lit bowls. See §4. |
 | 5 | Whether losing stings when nothing persists | **Held, by the player, on the greed run.** "1st run I was too greedy and died! that was fun." The extract run is the contrast that makes that sting readable: they *can* walk out. |
 | 6 | The kept sessions replay offline | **Greed: `replayed 207 events: identical`** (`theM4GateSessionReplays`). **Extract: `replayed 87 events: identical`** (`theM4ExtractSessionReplays`). Schema 3. |
@@ -57,16 +58,21 @@ Hit points from the swing log: start 20.
 **Crypt.** Inspect the sarcophagus (investigation 6 vs 15). Push the lid (athletics 20 vs 20).
 `spawn_entity` put Vessk on the dais. The player asked what he was doing in there; persuasion 13 vs
 15, and reconcile called `start_combat` — not the look, not the scream that followed. Vessk won
-initiative, hit twice for 5, died on the fighter's third swing. Roderick at **10**. Potion → **18**.
-Corpse search invented a vial and a spare torch; the counters did not move. Crypt alcove revealed.
-Clay lamp, black cloth, a key the board does not have.
+initiative, hit twice for 5, died on the fighter's third swing. Roderick at **10**. Corpse search
+found a rusted key the board does not have. Crypt alcove revealed: clay lamp, black cloth.
 
-**Gallery, first visit.** Dry cold, fallen ceiling, cold west brazier. Niche revealed. Six clay
-tokens taken. A follower at `SOMETHING_WANDERS_IN`. Failed persuasion, natural 1, LIGHT filled to
-`OUT`. The prose said pitch darkness. The gallery's wall torches did not go out — LIGHT spends the
-party's torch, not the room's fires. Spare torch spent (1 remaining), LIGHT back at 0. The tools
-model spawned a second Vessk. The player offered the tokens, then attacked. Two-goblin fight: first
-swing killed goblin-2; goblin-3 lasted. Roderick **18 → 12**. Chapel door.
+**Gallery, first visit.** Crossed at 10 HP; potion clicked on arrival → **18**. Dry cold, fallen
+ceiling, cold west brazier. Niche revealed. Six clay tokens taken. A look into the chapel, then
+chapel→gallery→crypt→gallery inside two minutes — three of LIGHT's first five ticks.
+
+**Gallery, again.** A follower at `SOMETHING_WANDERS_IN`. Failed persuasion, natural 1, LIGHT filled
+to `OUT`. The player credited the natural 1; five of the six ticks were crossings. The prose said
+pitch darkness. The gallery's wall torches did not go out — LIGHT spends the party's torch, not the
+room's fires. Spare torch spent (1 remaining), LIGHT back at 0. The player then clicked the niche's
+`SIGIL` three times; each click ran a full turn with checks, and on the second — a natural 2 on
+perception — reconcile spawned a second Vessk (`emberdelve-5md`). The player offered the tokens,
+then attacked. Two-goblin fight: first swing killed goblin-2; goblin-3 lasted. Roderick **18 → 12**.
+Corpse search invented a vial and a spare torch; the counters did not move. Chapel door.
 
 **Chapel.** Empty, as authored. Click-took the reliquary. Inspected the shrine niche, packed the
 votive and cloth in narration (no `prop_taken`). Rest 12→**16**. North, not south.
@@ -77,9 +83,11 @@ Roderick still **16**. Bookcase, empty coffin, barrel, niche with a lead cylinde
 cylinder and the vellum inside it. A ledger names Baron Aldus Vance. North.
 
 **Vault.** Dark room, gold chest, stone stag. Authored brute Brakk, `HOSTILE`, engine `combat.start`
-on the crossing — no `start_combat` tool. Brakk won initiative, missed, missed, hit 7 (Roderick at
-9), took 6 (Brakk at 10), hit **10** and killed him. `PARTY_LOST`. The greed chest was never
-touched.
+on the crossing — no `start_combat` tool. Brakk won initiative and missed. Roderick missed on a
+natural 2. Brakk hit 7 (Roderick at 9). Roderick hit 6 (Brakk at 10). Brakk rolled exactly 16
+against AC 16 for **10** — the most 1d8+2 can do — and killed him. `PARTY_LOST`. The greed chest was
+never touched. Everything said about the vault before the door was a colder draft
+(`emberdelve-8xh`).
 
 Returns along the way were returns. The gallery "just as you left them." The crypt still had Vessk
 on the flags and the two green braziers. Arrival speech fired on every crossing, first visits and
@@ -131,7 +139,33 @@ anyway.
 Same crossing: LIGHT fill, ALERT fill, `room_lighting_changed` crypt `BRAZIERLIT` → `DARK`. The
 player's torch died and the green bowls died with it. Judged: total darkness is better, and feel
 overrides the spec's "one clock meaning two things." Follow-on, not patched in front of this
-gate.
+gate. It was not a coincidence: LIGHT filling ticks ALERT (§6e), so that crossing took ALERT 4→5→6
+and `IT_IS_CLOSE` fired in the same bundle as `PATROL_ARRIVES` — the warning never got to warn. The
+two natural-1 ticks in the crypt are what put `LIGHT_OUT` on that crossing.
+
+**The vault death was a tail roll, and the sim behind §5a is optimistic.** From 16 HP one brute
+beats the fighter 14.4% of the time in `m4-attrition-sim.py`. That figure gives every foe a free
+turn to close; in both sessions every hostile swung on its first turn, Brakk from three squares.
+Without the approach turn it is **24.8%**, two goblins from full go 1.3% → 3.3%, and a brute at
+5 HP 54% → 71%. §5a's ladder and delve rates carry the same assumption into the generator plan
+(`emberdelve-q8o`). Nothing before the door said brute — the undercroft gave a colder draft — and
+the player, off two trivial goblin fights, read it as safe (`emberdelve-8xh`). §5a says the danger
+has to be legible before the door. It was not.
+
+**Clicking a marker is a whole turn.** `WsHandler.inspectMarker` submits "I look at the SIGIL: …"
+as free text, so the mechanics pass runs. The gallery `SIGIL` on the already-emptied niche was
+clicked four times; three clicks rolled checks and one spawned goblin-3 (`emberdelve-5md`). Markers
+are also standing in for props: a `SIGIL` on the revealed niche's own square, `SCORCH` for a lead
+cylinder, a vellum scroll and a torch strike. The purple glyphs the player took for "the clickable
+things" are those.
+
+**A move onto something solid is refused rather than resolved.** "Inspect the chair" and "inspect
+the coffin" put `move_entity` on the object's own square four times across both runs, and a click
+on furniture gets the same refusal in the client (`emberdelve-zim`).
+
+**A fact recorded the player's line as the goblin's.** 14:43:22, anchored on goblin-2: *The goblin
+spoke: "I can see you. Why are you following me?"* The vellum fact anchored on the coffin. Added to
+`emberdelve-pa8`.
 
 **The ALERT band `on you` is unreachable.** Spec §8b wants `quiet` / `stirring` / `hunting` / `on
 you` at filled 6. Spec §6f zeros ALERT on fill. After `SOMETHING_WANDERS_IN` / `PATROL_ARRIVES` the
@@ -140,10 +174,15 @@ next prompt says the site is quiet. Spec-versus-spec. Left for the generator pla
 **Invented loot on a corpse (greed run).** A potion and a torch, asserted, durable, counters
 unchanged. The hotdog class, now on a body. The player judged this working as designed.
 
-**Typed torch after combat did not light (extract run).** Same missing exploration bar as
-`emberdelve-0v6`. They asked the DM because the button was gone. The model narrated a strike,
-placed a clickable `SCORCH`, and never called `use_item`. LIGHT stayed out. Recurs on 0v6, not a
-second root.
+**Typed torch after combat did not light (extract run) — and it is not `0v6`.** They asked the DM
+because the bar was gone, but the bar is not why it failed. The server offered `use_item`: combat
+over, two torches, LIGHT full (`ToolSchema.usableItems`). `qwen3-next-80b` dropped the call, and
+reconcile, which has no `use_item`, placed two `SCORCH` markers for the strike instead. LIGHT stayed
+out. That is the dropped-tool-call failure mode, and it would have happened with the button on
+screen; the greed run's typed torch at 14:44 fired correctly. Two roots, not one.
+
+`0v6` itself is client-side: the bar hides while `Table.combat_beat` is non-null, a fight's end
+only marks the beat closing, and nothing clears it until the next room entry ships a fresh scene.
 
 **Combat highlights in the neighbour (extract run).** `PATROL_ARRIVES` started a fight while
 arrival was still being spoken. Legal-move quads showed in the gallery. Movement itself was the
@@ -152,7 +191,8 @@ crypt; the overlay caught up after the first turn.
 **Chrome leftovers, filed, not gate-fail.** Exploration bar stays gone after a fight
 (`emberdelve-0v6`) — extract run confirmed it. Potion, torch, and take clicks are silent
 (`emberdelve-kac`); rest already narrates. Arrival glues onto the previous transcript line
-(`emberdelve-2ks`). Ending page sits top-right (`emberdelve-vq3`). No current-room name in the
+(`emberdelve-2ks`); dialogue carries the model's blank lines in with it (`emberdelve-7o6`). Ending
+page sits top-right (`emberdelve-vq3`). No current-room name in the
 chrome (`emberdelve-eql`). Chapel candles clip the floor (`emberdelve-z0w`). `POTION (2)` copy
 (`emberdelve-8kf`). Crypt skull and lantern read too big (`emberdelve-hhb`). Gallery DIM still
 hangs enough wall torches to wash the aisle (`emberdelve-i97`). Legal-move highlights in the
@@ -205,8 +245,15 @@ HOSTILE occupant starts the fight the model is no longer allowed to start for fr
 delve has a page. The played half was not.
 
 The greed run took the thing the site is for, walked past the way out holding it, and died in the
-last room. They were not at 5 hit points in front of a door. They were at 16, rested, greedy, and
-the vault is what the brute is for. They said the death was fun.
+last room. They were not at 5 hit points in front of a door. They were at 16, rested, with no sign
+of what was behind it, and lost a fight they win three times in four or better — on the brute's
+best possible swing. They said the death was fun, and it was. It was not the doubt window.
+
+**Criterion 3 is not met, and the pass does not rest on it.** The question was whether a delve can
+be lost and whether losing stings; both played true. Whether a hurt party at a door faces a real
+decision is what the attrition numbers were built to answer, and neither run reached it: goblins
+do not spend enough hit points, and the one fight that does was invisible from the door. That goes
+to the generator, which inherits §5a as its encounter budget.
 
 The extract run walked the other door. Close was heard. They came out. That is what makes the first
 death a choice rather than a script.
@@ -215,7 +262,7 @@ death a choice rather than a script.
 > empty chapel, chose the north door, and fell in the vault with it. A 16-turn session took the
 > same box and climbed the south stair into grey daylight. Both logs replay identical. You can
 > lose a delve, you can leave with what you came for, and the first of those stung. That was the
-> question.
+> question. No door in either run was a hard call; that one stays open.
 
 ---
 
@@ -223,11 +270,16 @@ death a choice rather than a script.
 
 Findings, not tasks. The generator plan is next; these ride with it. Playtest leftovers are
 standalone beads, not children of the epic: `emberdelve-0v6`, `kac`, `2ks`, `5yj`, `vq3`, `eql`,
-`z0w`, `8kf`, and from the extract run `hhb`, `87x`, `i97`, `clw`, `4f9`.
+`z0w`, `8kf`, from the extract run `hhb`, `87x`, `i97`, `clw`, `4f9`, and from reading both logs
+afterwards `7o6`, `5md`, `zim`, `q8o`, `8xh`.
 
-- **The doubt window sat in the vault, not at 5 HP in a doorway.** Goblins still do not spend
-  enough hit points to make the chapel door a 5 HP problem. The brute does. Encounter, not max
-  HP, is still what places the window — the map's own finding, confirmed rather than overturned.
+- **The doubt window was never reached.** Seven goblins in five fights dealt 16 damage; three
+  fights dealt none. The lowest HP at any door was 10. The brute kills, but from 16 HP that is a
+  tail (14–25%), not a window, and nothing before the door announced it (`emberdelve-8xh`).
+  Encounter, not max HP, is still what places the window — and the sim that placed it gives every
+  foe a free approach turn play never gave (`emberdelve-q8o`).
+- **Markers have become the prop affordance, and a click on one is a full turn** with checks and
+  spawns behind it (`emberdelve-5md`).
 - **Failed talk starting a fight is the game.** Look-around no longer does. Do not "fix" a wary
   goblin that draws steel after a failed persuasion; play asked for that.
 - **LIGHT fill and room fires are different objects, and play now wants them coupled when the
