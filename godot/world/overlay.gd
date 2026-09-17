@@ -44,9 +44,14 @@ var _prop_mat: StandardMaterial3D
 var _blocked_mat: StandardMaterial3D
 
 
+## Refreshed by the World, not by Table.scene_changed directly — emberdelve-clw. As the World's
+## child this node is ready first and so would hear scene_changed first, painting legalMoves
+## through whichever room the World had not yet let go of. A crossing that starts a fight is
+## exactly that Scene. The World calls [method refresh] once it has taken the new room.
 func _ready() -> void:
 	_ensure()
-	Table.scene_changed.connect(refresh)
+	if _host() == null:
+		Table.scene_changed.connect(refresh)
 	refresh()
 
 

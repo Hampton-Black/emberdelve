@@ -734,6 +734,39 @@ func _crossed() -> Dictionary:
 	}
 
 
+func test_a_fight_started_by_a_crossing_paints_the_room_entered_not_the_room_left() -> void:
+	# emberdelve-clw: back through the door into the crypt, and a patrol makes it a fight on the
+	# same Scene. The overlay is the World's child, so it heard scene_changed first and painted
+	# legalMoves through the room the World had not yet let go of.
+	var world := _world_with_scene(_crossed())
+	await wait_process_frames(2)
+	var back := _crossed()
+	back["roomId"] = "crypt"
+	back["mode"] = "COMBAT"
+	back["entities"] = [
+		{"id": "keeper", "kind": "fighter", "name": "Roderick", "x": 6, "y": 10,
+			"hp": 12, "maxHp": 12, "isPlayerControlled": true},
+		{"id": "goblin", "kind": "goblin", "name": "Vessk", "x": 6, "y": 4,
+			"hp": 6, "maxHp": 6, "isPlayerControlled": false},
+	]
+	back["combat"] = _combat("keeper", [{"x": 3, "y": 2}], [])
+	Table.set_scene(back)
+	await wait_process_frames(2)
+
+	var moves := _overlay(world).get_node_or_null("Moves") as Node3D
+	assert_not_null(moves, "Overlay/Moves")
+	if moves == null:
+		return
+	assert_eq(moves.get_child_count(), 1)
+	if moves.get_child_count() != 1:
+		return
+	var painted: Vector3 = (moves.get_child(0) as Node3D).position
+	var in_crypt: Vector3 = world.grid_to_world("crypt", 3, 2)
+	var in_gallery: Vector3 = world.grid_to_world("gallery", 3, 2)
+	assert_almost_eq(painted.z, in_crypt.z, 0.001, "on the crypt's (3,2)")
+	assert_true(absf(painted.z - in_gallery.z) > 0.001, "not the gallery's (3,2)")
+
+
 func test_a_floor_click_lands_in_the_room_the_party_is_in() -> void:
 	var world := _world_with_scene(_crossed())
 	await wait_process_frames(2)

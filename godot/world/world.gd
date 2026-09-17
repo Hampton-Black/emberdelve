@@ -139,9 +139,18 @@ func _on_scene_changed() -> void:
 		_follow_party()
 		if rig:
 			rig.settle(Table.mode)
+		_refresh_overlay()
 		return
 	_sync_tokens()
 	_follow_party()
+	_refresh_overlay()
+
+
+## Last, so highlights are painted through the room just taken — see overlay.gd's _ready.
+func _refresh_overlay() -> void:
+	var overlay := get_node_or_null("Overlay")
+	if overlay != null and overlay.has_method("refresh"):
+		overlay.refresh()
 
 
 ## ALERT moved this room's fires. Rebuild only its Torches and re-apply lighting — not the
