@@ -1075,6 +1075,26 @@ func test_exploration_bar_shows_counts_and_hides_in_combat() -> void:
 	assert_false(bar.visible)
 
 
+func test_exploration_bar_comes_back_after_a_fight_without_a_crossing() -> void:
+	# emberdelve-0v6: the bar stayed gone until the next room entry.
+	Table.set_scene(_exploration_scene({"canSpendTorch": true}))
+	var bar := _exploration_bar()
+	Table.apply_diffs([
+		{"kind": "ModeChanged", "mode": "COMBAT"},
+		{"kind": "CombatChanged", "combat": _combat_view()},
+	])
+	await wait_seconds(1.4)
+	assert_false(bar.visible, "hidden while fighting")
+	Table.apply_diffs([
+		{"kind": "ModeChanged", "mode": "EXPLORATION"},
+		{"kind": "CombatChanged", "combat": null},
+	])
+	await wait_frames(2)
+	assert_false(bar.visible, "still hidden while the combat chrome dissolves")
+	await wait_seconds(Table.COMBAT_CLOSE_MS / 1000.0 + 0.15)
+	assert_true(bar.visible, "back once the dissolve is over, in the same room")
+
+
 func test_exploration_buttons_grey_when_the_server_says_so() -> void:
 	Table.set_scene(_exploration_scene({
 		"potions": 0, "torches": 1, "canSpendTorch": false,

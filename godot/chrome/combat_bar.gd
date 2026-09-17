@@ -21,7 +21,6 @@ const BAR_IN_MS := 200
 const CHIP_IN_MS := 260
 const CHROME_DELAY_MS := 760
 const CHROME_IN_MS := 320
-const CLOSE_MS := 400
 
 const INK := Color("d8cfc2")
 const YOURS := Color("7fae56")
@@ -207,7 +206,7 @@ func _settled() -> bool:
 		return true
 	var now := Time.get_ticks_msec()
 	if beat["closing_at"] != null:
-		return arrival(now, int(beat["closing_at"]), 0, CLOSE_MS) >= 1.0
+		return arrival(now, int(beat["closing_at"]), 0, Table.COMBAT_CLOSE_MS) >= 1.0
 	return arrival(now, int(beat["opened_at"]), CHROME_DELAY_MS, CHROME_IN_MS) >= 1.0
 
 
@@ -337,7 +336,7 @@ func _paint() -> void:
 	var chrome_t: float
 	var opened := int(beat["opened_at"])
 	if beat["closing_at"] != null:
-		bar_t = 1.0 - arrival(now, int(beat["closing_at"]), 0, CLOSE_MS)
+		bar_t = 1.0 - arrival(now, int(beat["closing_at"]), 0, Table.COMBAT_CLOSE_MS)
 		chrome_t = 1.0
 	else:
 		bar_t = arrival(now, opened, BAR_IN_DELAY_MS, BAR_IN_MS)

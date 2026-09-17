@@ -320,6 +320,9 @@ func _index_of_marker(id: String) -> int:
 # ---- The transcript, the rolls, and the fight
 
 const CEREMONY_MS := 1200
+## How long the last fight's chrome takes to dissolve. The beat is dropped once it has, and that
+## drop — not the mode flipping back — is what lets the exploration chrome return.
+const COMBAT_CLOSE_MS := 400
 
 signal transcript_changed()
 signal roll_thrown(result: Dictionary)
@@ -565,6 +568,9 @@ func _settle_combat(opened: bool, closed: bool) -> void:
 		if combat_beat != null and combat_beat["closing_at"] == null:
 			combat_beat["closing_at"] = now
 			combat_changed.emit()
+			var closing: Dictionary = combat_beat
+			get_tree().create_timer(COMBAT_CLOSE_MS / 1000.0).timeout.connect(
+				func() -> void: _drop_closed_beat(closing))
 		return
 
 	if view == null:
@@ -577,6 +583,15 @@ func _settle_combat(opened: bool, closed: bool) -> void:
 		combat_beat["view"] = view
 	else:
 		combat_beat = {"view": view, "opened_at": now - CEREMONY_MS, "closing_at": null}
+	combat_changed.emit()
+
+
+## Only the beat that started dissolving. A fight opened inside the dissolve, a reconnect, or a
+## reset has already replaced it, and dropping that one would hide a live fight.
+func _drop_closed_beat(closing: Dictionary) -> void:
+	if not is_same(combat_beat, closing):
+		return
+	combat_beat = null
 	combat_changed.emit()
 
 

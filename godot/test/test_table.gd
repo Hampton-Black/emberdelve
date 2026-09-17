@@ -453,6 +453,46 @@ func test_the_bar_outlives_the_fight_so_it_has_names_to_draw_while_it_dissolves(
 	assert_eq(Table.combat_beat["view"]["order"].size(), 2)
 
 
+func test_the_last_fight_lets_go_once_its_chrome_has_dissolved() -> void:
+	# emberdelve-0v6: nothing dropped the beat after the dissolve, so the exploration bar read a
+	# finished fight as a live one until a crossing shipped a fresh scene.
+	Table.apply_diffs([
+		{"kind": "ModeChanged", "mode": "COMBAT"},
+		{"kind": "CombatChanged", "combat": _combat()},
+	])
+	await wait_seconds(1.4)
+	watch_signals(Table)
+	Table.apply_diffs([
+		{"kind": "ModeChanged", "mode": "EXPLORATION"},
+		{"kind": "CombatChanged", "combat": null},
+	])
+	await wait_seconds(Table.COMBAT_CLOSE_MS / 1000.0 + 0.15)
+	assert_null(Table.combat_beat)
+	assert_signal_emit_count(Table, "combat_changed", 2, "once to start the dissolve, once to end it")
+
+
+func test_a_fight_opened_during_the_dissolve_is_not_dropped_with_the_last_one() -> void:
+	Table.apply_diffs([
+		{"kind": "ModeChanged", "mode": "COMBAT"},
+		{"kind": "CombatChanged", "combat": _combat()},
+	])
+	await wait_seconds(1.4)
+	Table.apply_diffs([
+		{"kind": "ModeChanged", "mode": "EXPLORATION"},
+		{"kind": "CombatChanged", "combat": null},
+	])
+	await wait_frames(2)
+	Table.apply_diffs([
+		{"kind": "ModeChanged", "mode": "COMBAT"},
+		{"kind": "CombatChanged", "combat": _combat()},
+	])
+	# Past the old beat's drop, and past the new fight's ceremony too: a hold still running when
+	# the test ends is in flight for the next one.
+	await wait_seconds(1.4)
+	assert_not_null(Table.combat_beat)
+	assert_null(Table.combat_beat["closing_at"])
+
+
 func test_a_reconnect_mid_fight_does_not_replay_the_ceremony() -> void:
 	# Backdated past the ceremony on purpose: replaying the drums would announce something that
 	# happened minutes ago.
