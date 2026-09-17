@@ -535,8 +535,12 @@ The full list is `docs/milestones/m3-evaluation.md` §8.
 The full list is `docs/milestones/m4-evaluation.md` §8. Playtest leftovers are standalone beads,
 not children of the epic.
 
-- **The doubt window sat in the vault, not at 5 HP in a doorway.** Two goblins still do not spend
-  enough hit points; a brute does. Encounter places the window.
+- **The doubt window was never reached, and spec §11 criterion 3 is not met.** The lowest HP at
+  any door was 10; seven goblins dealt 16 damage in five fights. The vault death was a tail roll
+  from 16 HP (14–25%), not a window, and nothing before the door announced the brute
+  (`emberdelve-8xh`). Encounter still places the window, but the sim that places it gives every
+  foe a free approach turn (`emberdelve-q8o`) — fix that before a generator budgets fights with
+  it. Re-measure on a generated site; do not tune the authored rooms for it.
 - **Failed talk starting a fight is the game.** Look-around no longer does. Do not patch a wary
   goblin that draws steel after a failed persuasion.
 - **LIGHT fill and room fires are different objects, and play now wants them coupled when the
