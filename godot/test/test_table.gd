@@ -324,6 +324,64 @@ func test_a_speaker_change_starts_a_new_paragraph() -> void:
 	assert_eq(Table.transcript.size(), 2)
 
 
+func test_an_arrival_after_a_finished_turn_is_its_own_paragraph() -> void:
+	# emberdelve-2ks: the door click takes the floor before the arrival lands, and the arrival
+	# used to read that as "still the same turn" and join the last narrator paragraph.
+	Table.append_narration({"speakerId": "narrator", "text": "The goblin falls still."})
+	Table.end_narration()
+	await wait_frames(4)
+	Table.cross_exit("door-north")
+	Table.append_narration({"speakerId": "narrator", "text": "Cold air, and a long gallery."})
+	await wait_frames(4)
+	assert_eq(Table.transcript.size(), 2)
+	if Table.transcript.size() == 2:
+		assert_eq(Table.transcript[1]["text"], "Cold air, and a long gallery.")
+
+
+func test_a_crossing_mid_speech_still_starts_a_new_paragraph() -> void:
+	Table.append_narration({"speakerId": "narrator", "text": "The goblin falls still."})
+	Table.cross_exit("door-north")
+	Table.append_narration({"speakerId": "narrator", "text": "Cold air, and a long gallery."})
+	await wait_frames(4)
+	assert_eq(Table.transcript.size(), 2)
+
+
+func test_a_rail_beat_after_a_finished_turn_is_its_own_paragraph() -> void:
+	# A rest or a potion click narrates with nobody having typed anything.
+	Table.append_narration({"speakerId": "narrator", "text": "The goblin falls still."})
+	Table.end_narration()
+	await wait_frames(4)
+	Table.append_narration({"speakerId": "narrator", "text": "You catch your breath."})
+	await wait_frames(4)
+	assert_eq(Table.transcript.size(), 2)
+
+
+func test_segment_whitespace_never_becomes_blank_lines() -> void:
+	# emberdelve-7o6, from the delve log at 14:21:54: narrator prose beside a quotation arrives
+	# with the model's newlines still on it.
+	Table.append_narration({"speakerId": "fighter", "text": "\"What were you doing in there?\""})
+	Table.append_narration({"speakerId": "narrator",
+		"text": "\n\nThe goblin spits and looks away. \n\n\n"})
+	Table.append_narration({"speakerId": "goblin", "text": "None of your business,"})
+	Table.append_narration({"speakerId": "narrator", "text": "  it says.\n\nThen, quieter:\n"})
+	await wait_frames(6)
+	assert_eq(Table.transcript.size(), 4)
+	if Table.transcript.size() == 4:
+		assert_eq(Table.transcript[1]["text"], "The goblin spits and looks away.")
+		assert_eq(Table.transcript[3]["text"], "it says. Then, quieter:")
+	for entry in Table.transcript:
+		assert_false(String(entry["text"]).contains("\n"), String(entry["text"]))
+
+
+func test_a_whitespace_only_segment_adds_nothing() -> void:
+	Table.append_narration({"speakerId": "narrator", "text": "It waits."})
+	Table.append_narration({"speakerId": "goblin", "text": "\n\n"})
+	Table.append_narration({"speakerId": "narrator", "text": "Then it moves."})
+	await wait_frames(6)
+	assert_eq(Table.transcript.size(), 1)
+	assert_eq(Table.transcript[0]["text"], "It waits. Then it moves.")
+
+
 func test_the_dm_gives_up_the_floor_behind_the_queue() -> void:
 	Table.append_narration({"speakerId": "narrator", "text": "done"})
 	Table.end_narration()

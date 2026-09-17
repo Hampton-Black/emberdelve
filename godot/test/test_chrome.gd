@@ -133,6 +133,20 @@ func test_prose_and_rolls_share_one_list_in_arrival_order() -> void:
 	assert_lt(roll_at, prose_at)
 
 
+func test_a_parley_renders_without_empty_lines_between_speakers() -> void:
+	# emberdelve-7o6: narrator prose beside a quotation used to carry the model's newlines into
+	# the record, and every exchange rendered with blank lines stacked between the speakers.
+	var record := _transcript()
+	Table.append_narration({"speakerId": "narrator", "text": "\n\nThe goblin spits. \n\n\n"})
+	Table.append_narration({"speakerId": "goblin", "text": "None of your business."})
+	Table.append_narration({"speakerId": "narrator", "text": "\nIt waits.\n"})
+	await wait_frames(6)
+	assert_eq(record.text,
+		"[color=#cfc4ae]The goblin spits.[/color]\n\n"
+		+ "[color=#8fae72]None of your business.[/color]\n\n"
+		+ "[color=#cfc4ae]It waits.[/color]")
+
+
 func test_the_log_rebuilds_when_table_changes_and_nothing_else_writes_it() -> void:
 	var record := _transcript()
 	assert_eq(record.text, "")

@@ -353,6 +353,11 @@ var dice_dismiss_at = null
 ## { "view": Dictionary, "opened_at": int, "closing_at": int or null }
 var combat_beat = null
 
+## Whether the next line from the same speaker extends the last paragraph. Open from a turn's
+## first line until the turn ends or a new one begins. Kept apart from awaiting_dm on purpose:
+## a door click takes the floor before its arrival lands, and the floor is not the paragraph.
+var _paragraph_open := false
+
 var error_message := ""
 
 
@@ -363,6 +368,7 @@ func _reset_talk() -> void:
 	active_roll = null
 	dice_dismiss_at = null
 	combat_beat = null
+	_paragraph_open = false
 	error_message = ""
 	Clock.silence_now()
 	transcript_changed.emit()
@@ -393,14 +399,22 @@ func append_narration(segment: Dictionary) -> void:
 		if active_roll != null and dice_dismiss_at == null:
 			dismiss_dice()
 
+		# The model's newlines are not paragraph breaks — emberdelve-7o6. Prose beside a
+		# quotation arrives wrapped in them, and stored verbatim they rendered as blank lines
+		# between every line of a parley. Breaks are decided below, by turn and by speaker.
+		var text := _flatten(String(segment["text"]))
+		if text.is_empty():
+			return
+
 		var last: Dictionary = transcript[-1] if not transcript.is_empty() else {}
-		if awaiting_dm and last.get("kind", "") == "prose" \
+		if _paragraph_open and last.get("kind", "") == "prose" \
 				and last.get("speakerId", "") == segment["speakerId"]:
-			last["text"] = _join_prose(String(last["text"]), String(segment["text"]))
+			last["text"] = _join_prose(String(last["text"]), text)
 		else:
 			transcript.append({"kind": "prose", "speakerId": String(segment["speakerId"]),
-				"text": String(segment["text"])})
-			awaiting_dm = true
+				"text": text})
+			_paragraph_open = true
+		awaiting_dm = true
 		transcript_changed.emit())
 
 
@@ -409,12 +423,14 @@ func append_narration(segment: Dictionary) -> void:
 func end_narration() -> void:
 	Clock.mark(func() -> void:
 		awaiting_dm = false
+		_paragraph_open = false
 		transcript_changed.emit())
 
 
 func say_as_player(text: String) -> void:
 	# A new turn drops the rest of the last one, but lets the sentence in the air finish.
 	Clock.silence()
+	_paragraph_open = false
 	transcript.append({"kind": "prose", "speakerId": "player", "text": text})
 	awaiting_dm = true
 	transcript_changed.emit()
@@ -460,6 +476,9 @@ func _dismiss_leave_confirm() -> void:
 
 func _send_cross(exit_id: String) -> void:
 	Clock.silence()
+	# The arrival is a new room, not more of the last turn — emberdelve-2ks. This click takes
+	# the floor before the arrival lands, which is what used to join the two.
+	_paragraph_open = false
 	awaiting_dm = true
 	transcript_changed.emit()
 	Net.enter_exit(exit_id)
@@ -469,6 +488,7 @@ func _send_cross(exit_id: String) -> void:
 ## fact the player pointed at.
 func inspect_marker(marker_id: String) -> void:
 	Clock.silence()
+	_paragraph_open = false
 	awaiting_dm = true
 	transcript_changed.emit()
 	Net.use_prop(marker_id, "inspect")
@@ -593,6 +613,12 @@ func _drop_closed_beat(closing: Dictionary) -> void:
 		return
 	combat_beat = null
 	combat_changed.emit()
+
+
+## One line of prose: every run of whitespace that holds a newline becomes a single space.
+func _flatten(text: String) -> String:
+	var breaks := RegEx.create_from_string("\\s*\\n\\s*")
+	return breaks.sub(text, " ", true).strip_edges()
 
 
 ## Segments arrive pre-trimmed of nothing, so join with exactly one space.
