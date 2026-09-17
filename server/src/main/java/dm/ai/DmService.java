@@ -7,6 +7,7 @@ import dm.model.ClockId;
 import dm.model.Combatant;
 import dm.model.Consumable;
 import dm.model.Event;
+import dm.model.Marker;
 import dm.model.Outcome;
 import dm.model.PartyLight;
 import dm.model.PartyMember;
@@ -94,6 +95,15 @@ public final class DmService {
      */
     static final String CLOSE = "The delve has ended. Two or three sentences. "
             + "Do not use the words won, lost, or failed. Do not say numbers.";
+
+    /**
+     * A click on a marker. The marker is something the narrator already said, so the click is
+     * recall, not a search — emberdelve-5md, where an emptied niche's SIGIL clicked four times
+     * rolled three checks and spawned a goblin.
+     */
+    static final String MARKER_RECALL = "The player is looking again at something already "
+            + "established, quoted in their line. Describe it from what is known, in a sentence "
+            + "or two. Nothing new is found there and nothing in the room changes.";
 
     /** Room-scoped register for a rest. Spec §8d. */
     static final String REST_DIRECTIVE = ClockTables.REST;
@@ -327,6 +337,37 @@ public final class DmService {
     }
 
     /**
+     * Narrates a click on a marker: prose only, with no mechanics pass and no reconcile, so the
+     * click can neither roll a check nor spawn, place or assert anything. Takes the lock rather
+     * than giving up — the player asked.
+     *
+     * <p>Logged as the player's line, like a typed turn, so the transcript reads the same after
+     * the fact. The line carries the tag and the text and never the square (pa8): a marker that
+     * prints (9,6) will be read aloud.
+     */
+    public void narrateMarker(String actorId, Marker marker, TurnSink sink) {
+        String line = "I look at the " + marker.tag().name() + ": " + marker.text();
+        engine.log().append(new Event.PlayerSaid(Instant.now(), actorId, line));
+        log.info("| {} | {}", actorId, line);
+
+        narrating.lock();
+        try {
+            var failed = new boolean[]{false};
+            // No repeat directive. Clicking a glyph twice is looking twice, and "narrate what is
+            // different now" is an invitation to invent the difference.
+            var prose = runProsePhase(line, List.of(), sink, failed, false, MARKER_RECALL, false);
+            if (failed[0]) {
+                return;
+            }
+            history.add(DmClient.ChatMessage.user(line));
+            history.add(DmClient.ChatMessage.assistant(prose.text()));
+        } finally {
+            narrating.unlock();
+        }
+        sink.complete();
+    }
+
+    /**
      * Handles a free-text turn. Blocking by design — each turn runs on its own virtual thread,
      * so the two-phase orchestration reads like ordinary sequential code.
      */
@@ -514,6 +555,13 @@ public final class DmService {
     private Prose runProsePhase(String text, List<String> mechanics, TurnSink sink,
                                 boolean[] failed, boolean inferUnmarkedQuotes,
                                 String arrivalDirective) {
+        return runProsePhase(text, mechanics, sink, failed, inferUnmarkedQuotes,
+                arrivalDirective, true);
+    }
+
+    private Prose runProsePhase(String text, List<String> mechanics, TurnSink sink,
+                                boolean[] failed, boolean inferUnmarkedQuotes,
+                                String arrivalDirective, boolean checkRepeat) {
         var narrated = new StringBuilder();
         var seed = inferUnmarkedQuotes ? soleCreature() : null;
         var parser = new NarrationParser(liveSpeakers(), seed, segment -> {
@@ -585,7 +633,7 @@ public final class DmService {
         // Said here rather than in the system prompt because it is only true on the turns where
         // it is true, and a standing "do not repeat yourself" is a rule the model has no way to
         // check itself against.
-        if (isRepeat(engine.log(), text)) {
+        if (checkRepeat && isRepeat(engine.log(), text)) {
             directive.append("The player has tried something like this before. ");
             narrationAfter(engine.log(), text).ifPresent(earlier -> directive
                     .append("Last time you told them, out loud:\n\n\"")

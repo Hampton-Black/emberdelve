@@ -439,10 +439,8 @@ public final class WsHandler {
                 .map(PartyMember::entityId)
                 .findFirst()
                 .orElse("fighter");
-        // Tag + text, never a grid coordinate — pa8: a visible marker that prints (9,6)
-        // will be read aloud.
-        String line = "I look at the " + marker.tag().name() + ": " + marker.text();
-        turns.submit(() -> dm.handleFreeText(actorId, line, turnSink(ctx)));
+        // Recall, not a turn: emberdelve-5md.
+        turns.submit(() -> dm.narrateMarker(actorId, marker, turnSink(ctx)));
     }
 
     private void pause() {
