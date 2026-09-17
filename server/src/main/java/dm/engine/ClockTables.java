@@ -56,6 +56,17 @@ public final class ClockTables {
     public static final String TORCH_RELIT =
             "The torch catches; the ring of light spreads again.";
 
+    /** Party-scoped clause when a potion is drunk. No number: the bar already shows it. */
+    public static final String POTION_DRUNK =
+            "A healing draught has just been drunk. A sentence — how it lands, never how much.";
+
+    /** Room-scoped clause when the party takes something, carrying what it is. */
+    public static String taken(String description, boolean objective) {
+        return "The party has just taken this: " + description
+                + (objective ? " It is what they came for." : "")
+                + " A sentence — it is in hand now.";
+    }
+
     /** Room-scoped clause when the party rests. Spec §8d. */
     public static final String REST =
             "The party has stopped to rest and catch their breath. A sentence or two — what "

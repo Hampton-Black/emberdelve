@@ -482,6 +482,8 @@ public final class GameEngine {
         } else {
             log.append(new Event.PropTaken(Instant.now(), state().roomId(), propId));
         }
+        directives.latch(Directive.aboutRoom(state().roomId(),
+                ClockTables.taken(definition.description(), objective)));
         return List.of(new Diff.PropRemoved(propId, state().holdingObjective(), scene().blocked()));
     }
 
@@ -1022,6 +1024,7 @@ public final class GameEngine {
         if (item == Consumable.POTION) {
             int hpTo = state().find(actorId).orElseThrow().hp();
             diffs.add(new Diff.StatChanged(actorId, "hp", hpFrom, hpTo));
+            directives.latch(Directive.aboutParty(ClockTables.POTION_DRUNK));
         }
         if (item == Consumable.TORCH) {
             diffs.addAll(resetLight());

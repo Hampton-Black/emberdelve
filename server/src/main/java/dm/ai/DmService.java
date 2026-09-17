@@ -256,6 +256,22 @@ public final class DmService {
     }
 
     /**
+     * Narrates a clicked potion or torch. Neither ticks a clock, which is why spec §8d left them
+     * silent; play found an item spent without a word to read as nothing having happened
+     * (emberdelve-kac). The engine has already latched the clause.
+     */
+    public void narrateItem(Consumable item, TurnSink sink) {
+        narrateRail(item == Consumable.TORCH
+                ? "The party lights a fresh torch."
+                : "The party drinks a potion.", sink);
+    }
+
+    /** Narrates a clicked take. The engine has already latched what was taken. emberdelve-kac. */
+    public void narrateTake(TurnSink sink) {
+        narrateRail("The party takes it.", sink);
+    }
+
+    /**
      * Narrates a click crossing and any clock signs that fired with it. Takes the lock rather
      * than giving up — a crossing ticks both clocks and may start a fight. Spec §8d.
      *

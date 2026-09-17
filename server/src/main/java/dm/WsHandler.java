@@ -150,9 +150,13 @@ public final class WsHandler {
             case "endTurn" -> act(ctx, sink ->
                     engine.combat().endTurn(message.path("actorId").asText(), sink));
 
-            case "useItem" -> sendDiffs(ctx, engine.useItem(
-                    message.path("actorId").asText("fighter"),
-                    Consumable.valueOf(message.path("item").asText("").toUpperCase())));
+            case "useItem" -> {
+                var item = Consumable.valueOf(message.path("item").asText("").toUpperCase());
+                sendDiffs(ctx, engine.useItem(message.path("actorId").asText("fighter"), item));
+                if (dm != null) {
+                    turns.submit(() -> dm.narrateItem(item, turnSink(ctx)));
+                }
+            }
 
             case "rest" -> {
                 String actorId = message.path("actorId").asText("fighter");
@@ -176,6 +180,9 @@ public final class WsHandler {
                 } else if ("take".equals(action)) {
                     try {
                         sendDiffs(ctx, engine.takeProp(id));
+                        if (dm != null) {
+                            turns.submit(() -> dm.narrateTake(turnSink(ctx)));
+                        }
                     } catch (IllegalArgumentException e) {
                         send(ctx, new ServerMessage.Error(e.getMessage()));
                     }

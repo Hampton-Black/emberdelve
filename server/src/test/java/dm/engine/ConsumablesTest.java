@@ -135,8 +135,8 @@ class ConsumablesTest {
     }
 
     @Test
-    @DisplayName("a torch latches a party-scoped relight directive; a potion does not")
-    void torchRelightDirective() {
+    @DisplayName("a torch and a potion each latch a party-scoped clause")
+    void itemDirectives() {
         engine.tickClock(ClockId.LIGHT);
 
         engine.useItem("fighter", Consumable.TORCH);
@@ -144,11 +144,16 @@ class ConsumablesTest {
         var waiting = engine.directives().snapshot();
         assertEquals(1, waiting.size());
         assertEquals(Directive.About.PARTY, waiting.getFirst().about());
-        assertFalse(engine.directives().snapshot().isEmpty());
+        assertEquals(ClockTables.TORCH_RELIT, waiting.getFirst().clause());
 
+        // Spec §8d left the potion silent because it moves no clock; play reversed it
+        // (emberdelve-kac).
         engine.directives().clear();
         engine.useItem("fighter", Consumable.POTION);
-        assertTrue(engine.directives().snapshot().isEmpty());
+        waiting = engine.directives().snapshot();
+        assertEquals(1, waiting.size());
+        assertEquals(Directive.About.PARTY, waiting.getFirst().about());
+        assertEquals(ClockTables.POTION_DRUNK, waiting.getFirst().clause());
     }
 
     @Test

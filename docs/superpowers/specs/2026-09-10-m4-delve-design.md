@@ -819,6 +819,12 @@ the sword comes out — the thing `AGENTS.md` calls the loudest fault in T10.
 LIGHT down, which fires nothing, and the player has just watched the pool come back; its relight
 directive waits for the next narration. A potion moves no clock.
 
+*Reversed in play, 2026-09-16 (`emberdelve-kac`).* A potion drunk, a torch lit and a reliquary
+taken, each in silence, read as nothing having happened — and a waiting relight clause was
+narrated on whatever spoke next, one room later. Every click on the bar and every take now latches
+its own clause and narrates it at once, the way a rest does. The rule is now **a player action
+that changes the party or the room narrates**, clock or not.
+
 - **A crossing takes `lock`, not `tryLock`, and one that finds the rail empty says nothing.** The
   asymmetry rule — narration the player asked for waits, narration the engine generated gives up —
   exists because a combat beat's facts are passed in and are lost if it is dropped. Directives wait
