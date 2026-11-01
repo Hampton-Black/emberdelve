@@ -3,7 +3,8 @@
 **Gate question: can the world be made rather than authored?** Unchanged since 2026-08-20. What it
 asks has changed, because there is now an authored world to measure a made one against.
 
-**Status:** Draft, 2026-09-16. Not approved. Supersedes
+**Status:** Approved, 2026-11-01. Drafted 2026-09-16; the six review questions are settled in §15,
+and the sections they touched say so. Supersedes
 `docs/superpowers/specs/2026-08-20-m1-procedural-generation-design.md` for M1's outstanding half and
 retires `docs/superpowers/plans/2026-08-21-m1-dungeon-navigation.md` (§12 says what lifts from it).
 Builds on M3's traversal spine and M4's delve. The single-room generator that merged under the
@@ -126,7 +127,7 @@ rules can be checked and the dress pass can be told what it is dressing.
 |---|---|---|
 | `ENTRANCE` | Holds the way out. A fight here is the lid's: the model's decision, at `goblinSpawn` | crypt |
 | `PASSAGE` | Between the entrance and the objective. Something to find, maybe a wary mob | gallery |
-| `OBJECTIVE` | Holds the reliquary. **No occupants**, so a rest after taking it is a real rest | chapel |
+| `OBJECTIVE` | Holds the reliquary. Empty, or mobs in about one site in three; never a brute. A rest after taking it is earned by clearing it (§7c) | chapel |
 | `DEPTH` | Beyond the objective. The mobs | undercroft |
 | `HOARD` | Deepest. The brute and the greed prize | vault |
 
@@ -167,11 +168,12 @@ One validator, pure, returning violations the way `SpatialValidator` does. It ch
 - **Roles.** Exactly one `ENTRANCE`, one `OBJECTIVE` and one `HOARD`. The objective within two
   crossings of the entrance. The hoard at maximum depth and not on the objective's path.
 - **Contents.** Every room has at least one hidden prop with a host (§7b). The reliquary is in the
-  objective room and nowhere else. The objective room holds no occupants. No room holds a brute
-  plus mobs.
+  objective room and nowhere else. The objective room holds no brute. No room holds a brute plus
+  mobs.
 - **Fires.** Where a room has a fires object, `to` differs from the initial preset in an allowed
   direction (§7e). At least one room per site moves brighter.
-- **Budget.** Authored fights within §7c's bounds.
+- **Budget.** Authored fights within §7c's bounds. Mobs in the objective room count against the
+  site's budget like any other room's.
 
 **The authored five-room site must pass `SiteRules`.** If the authored site fails a rule, then
 either the rule is wrong or the authored site broke the specification. Both are findings, and
@@ -214,6 +216,11 @@ of every log's meaning.** A change to `PropPlacer` would replay last week's evid
 against a different site. It would not refuse to replay. It would diverge silently, and
 `ReplayRunner` would report a stranger failure than a refused log ever gives.
 
+The alternative, stamping a generator version and refusing mismatched logs, was weighed in review
+and rejected (§15, Q1). Replays exist for debugging and for giving agents visibility into what
+happened in play. A log that stops replaying after a generator tweak fails both: a bug found in play
+could no longer be reproduced from the file that recorded it.
+
 So `SessionStarted` gets a sibling input event at session start:
 
 ```java
@@ -230,7 +237,8 @@ record SiteLaidOut(Instant at, long seed, List<RoomDefinition> rooms) implements
 - **The seed is recorded and no longer load-bearing for replay.** It is what `--generate <seed>`
   and `--dump <seed>` reproduce *on this build*, which is all a seed needs to do.
 
-This adds an event, so `Event.SCHEMA_VERSION` goes to 4 and the M4 evidence sessions are refused,
+This adds events (`SiteLaidOut` here, and `SiteDressed` for the site call's words, §8a), so
+`Event.SCHEMA_VERSION` goes to 4 and the M4 evidence sessions are refused,
 per the standing rule. Re-record `crypt-fight.jsonl`. Keep the M4 logs in `docs/evidence/` as a
 record, and replace them in the suite with an M1 session once one is played.
 
@@ -275,11 +283,18 @@ Occupants per role, as authored, with the generator choosing inside the bounds:
 |---|---|---|
 | `ENTRANCE` | none authored; the `goblinSpawn` slot for the lid | model's decision |
 | `PASSAGE` | none, or one mob | `WARY` |
-| `OBJECTIVE` | **none** | — |
+| `OBJECTIVE` | none, or mobs in about one site in three; **never a brute** | `WARY` |
 | `DEPTH` | two or three mobs | `WARY` |
 | `HOARD` | one brute | `HOSTILE` |
 
 Every room keeps a `goblinSpawn` slot, even when its occupant list is empty (M4 §14).
+
+**The objective room is not guaranteed empty** (§15, Q4). An always-empty objective room made the
+M4 rest a real one, and it also made the objective room predictable: a player who learns the rule
+knows the reliquary is never guarded. So about one site in three puts mobs there. Those mobs count
+against the site's fight budget, so another room in that site gets lighter, and `SiteRules` checks
+the total (§5a). The rest after the grab survives as something earned rather than given: a rest
+needs no living hostile in the room, so clearing the room is what buys it.
 
 **The numbers in that table wait on `emberdelve-q8o`.** M4 §5a's ladder gave every foe a free
 approach turn that play never gave. Without that turn, one brute from 16 HP goes from 14.4% to
@@ -311,10 +326,17 @@ so no room is told to move somewhere it cannot:
 `BRAZIERLIT` stays authored-only, as its javadoc says. At least one room per site moves brighter.
 The dress pass writes `lit` and `moved` (§8b).
 
-**`emberdelve-4f9` lands first, because it changes what a fires object means.** Once `LIGHT_OUT`
-puts the current room's fires out, a room whose `to` is brighter needs a ruling: does a dead torch
-darken a room whose fires were due to flare? Decide it in that bead, against the authored rooms,
-before any generator writes a `to`.
+**`emberdelve-4f9` lands first, because it changes what a fires object means.** Ruled in review
+(§15, Q5), and written into that bead's acceptance criteria:
+
+- **`LIGHT_OUT` puts the current room's fires out.** The room goes dark with the torch.
+- **A later ALERT fill whose move is brighter still applies it.** A room that went dark with the
+  torch flares to its `to` when ALERT fills, which reads as the patrol bringing fire.
+- **The party relighting its own torch never restores the room's fires.** LIGHT is the party's
+  light; only ALERT moves the room's.
+
+So a brighter `to` is never wasted and never contradicts a dead torch, and the generator may write
+one freely.
 
 ---
 
@@ -335,6 +357,16 @@ with no relationship to one another. So:
 The premise enters every room call and the narrator's `## The site` block. It is free-form model
 text that enters the prompt and reaches no engine, which is the `assert_fact` rule, already written
 down.
+
+**The site call's output is recorded, like every room's.** The premise is model-written, so it falls
+under §8b's lifetime rule: anything a model wrote is recorded. It goes into the log at session start
+as a `SiteDressed` event (name, premise, why the reliquary is here), beside `SiteLaidOut` and ahead
+of the `RoomDressed` events, and replay reads it back rather than calling a model. It is part of
+§6's schema 4.
+
+The site call was kept in review (§15, Q2). It costs one serial call ahead of the parallel five, and
+cohesion is the biggest immersion risk a generated site carries. Five rooms that do not belong to
+one place would be felt on the first crossing.
 
 ### 8b. What a room call writes
 
@@ -370,6 +402,11 @@ or `brute`. It writes a sign for that exit: armour shifting, a heavy breath, boo
   alive. A sign for a dead brute is a copper key.
 - **The kind of danger, never the size.** "Something heavy moves beyond the north door" helps the
   player decide. "A brute with 16 hit points" is a stat read aloud, which `dm.md` forbids.
+- **Written by the dress pass, with no automated check yet** (§15, Q3). Engine-owned sentences like
+  `ClockTables` would be consistent and could never overstate the danger; dress-pass signs sound
+  like the room, and that was judged the better trade. Whether signs land is judged in play. A sign
+  that lies about its door, telling of `mobs` where a brute waits or of nothing where mobs do, is a
+  contradiction under gate criterion 2 (§11), counted like any other.
 
 ### 8d. Dressed before play, behind the title
 
@@ -430,7 +467,7 @@ means re-tuning the generator against a moving target.
 | Bead | Why first |
 |---|---|
 | `emberdelve-q8o` | The encounter budget in §7c is this sim's output |
-| `emberdelve-4f9` | Settles what a fires object means before a generator writes a `to` |
+| `emberdelve-4f9` | Makes a fires object mean what §7e ruled, before a generator writes a `to` |
 | `emberdelve-5yj` | A generated site multiplies goblins |
 | `emberdelve-87x` | The dress prompt is rewritten in §8b; write it once, in the right noun |
 | `emberdelve-pa8` | Generated prop ids (`pillar-2`) are more ambiguous anchors than authored ones, and grid coordinates still leak into `## Established` |
@@ -455,7 +492,7 @@ Godot client, one copied to `docs/evidence/` to replay in the suite, and
 | 1 | **Each session is a delve to an ending** on a generated site: the objective found, the way out asked. One of the two may be lost. |
 | 2 | **Nothing on the board contradicts what the narrator was given.** Counted, not felt: door copy against `crossExit`, fire lines against the lighting shown, signs against what stood behind the door, reveal hints against the host a player searched. Invented content from play (corpse loot, the hotdog) is counted separately. It is a narrator finding, not a generator one. |
 | 3 | **Something was found.** At least one `reveal_prop` per session, from a hint the player followed. |
-| 4 | **Hurt, in front of a door, the decision is genuinely uncertain.** M4's criterion 3, re-asked on the site the generator budgeted, with a sign on the door. Judged by the player. If it fails again, that is a finding about the ladder and not a generator bug, and it gets a bead with the numbers. |
+| 4 | **Hurt, in front of a door, the decision is genuinely uncertain.** M4's criterion 3, re-asked on the site the generator budgeted, with a sign on the door. Judged by the player. **This gates M1, and it passes if either session delivers the moment** (§15, Q6). If neither does, M1 does not pass. The failure is a finding about the ladder rather than a generator bug, and it gets a bead with the numbers. |
 | 5 | **The two sites read as two places.** Judged by the player. Recorded beside it: the mush check, twenty `--dump`ed sites read before the sessions, noting whether room roles and premises repeat. |
 | 6 | **Both sessions replay offline, identical**, and still replay after a deliberate change to `PropPlacer` on a scratch branch. §6 exists to make this row true. |
 | 7 | **The authored site still passes `SiteRules`, boots under `--site authored`, and its fixtures replay.** |
@@ -530,8 +567,8 @@ for that cleanup).
    that closes `xgg.9`, and `--dump` of the placed site.
 6. **Contents by role** (§7): appearances in kits, hidden props behind hosts, takeables, occupants,
    fires. `SiteRules` passes on a thousand seeds.
-7. **The dress pass** (§8): the site call, parallel room calls, the grown `Dressing`, signs in
-   `## Ways out`, and the title waiting on it.
+7. **The dress pass** (§8): the site call and its `SiteDressed` record, parallel room calls, the
+   grown `Dressing`, signs in `## Ways out`, and the title waiting on it.
 8. **The dress model measurement** (§8e) over twenty dumped sites.
 9. **The live seed** (§9): DESCEND AGAIN draws one, and `--generate` and `--site authored` work.
 10. **The mush check**, then **play the gate** (§11).
@@ -541,25 +578,16 @@ whose output can be looked at, and step 7 the first that can be played.
 
 ---
 
-## 15. Open questions for review
+## 15. Review questions, settled 2026-11-01
 
-Each of these is decided above with a recommendation. They are the ones worth a second opinion
-before approval.
+Six questions were left open in the draft. Each was settled in a one-at-a-time review, and the
+section it touched now says so.
 
-1. **Record the structure (§6), or stamp a generator version and refuse mismatched logs?**
-   Recording keeps evidence sessions replaying forever and costs a schema bump now. Refusing is
-   smaller, and it means every generator tweak retires the evidence.
-2. **Two dress passes, site then rooms (§8a), or rooms alone?** The site pass is the answer to
-   coherence and costs one serial call. The old plan's advice was to run the mush check before
-   reaching for any fix.
-3. **Signs on exits (§8c): from the dress pass, or engine-owned sentences like `ClockTables`?**
-   Engine sentences are consistent and can never overstate the danger. Dress-pass signs sound
-   like the room. The draft picks the dress pass, with a closed set of danger kinds as input.
-4. **Should the objective room be guaranteed empty (§7c)?** It is what made the M4 rest a real one,
-   and it is the answer to M4 §13's open question about a room the party can rest in. It also makes
-   the objective room predictable.
-5. **What does `LIGHT_OUT` do to a room whose fires were due to move brighter (§7e)?** Belongs to
-   `emberdelve-4f9`; flagged here because the generator cannot write a `to` until it is answered.
-6. **Does criterion 4 gate M1?** M4 passed without its version of it. The draft makes it a
-   criterion because the generator is now the thing that owns the budget. A second failure would
-   then fail M1 rather than being carried forward again.
+| # | Question | Settled |
+|---|---|---|
+| 1 | Record the structure (§6), or stamp a generator version and refuse mismatched logs? | **Record it**, as `SiteLaidOut` at schema 4. Replays are for debugging and agent visibility, so a log must keep reproducing after the generator changes. |
+| 2 | Two dress passes, site then rooms (§8a), or rooms alone? | **Two passes**: the site call first, then the five rooms in parallel. Cohesion is the biggest immersion risk. The site call is model-written, so it is recorded too (`SiteDressed`). |
+| 3 | Signs on exits (§8c): from the dress pass, or engine-owned sentences? | **The dress pass**, from a closed set of danger kinds, with no automated check for now; judged in play. A sign that lies about its door counts under criterion 2. |
+| 4 | Should the objective room be guaranteed empty (§7c)? | **No.** Empty, or mobs in about one site in three; never a brute. Those mobs count against the site's fight budget and `SiteRules` checks it. The rest after the grab is earned by clearing the room. |
+| 5 | What does `LIGHT_OUT` do to a room whose fires were due to move brighter (§7e)? | `LIGHT_OUT` puts the room's fires out. A later ALERT fill whose move is brighter still applies, so the room flares. The party's own relight never restores the room's fires. The generator may write a brighter `to` freely. Carried into `emberdelve-4f9`. |
+| 6 | Does criterion 4 gate M1? | **Yes**, and it passes if either of the two sessions delivers it (§11). |
