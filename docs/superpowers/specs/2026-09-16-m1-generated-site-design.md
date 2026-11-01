@@ -332,6 +332,10 @@ The dress pass writes `lit` and `moved` (§8b).
 - **`LIGHT_OUT` puts the current room's fires out.** The room goes dark with the torch.
 - **A later ALERT fill whose move is brighter still applies it.** A room that went dark with the
   torch flares to its `to` when ALERT fills, which reads as the patrol bringing fire.
+- **Any later ALERT move applies to its target, whatever its direction from the initial preset.**
+  The torch goes out, the room goes `DARK`, and a `TORCHLIT` room that was due to dim then goes to
+  `DIM` when ALERT fills. `DIM` is still brighter than pitch dark, and the world's moves are the
+  world bringing fire. A move is never cancelled because the torch already darkened the room.
 - **The party relighting its own torch never restores the room's fires.** LIGHT is the party's
   light; only ALERT moves the room's.
 
@@ -589,5 +593,5 @@ section it touched now says so.
 | 2 | Two dress passes, site then rooms (§8a), or rooms alone? | **Two passes**: the site call first, then the five rooms in parallel. Cohesion is the biggest immersion risk. The site call is model-written, so it is recorded too (`SiteDressed`). |
 | 3 | Signs on exits (§8c): from the dress pass, or engine-owned sentences? | **The dress pass**, from a closed set of danger kinds, with no automated check for now; judged in play. A sign that lies about its door counts under criterion 2. |
 | 4 | Should the objective room be guaranteed empty (§7c)? | **No.** Empty, or mobs in about one site in three; never a brute. Those mobs count against the site's fight budget and `SiteRules` checks it. The rest after the grab is earned by clearing the room. |
-| 5 | What does `LIGHT_OUT` do to a room whose fires were due to move brighter (§7e)? | `LIGHT_OUT` puts the room's fires out. A later ALERT fill whose move is brighter still applies, so the room flares. The party's own relight never restores the room's fires. The generator may write a brighter `to` freely. Carried into `emberdelve-4f9`. |
+| 5 | What does `LIGHT_OUT` do to a room whose fires were due to move brighter (§7e)? | `LIGHT_OUT` puts the room's fires out. A later ALERT move still applies to its target, so the room flares, and a move to `DIM` puts the dark room at `DIM` (settled as a follow-up, same day). The party's own relight never restores the room's fires. The generator may write a brighter `to` freely. Carried into `emberdelve-4f9`. |
 | 6 | Does criterion 4 gate M1? | **Yes**, and it passes if either of the two sessions delivers it (§11). |
